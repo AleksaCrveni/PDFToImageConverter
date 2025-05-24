@@ -46,7 +46,11 @@ namespace Converter.Parsers
       ParsePdfVersionFromHeader(stream, ref pdfVersion);
       return GetCrossRefByteOffset(stream);
     }
-    
+
+    // TODO: account for this later
+    // Comment from spec:
+    // Beginning with PDF 1.4, the VErsion entry in the document's catalog dictionary (lcoated via the Root entry in the file's trailer
+    // as described in 7.5.5, if present, shall be used instead of version specified in the Header
     private void ParsePdfVersionFromHeader(Stream stream, ref PDFVersion version)
     {
 
