@@ -1,4 +1,6 @@
-﻿using System.Globalization;
+﻿using System;
+using System.Globalization;
+using System.Reflection.Metadata.Ecma335;
 using System.Runtime.Versioning;
 using System.Text;
 
@@ -9,6 +11,7 @@ namespace Converter.Parsers
   {
     StringBuilder _sb;
     private readonly byte _newLineByte = 10;
+    private readonly string _trailerConst = "trailer";
     public PdfParser()
     {
       _sb = new StringBuilder();
@@ -41,14 +44,84 @@ namespace Converter.Parsers
     }
 
     // return some kind of struct
-    public ulong Parse(string filepath)
+    public PDFFile Parse(string filepath)
     {
       var stream = (Stream)File.OpenRead(filepath);
       // go to end to find byte offset to cross refernce table
-      PDFVersion pdfVersion = PDFVersion.V1_0;
-      ParsePdfVersionFromHeader(stream, ref pdfVersion);
-      return GetLastCrossRefByteOffset(stream);
+      PDFFile file = new PDFFile();
+      ReadInitialData(stream, file);
+      return file;
     }
+
+    // Read PDFVersion, Byte offset for last cross reference table, file trailer
+
+    void ReadInitialData(Stream stream, PDFFile file)
+    {
+
+      file.PdfVersion = ParsePdfVersionFromHeader(stream);
+      // Read last 1024 bytes and trailer, startxref, (last)cross reference tables bytes and %%EOF
+      stream.Seek(-1024, SeekOrigin.End);
+      Span<byte> footerBuffer = stackalloc byte[1024];
+      int readBytes = stream.Read(footerBuffer);
+      if (readBytes != footerBuffer.Length)
+        throw new InvalidDataException("Invalid data");
+
+
+      ParseHelper parseHelper = new ParseHelper(footerBuffer);
+      file.Trailer = ParseTrailer(ref parseHelper);
+      file.LastCrossReferenceOffset = ParseLastCrossRefByteOffset(footerBuffer, );
+      file.PdfVersion = ParsePdfVersionFromHeader(stream);
+
+
+
+
+
+
+
+
+      //long starter = stream.Position;
+      //int b = stream.ReadByte();
+      //while (b != )
+      //{
+      //  ReadChar();
+      //}
+
+      //string literal = _internal.Slice(starter, _position - starter).ToString();
+      //return literal switch
+      //{
+      //  "let" => new Token(TokenType.LET, literal),
+      //  "fn" => new Token(TokenType.FUNCTION, literal),
+      //  "if" => new Token(TokenType.IF, literal),
+      //  "else" => new Token(TokenType.ELSE, literal),
+      //  "true" => new Token(TokenType.TRUE, literal),
+      //  "false" => new Token(TokenType.FALSE, literal),
+      //  "return" => new Token(TokenType.RETURN, literal),
+      //  _ => new Token(TokenType.IDENT, literal)
+      //};
+    }
+    // TODO: test case when trailer is not complete ">>" can't be found after opening brackets
+    private Trailer ParseTrailer(ref ParseHelper helper)
+    {
+      Trailer trailer = new Trailer();
+      string tokenString = helper.GetNextString();
+      int tokenInt = 0;
+      while (tokenString != string.Empty)
+      {
+        if (tokenString == _trailerConst)
+        {
+          tokenString = helper.GetNextString();
+          if (tokenString == "<<")
+          {
+
+            // parse and end when ">>"
+            while (tokenString)
+          }
+        }
+        tokenString = helper.GetNextString();
+      }
+    }
+
+
 
     // TODO: account for this later
     // Comment from spec:
@@ -56,10 +129,10 @@ namespace Converter.Parsers
     // as described in 7.5.5, if present, shall be used instead of version specified in the Header
     // TODO: I really should have just compared and parsed the string instead of trying to act smart
     // because i will have to parse entire file and heapallock anyways
-    private void ParsePdfVersionFromHeader(Stream stream, ref PDFVersion version)
+    private PDFVersion ParsePdfVersionFromHeader(Stream stream)
     {
-
-      stream.Seek(0, SeekOrigin.Begin);
+      // We parse this first so we should already be at 0
+      // stream.Seek(0, SeekOrigin.Begin);
 
       Span<byte> buffer = stackalloc byte[8];
       int bytesRead = stream.Read(buffer);
@@ -88,28 +161,28 @@ namespace Converter.Parsers
         switch (minorVersion)
         {
           case (byte)30:
-            version = PDFVersion.V1_0;
+            return PDFVersion.V1_0;
             break;
           case (byte)31:
-            version = PDFVersion.V1_1;
+            return PDFVersion.V1_1;
             break;
           case (byte)32:
-            version = PDFVersion.V1_2;
+            return PDFVersion.V1_2;
             break;
           case (byte)33:
-            version = PDFVersion.V1_3;
+            return PDFVersion.V1_3;
             break;
           case (byte)34:
-            version = PDFVersion.V1_4;
+            return PDFVersion.V1_4;
             break;
           case (byte)35:
-            version = PDFVersion.V1_5;
+            return PDFVersion.V1_5;
             break;
           case (byte)36:
-            version = PDFVersion.V1_6;
+            return PDFVersion.V1_6;
             break;
           case (byte)37:
-            version = PDFVersion.V1_7;
+            return PDFVersion.V1_7;
             break;
           default:
             throw new InvalidDataException("Invalid data");
@@ -120,7 +193,7 @@ namespace Converter.Parsers
         switch (minorVersion)
         {
           case (byte)30:
-            version = PDFVersion.V2_0;
+            return PDFVersion.V2_0;
             break;
           default:
             throw new InvalidDataException("Invalid data");
@@ -134,8 +207,9 @@ namespace Converter.Parsers
     // The trailer of a PDF file enables a conforming reader to quickly find the cross-reference table and certain special objects.
     // Conforming readers should read a PDF file from its end. The last line of the file shall contain only the end-of-file marker, %%EOF
     // https://stackoverflow.com/questions/11896858/does-the-eof-in-a-pdf-have-to-appear-within-the-last-1024-bytes-of-the-file
-    private ulong GetLastCrossRefByteOffset(Stream stream)
+    private ulong ParseLastCrossRefByteOffset(Stream stream)
     {
+      stream.Seek(-6, SeekOrigin.End);
       bool found = false;
       sbyte index = 0;
 
@@ -145,7 +219,6 @@ namespace Converter.Parsers
       // not sure if this is needed, but validate if %%EOF exists
       Span<byte> _eofBytes = stackalloc byte[6] { 37, 37, 69, 79, 70, 10 };
       Span<byte> _eofByteBuffer = stackalloc byte[6];
-      stream.Seek(-6, SeekOrigin.End);
       int bytesRead = stream.Read(_eofByteBuffer);
       if (bytesRead != _eofByteBuffer.Length)
         throw new InvalidDataException("Invalid data");
@@ -182,7 +255,6 @@ namespace Converter.Parsers
         if (!char.IsDigit((char)buffer[index]))
           throw new InvalidDataException("Invalid data");
         value = value * 10 + (ulong)CharUnicodeInfo.GetDecimalDigitValue((char)buffer[index]);
-        
       }
       return value;
     }
@@ -194,6 +266,7 @@ namespace Converter.Parsers
   // so i think i dont need these enums since header in files is 2_0 OR 1_7
   enum PDFVersion
   {
+    INVALID,
     V1_0,
     V1_1,
     V1_2,
@@ -207,15 +280,21 @@ namespace Converter.Parsers
     V2_0_2020
   }
   
+  // Spec reference on page 51
+  // Table 15
   struct Trailer
   {
-    int Size;
-    int Prev;
-    (int, int) RootIR;
+    
+    public int Size;
+    public int Prev;
+    public (int, int) RootIR;
     // not sure what it is, fix later
-    Dictionary<object, object> Encrypt;
-    (int, int, char) InfoIR;
-    List<string> ID;
+    public Dictionary<object, object> Encrypt;
+    public (int, int) InfoIR;
+    public List<string> ID;
+    // Only in hybrid-reference file
+    // The byte offset in the decoded stream from the bgegging of the file of a cross reference stream
+    public int XrefStm;
   }
 
 }
