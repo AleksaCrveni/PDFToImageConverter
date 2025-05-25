@@ -1,8 +1,10 @@
 ﻿using System.Globalization;
+using System.Runtime.Versioning;
 using System.Text;
 
 namespace Converter.Parsers
 {
+  // Note to myself - when dealing with variables that are indirect references add 'IR' on the end of the name
   public class PdfParser
   {
     StringBuilder _sb;
@@ -23,6 +25,7 @@ namespace Converter.Parsers
       {
         cArr[i] = (char)arr[i];
         c = (char)arr[i];
+        // TODO: Improve EOL check - (SP CR, SP LF, CR LF) are possible Eend of lines
         if (c == '\n')
         {
           lines.Add(sb.ToString());
@@ -44,13 +47,15 @@ namespace Converter.Parsers
       // go to end to find byte offset to cross refernce table
       PDFVersion pdfVersion = PDFVersion.V1_0;
       ParsePdfVersionFromHeader(stream, ref pdfVersion);
-      return GetCrossRefByteOffset(stream);
+      return GetLastCrossRefByteOffset(stream);
     }
 
     // TODO: account for this later
     // Comment from spec:
     // Beginning with PDF 1.4, the VErsion entry in the document's catalog dictionary (lcoated via the Root entry in the file's trailer
     // as described in 7.5.5, if present, shall be used instead of version specified in the Header
+    // TODO: I really should have just compared and parsed the string instead of trying to act smart
+    // because i will have to parse entire file and heapallock anyways
     private void ParsePdfVersionFromHeader(Stream stream, ref PDFVersion version)
     {
 
@@ -129,7 +134,7 @@ namespace Converter.Parsers
     // The trailer of a PDF file enables a conforming reader to quickly find the cross-reference table and certain special objects.
     // Conforming readers should read a PDF file from its end. The last line of the file shall contain only the end-of-file marker, %%EOF
     // https://stackoverflow.com/questions/11896858/does-the-eof-in-a-pdf-have-to-appear-within-the-last-1024-bytes-of-the-file
-    private ulong GetCrossRefByteOffset(Stream stream)
+    private ulong GetLastCrossRefByteOffset(Stream stream)
     {
       bool found = false;
       sbyte index = 0;
@@ -201,4 +206,17 @@ namespace Converter.Parsers
     V2_0,
     V2_0_2020
   }
+  
+  struct Trailer
+  {
+    int Size;
+    int Prev;
+    (int, int) RootIR;
+    // not sure what it is, fix later
+    Dictionary<object, object> Encrypt;
+    (int, int, char) InfoIR;
+    List<string> ID;
+  }
+
 }
+
