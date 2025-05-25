@@ -1,9 +1,11 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
-VisualStudioVersion = 17.13.35825.156 d17.13
+VisualStudioVersion = 17.13.35825.156
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Converter", "Converter\Converter.csproj", "{A17FAD41-075B-456B-92B7-2B9B67686077}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "StringToByteConverter", "StringToByteConverter\StringToByteConverter.csproj", "{07AD219C-7A23-4B27-9155-49530EF53EE3}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -15,6 +17,10 @@ Global
 		{A17FAD41-075B-456B-92B7-2B9B67686077}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{A17FAD41-075B-456B-92B7-2B9B67686077}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{A17FAD41-075B-456B-92B7-2B9B67686077}.Release|Any CPU.Build.0 = Release|Any CPU
+		{07AD219C-7A23-4B27-9155-49530EF53EE3}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{07AD219C-7A23-4B27-9155-49530EF53EE3}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{07AD219C-7A23-4B27-9155-49530EF53EE3}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{07AD219C-7A23-4B27-9155-49530EF53EE3}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
