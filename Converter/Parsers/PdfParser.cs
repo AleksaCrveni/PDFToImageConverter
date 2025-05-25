@@ -7,6 +7,7 @@ using System.Text;
 namespace Converter.Parsers
 {
   // Note to myself - when dealing with variables that are indirect references add 'IR' on the end of the name
+  // TODO: Am I stupid or i can just compare characters directly instead of bytes........................
   public class PdfParser
   {
     StringBuilder _sb;
