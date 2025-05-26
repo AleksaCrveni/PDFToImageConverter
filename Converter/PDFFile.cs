@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 
 namespace Converter
 {
-  class PDFFile
+  public class PDFFile
   {
     public PDFVersion PdfVersion { get; set; } = PDFVersion.INVALID;
     public ulong LastCrossReferenceOffset { get; set; }
