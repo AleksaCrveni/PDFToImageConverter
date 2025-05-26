@@ -70,35 +70,8 @@ namespace Converter.Parsers
 
       ParseHelper parseHelper = new ParseHelper(footerBuffer);
       file.Trailer = ParseTrailer(ref parseHelper);
-      file.LastCrossReferenceOffset = ParseLastCrossRefByteOffset(footerBuffer, );
-      file.PdfVersion = ParsePdfVersionFromHeader(stream);
-
-
-
-
-
-
-
-
-      //long starter = stream.Position;
-      //int b = stream.ReadByte();
-      //while (b != )
-      //{
-      //  ReadChar();
-      //}
-
-      //string literal = _internal.Slice(starter, _position - starter).ToString();
-      //return literal switch
-      //{
-      //  "let" => new Token(TokenType.LET, literal),
-      //  "fn" => new Token(TokenType.FUNCTION, literal),
-      //  "if" => new Token(TokenType.IF, literal),
-      //  "else" => new Token(TokenType.ELSE, literal),
-      //  "true" => new Token(TokenType.TRUE, literal),
-      //  "false" => new Token(TokenType.FALSE, literal),
-      //  "return" => new Token(TokenType.RETURN, literal),
-      //  _ => new Token(TokenType.IDENT, literal)
-      //};
+      // TODO use parsehelper dont seek and copy again
+      file.LastCrossReferenceOffset = ParseLastCrossRefByteOffset(stream);
     }
     // TODO: test case when trailer is not complete ">>" can't be found after opening brackets
     private Trailer ParseTrailer(ref ParseHelper helper)
@@ -113,17 +86,28 @@ namespace Converter.Parsers
           tokenString = helper.GetNextString();
           if (tokenString == "<<")
           {
-
-            // parse and end when ">>"
-            while (tokenString)
+            tokenString = helper.GetNextString();
+            while (tokenString != "" || tokenString != ">>")
+            {
+              // TODO: Probably move this to normal switch or if statement because of string alloc in case key is not found
+              object _ = tokenString switch
+              {
+                "/Size" => trailer.Size = helper.GetNextInt32Strict(),
+                "/Root" => trailer.RootIR = helper.GetNextIndirectReference(),
+                "/Info" => trailer.InfoIR = helper.GetNextIndirectReference(),
+                "/Encrypt" => trailer.EncryptIR = helper.GetNextIndirectReference(),
+                "/Prev" => trailer.Prev = helper.GetNextInt32Strict(),
+                "/ID" => trailer.ID = helper.GetNextArrayKnownLengthStrict(2),
+                _ => ""
+              };
+              tokenString = helper.GetNextString();
+            }
           }
         }
         tokenString = helper.GetNextString();
       }
+      return trailer;
     }
-
-
-
     // TODO: account for this later
     // Comment from spec:
     // Beginning with PDF 1.4, the VErsion entry in the document's catalog dictionary (lcoated via the Root entry in the file's trailer
@@ -290,9 +274,9 @@ namespace Converter.Parsers
     public int Prev;
     public (int, int) RootIR;
     // not sure what it is, fix later
-    public Dictionary<object, object> Encrypt;
+    public (int, int) EncryptIR;
     public (int, int) InfoIR;
-    public List<string> ID;
+    public string[] ID;
     // Only in hybrid-reference file
     // The byte offset in the decoded stream from the bgegging of the file of a cross reference stream
     public int XrefStm;

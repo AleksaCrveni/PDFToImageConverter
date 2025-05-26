@@ -19,7 +19,6 @@ namespace Converter.Parsers
     {
       _buffer = (ReadOnlySpan<byte>)buffer;
     }
-    
     public string GetNextString()
     {
       SkipWhiteSpace();
@@ -32,7 +31,17 @@ namespace Converter.Parsers
 
       return _buffer.Slice(starter, _position - starter).ToString();
     }
-
+    
+    public (int, int) GetNextIndirectReference()
+    {
+      (int a, int b) res;
+      res.a = GetNextInt32Strict();
+      res.b = GetNextInt32Strict();
+      SkipWhiteSpace();
+      if (_char != 'R')
+        throw new InvalidDataException("Invalid trailer data. Expected R");
+      return res;
+    }
 
     public int GetNextInt32Strict()
     {
@@ -55,6 +64,32 @@ namespace Converter.Parsers
         result = result * 10 + (int)CharUnicodeInfo.GetDecimalDigitValue((char)numberInBytes[i]);
       }
       return result;
+    }
+
+    public string[] GetNextArrayKnownLengthStrict(int len)
+    {
+      string[] res = new string[len];
+      SkipWhiteSpace();
+      if (_char != '[')
+        throw new InvalidDataException("Invalid trailer data. Expected Array");
+      for (int i = 0; i < len; i++)
+        res[i] = ReadArrayElement();
+      return res;
+    }
+    public string ReadArrayElement()
+    {
+      SkipWhiteSpace();
+      ReadChar();
+      if (_char != '<')
+        throw new InvalidDataException("Invalid trailer data. Expected Array");
+
+      int starter = _position;
+      ReadChar();
+      while (_char != '>' || _char != 0x00)
+        ReadChar();
+      if (_char == 0x00)
+        throw new InvalidDataException("Invalid trailer data. Expected Array");
+      return _buffer.Slice(starter, _position - starter).ToString();
     }
 
     public byte GetNextDigitStrict()
