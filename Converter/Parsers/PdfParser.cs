@@ -84,10 +84,12 @@ namespace Converter.Parsers
         if (tokenString == _trailerConst)
         {
           tokenString = helper.GetNextString();
+
+          // Maybe move this to dictionary parsing
           if (tokenString == "<<")
           {
             tokenString = helper.GetNextString();
-            while (tokenString != "" || tokenString != ">>")
+            while (tokenString != "" && tokenString != ">>")
             {
               // TODO: Probably move this to normal switch or if statement because of string alloc in case key is not found
               object _ = tokenString switch
@@ -102,9 +104,16 @@ namespace Converter.Parsers
               };
               tokenString = helper.GetNextString();
             }
+            // Means that dict is corrupt
+            if (tokenString == "")
+              throw new InvalidDataException("Invalid dictionary");
+            break;
           }
         }
-        tokenString = helper.GetNextString();
+        else
+        {
+          tokenString = helper.GetNextString();
+        }
       }
       return trailer;
     }
@@ -123,50 +132,50 @@ namespace Converter.Parsers
       int bytesRead = stream.Read(buffer);
       if (bytesRead != buffer.Length)
         throw new InvalidDataException("Invalid data");
-      // checking for %PDF- in bytes
-      if (buffer[0] != (byte)25)
+      // checking for %PDF-X.X in bytes
+      if (buffer[0] != (byte)0x25)
         throw new InvalidDataException("Invalid data");
-      if (buffer[1] != (byte)50)
+      if (buffer[1] != (byte)0x50)
         throw new InvalidDataException("Invalid data");
-      if (buffer[2] != (byte)44)
+      if (buffer[2] != (byte)0x44)
         throw new InvalidDataException("Invalid data");
-      if (buffer[3] != (byte)46)
+      if (buffer[3] != (byte)0x46)
         throw new InvalidDataException("Invalid data");
-      if (buffer[4] != (byte)2d)
+      if (buffer[4] != (byte)0x2d)
         throw new InvalidDataException("Invalid data");
       // checking version
       byte majorVersion = buffer[5]; 
-      if (majorVersion != (byte)31 && majorVersion != (byte)32)
+      if (majorVersion != (byte)0x31 && majorVersion != (byte)0x32)
         throw new InvalidDataException("Invalid data");
-      if (buffer[6] != CharUnicodeInfo.GetDecimalDigitValue('.'))
+      if (buffer[6] != (byte)0x2e)
         throw new InvalidDataException("Invalid data");
       byte minorVersion = buffer[7];
-      if (majorVersion == (byte)31)
+      if (majorVersion == (byte)0x31)
       {
         switch (minorVersion)
         {
-          case (byte)30:
+          case (byte)0x30:
             return PDFVersion.V1_0;
             break;
-          case (byte)31:
+          case (byte)0x31:
             return PDFVersion.V1_1;
             break;
-          case (byte)32:
+          case (byte)0x32:
             return PDFVersion.V1_2;
             break;
-          case (byte)33:
+          case (byte)0x33:
             return PDFVersion.V1_3;
             break;
-          case (byte)34:
+          case (byte)0x34:
             return PDFVersion.V1_4;
             break;
-          case (byte)35:
+          case (byte)0x35:
             return PDFVersion.V1_5;
             break;
-          case (byte)36:
+          case (byte)0x36:
             return PDFVersion.V1_6;
             break;
-          case (byte)37:
+          case (byte)0x37:
             return PDFVersion.V1_7;
             break;
           default:
@@ -177,7 +186,7 @@ namespace Converter.Parsers
       {
         switch (minorVersion)
         {
-          case (byte)30:
+          case (byte)0x30:
             return PDFVersion.V2_0;
             break;
           default:
@@ -249,7 +258,7 @@ namespace Converter.Parsers
 
   // extensions should be directly supported instead of normal versions for 1_7 and 2_0
   // so i think i dont need these enums since header in files is 2_0 OR 1_7
-  enum PDFVersion
+  public enum PDFVersion
   {
     INVALID,
     V1_0,
@@ -267,7 +276,7 @@ namespace Converter.Parsers
   
   // Spec reference on page 51
   // Table 15
-  struct Trailer
+  public struct Trailer
   {
     
     public int Size;
