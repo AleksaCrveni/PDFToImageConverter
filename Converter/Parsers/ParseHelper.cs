@@ -29,7 +29,7 @@ namespace Converter.Parsers
         ReadChar();
       }
 
-      return _buffer.Slice(starter, _position - starter).ToString();
+      return Encoding.Default.GetString(_buffer.Slice(starter, _position - starter));
     }
     
     public (int, int) GetNextIndirectReference()
@@ -40,6 +40,7 @@ namespace Converter.Parsers
       SkipWhiteSpace();
       if (_char != 'R')
         throw new InvalidDataException("Invalid trailer data. Expected R");
+      ReadChar();
       return res;
     }
 
@@ -72,24 +73,33 @@ namespace Converter.Parsers
       SkipWhiteSpace();
       if (_char != '[')
         throw new InvalidDataException("Invalid trailer data. Expected Array");
+      ReadChar();
       for (int i = 0; i < len; i++)
         res[i] = ReadArrayElement();
+
+      SkipWhiteSpace();
+      if (_char != ']')
+        throw new InvalidDataException("Invalid trailer data. Expected Array");
+      ReadChar();
       return res;
     }
     public string ReadArrayElement()
     {
       SkipWhiteSpace();
-      ReadChar();
       if (_char != '<')
         throw new InvalidDataException("Invalid trailer data. Expected Array");
-
-      int starter = _position;
+      // Move to actual array start
       ReadChar();
-      while (_char != '>' || _char != 0x00)
+      int starter = _position;
+      while (_char != '>' && _char != 0x00)
         ReadChar();
       if (_char == 0x00)
         throw new InvalidDataException("Invalid trailer data. Expected Array");
-      return _buffer.Slice(starter, _position - starter).ToString();
+      string res = Encoding.Default.GetString(_buffer.Slice(starter, _position - starter));
+
+      // Move to next from '>'
+      ReadChar();
+      return res;
     }
 
     public byte GetNextDigitStrict()

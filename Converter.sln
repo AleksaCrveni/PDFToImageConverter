@@ -7,6 +7,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Converter", "Converter\Conv
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "StringToByteConverter", "StringToByteConverter\StringToByteConverter.csproj", "{07AD219C-7A23-4B27-9155-49530EF53EE3}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Tester", "Tester\Tester.csproj", "{6078D1D1-1F3D-45A0-B840-29804379952B}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -21,6 +23,10 @@ Global
 		{07AD219C-7A23-4B27-9155-49530EF53EE3}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{07AD219C-7A23-4B27-9155-49530EF53EE3}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{07AD219C-7A23-4B27-9155-49530EF53EE3}.Release|Any CPU.Build.0 = Release|Any CPU
+		{6078D1D1-1F3D-45A0-B840-29804379952B}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{6078D1D1-1F3D-45A0-B840-29804379952B}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{6078D1D1-1F3D-45A0-B840-29804379952B}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{6078D1D1-1F3D-45A0-B840-29804379952B}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
