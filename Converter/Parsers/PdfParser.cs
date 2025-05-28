@@ -198,6 +198,7 @@ namespace Converter.Parsers
     // The trailer of a PDF file enables a conforming reader to quickly find the cross-reference table and certain special objects.
     // Conforming readers should read a PDF file from its end. The last line of the file shall contain only the end-of-file marker, %%EOF
     // https://stackoverflow.com/questions/11896858/does-the-eof-in-a-pdf-have-to-appear-within-the-last-1024-bytes-of-the-file
+    // NOTE: according to specification for NON cross reference stream PDF files, max lengh for byteoffset is 10 digits so 10^10 bytes (10gb) so ulong will be more than enough
     private ulong ParseLastCrossRefByteOffset(Stream stream)
     {
       stream.Seek(-6, SeekOrigin.End);

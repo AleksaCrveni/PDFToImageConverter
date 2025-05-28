@@ -27,9 +27,11 @@ namespace Converter.Parsers
       return Encoding.Default.GetString(_buffer.Slice(starter, _position - starter));
     }
     
+    // TODO: Add more limiters, first digit must be > 0, but second can be 0 higher
     public (int, int) GetNextIndirectReference()
     {
       (int a, int b) res;
+      
       res.a = GetNextInt32Strict();
       res.b = GetNextInt32Strict();
       SkipWhiteSpace();
