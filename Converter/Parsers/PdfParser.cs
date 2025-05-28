@@ -1,7 +1,4 @@
-﻿using System;
-using System.Globalization;
-using System.Reflection.Metadata.Ecma335;
-using System.Runtime.Versioning;
+﻿using System.Globalization;
 using System.Text;
 
 namespace Converter.Parsers

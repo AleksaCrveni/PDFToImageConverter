@@ -1,8 +1,5 @@
-﻿using System.IO;
-using System;
-using Converter;
+﻿using Converter;
 using Converter.Parsers;
-using System.Reflection;
 
 namespace Tester
 {
