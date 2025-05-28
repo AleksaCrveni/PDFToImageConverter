@@ -4,13 +4,13 @@ using System.Text;
 
 namespace Converter.Parsers
 {
-  public ref struct ParseHelper
+  public ref struct SpanParseHelper
   {
     private ReadOnlySpan<byte> _buffer;
     private int _position = 0; // current posion
     private int _readPosition = 0; // next position
     private byte _char; // current char
-    public ParseHelper(Span<byte> buffer)
+    public SpanParseHelper(Span<byte> buffer)
     {
       _buffer = (ReadOnlySpan<byte>)buffer;
     }
@@ -149,6 +149,14 @@ namespace Converter.Parsers
       _position = _readPosition++;
     }
 
+    // I don't think if this is good idea
+    // Replace internal buffer and reset positions
+    public void ReplaceInternalSpan(Span<byte> buffer)
+    {
+      _buffer = buffer;
+      _position = 0;
+      _readPosition = 0;-
+    }
 
 
   }

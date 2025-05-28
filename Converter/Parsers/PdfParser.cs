@@ -65,13 +65,34 @@ namespace Converter.Parsers
         throw new InvalidDataException("Invalid data");
 
 
-      ParseHelper parseHelper = new ParseHelper(footerBuffer);
+      SpanParseHelper parseHelper = new SpanParseHelper(footerBuffer);
       file.Trailer = ParseTrailer(ref parseHelper);
       // TODO use parsehelper dont seek and copy again
       file.LastCrossReferenceOffset = ParseLastCrossRefByteOffset(stream);
+
+      
+
+    }
+
+    private void ParseCrossReferenceTable(Stream stream, ulong byteOffset)
+    {
+      // TODO: I guess byteoffset should be long
+      // i really feel i should be loading in more bytes in chunk
+      stream.Position = (long)byteOffset;
+
+      // make sure talbe is starting with xref keyword
+      Span<byte> xrefBufferChar = stackalloc byte[4] { (byte)'x', (byte)'r', (byte)'e', (byte)'f' };
+      Span<byte> xrefBuffer = stackalloc byte[4];
+      int readBytes = stream.Read(xrefBuffer);
+      if (xrefBuffer.Length != readBytes)
+        throw new InvalidDataException("Invalid data");
+      if (AreSpansEqual(xrefBuffer, xrefBufferChar, 4))
+        throw new InvalidDataException("Invalid data");
+      
+
     }
     // TODO: test case when trailer is not complete ">>" can't be found after opening brackets
-    private Trailer ParseTrailer(ref ParseHelper helper)
+    private Trailer ParseTrailer(ref SpanParseHelper helper)
     {
       Trailer trailer = new Trailer();
       string tokenString = helper.GetNextString();
@@ -199,6 +220,8 @@ namespace Converter.Parsers
     // Conforming readers should read a PDF file from its end. The last line of the file shall contain only the end-of-file marker, %%EOF
     // https://stackoverflow.com/questions/11896858/does-the-eof-in-a-pdf-have-to-appear-within-the-last-1024-bytes-of-the-file
     // NOTE: according to specification for NON cross reference stream PDF files, max lengh for byteoffset is 10 digits so 10^10 bytes (10gb) so ulong will be more than enough
+    // NOTE: i can't seem to find max lenght for cross refernce stream PDF files
+
     private ulong ParseLastCrossRefByteOffset(Stream stream)
     {
       stream.Seek(-6, SeekOrigin.End);
@@ -250,10 +273,19 @@ namespace Converter.Parsers
       }
       return value;
     }
+    
+    // this is probably naive solution wihtout charset taken in account
+    private bool AreSpansEqual(Span<byte> a, Span<byte> b, int len, bool strict = true)
+    {
+      if (a.Length != b.Length && strict)
+        throw new InvalidDataException("Spans different size");
+      // support only int32 size for now??
+      for (int i = 0; i < len; i++)
+        if (a[i] != b[i]) return false;
 
-
+      return true;
+    } 
   }
-
   // extensions should be directly supported instead of normal versions for 1_7 and 2_0
   // so i think i dont need these enums since header in files is 2_0 OR 1_7
   public enum PDFVersion
