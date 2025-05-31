@@ -1,4 +1,5 @@
 ﻿using System.Globalization;
+using System.Numerics;
 using System.Text;
 
 namespace Converter.Parsers
@@ -69,12 +70,11 @@ namespace Converter.Parsers
       file.Trailer = ParseTrailer(ref parseHelper);
       // TODO use parsehelper dont seek and copy again
       file.LastCrossReferenceOffset = ParseLastCrossRefByteOffset(stream);
-
-      
-
+      file.CrossReferenceEntries = ParseCrossReferenceTable(stream, file.LastCrossReferenceOffset, file.Trailer.Size);
     }
 
-    private void ParseCrossReferenceTable(Stream stream, ulong byteOffset)
+    // TODO: This will work only for one section, not subsections.Fix it later!
+    private List<CRefEntry> ParseCrossReferenceTable(Stream stream, ulong byteOffset, uint cRefTableSize)
     {
       // TODO: I guess byteoffset should be long
       // i really feel i should be loading in more bytes in chunk
@@ -86,10 +86,39 @@ namespace Converter.Parsers
       int readBytes = stream.Read(xrefBuffer);
       if (xrefBuffer.Length != readBytes)
         throw new InvalidDataException("Invalid data");
-      if (AreSpansEqual(xrefBuffer, xrefBufferChar, 4))
+      if (!AreSpansEqual(xrefBuffer, xrefBufferChar, 4))
         throw new InvalidDataException("Invalid data");
-      
 
+      Span<byte> nextLineBuffer = StreamParseHelper.GetNextLine(stream).AsSpan();
+      SpanParseHelper parseHelper = new SpanParseHelper(nextLineBuffer);
+      uint startObj = parseHelper.GetNextUInt32Strict();
+      uint endObj = parseHelper.GetNextUInt32Strict();
+      uint sectionLen = endObj - startObj;
+
+      // TODO: Think if you want list or array and fix this later
+      CRefEntry[] entryArr = new CRefEntry[sectionLen];
+      Array.Fill<CRefEntry>(entryArr, new CRefEntry());
+      List<CRefEntry> cRefEntries = entryArr.ToList();
+      Span<byte> cRefEntryBuffer = stackalloc byte[20];
+      readBytes = 0;
+      CRefEntry entry;
+      for (int i = (int)startObj; i < endObj; i++)
+      {
+        readBytes = stream.Read(cRefEntryBuffer);
+        if (readBytes != cRefEntryBuffer.Length)
+          throw new InvalidDataException("Invalid data");
+
+        entry = cRefEntries[i];
+        entry.TenDigitValue = ConvertBytesToUnsignedInt64(cRefEntryBuffer.Slice(0, 10));
+        entry.GenerationNumber = ConvertBytesToUnsignedInt16(cRefEntryBuffer.Slice(11, 5));
+        byte entryType = cRefEntryBuffer[17];
+        if (entryType != (byte)'n' && entryType != (byte)'f')
+          throw new InvalidDataException("Invalid data");
+        entry.EntryType = entryType;
+        cRefEntries[i] = entry;
+      }
+
+      return cRefEntries;
     }
     // TODO: test case when trailer is not complete ">>" can't be found after opening brackets
     private Trailer ParseTrailer(ref SpanParseHelper helper)
@@ -112,11 +141,11 @@ namespace Converter.Parsers
               // TODO: Probably move this to normal switch or if statement because of string alloc in case key is not found
               object _ = tokenString switch
               {
-                "/Size" => trailer.Size = helper.GetNextInt32Strict(),
+                "/Size" => trailer.Size = helper.GetNextUInt32Strict(),
                 "/Root" => trailer.RootIR = helper.GetNextIndirectReference(),
                 "/Info" => trailer.InfoIR = helper.GetNextIndirectReference(),
                 "/Encrypt" => trailer.EncryptIR = helper.GetNextIndirectReference(),
-                "/Prev" => trailer.Prev = helper.GetNextInt32Strict(),
+                "/Prev" => trailer.Prev = helper.GetNextUInt32Strict(),
                 "/ID" => trailer.ID = helper.GetNextArrayKnownLengthStrict(2),
                 _ => ""
               };
@@ -162,7 +191,7 @@ namespace Converter.Parsers
       if (buffer[4] != (byte)0x2d)
         throw new InvalidDataException("Invalid data");
       // checking version
-      byte majorVersion = buffer[5]; 
+      byte majorVersion = buffer[5];
       if (majorVersion != (byte)0x31 && majorVersion != (byte)0x32)
         throw new InvalidDataException("Invalid data");
       if (buffer[6] != (byte)0x2e)
@@ -273,7 +302,7 @@ namespace Converter.Parsers
       }
       return value;
     }
-    
+
     // this is probably naive solution wihtout charset taken in account
     private bool AreSpansEqual(Span<byte> a, Span<byte> b, int len, bool strict = true)
     {
@@ -284,42 +313,32 @@ namespace Converter.Parsers
         if (a[i] != b[i]) return false;
 
       return true;
-    } 
-  }
-  // extensions should be directly supported instead of normal versions for 1_7 and 2_0
-  // so i think i dont need these enums since header in files is 2_0 OR 1_7
-  public enum PDFVersion
-  {
-    INVALID,
-    V1_0,
-    V1_1,
-    V1_2,
-    V1_3,
-    V1_4,
-    V1_5,
-    V1_6,
-    V1_7,
-    V1_7_2008,
-    V2_0,
-    V2_0_2020
-  }
-  
-  // Spec reference on page 51
-  // Table 15
-  public struct Trailer
-  {
-    
-    public int Size;
-    public int Prev;
-    public (int, int) RootIR;
-    // not sure what it is, fix later
-    public (int, int) EncryptIR;
-    public (int, int) InfoIR;
-    public string[] ID;
-    // Only in hybrid-reference file
-    // The byte offset in the decoded stream from the bgegging of the file of a cross reference stream
-    public int XrefStm;
-  }
+    }
 
+    // do these better, seems odd?
+    private UInt16 ConvertBytesToUnsignedInt16(Span<byte> buffer)
+    {
+      uint res = 0;
+      for (int i = 0; i < buffer.Length; i++)
+      {
+        // these should be no negative ints so this is okay i believe?
+        res = res * 10 + (uint)CharUnicodeInfo.GetDecimalDigitValue((char)buffer[i]);
+      }
+      // this should wrap, idk if i should throw exception
+      return (UInt16)res;
+    }
+
+    private UInt64 ConvertBytesToUnsignedInt64(Span<byte> buffer)
+    {
+      uint res = 0;
+      for (int i = 0; i < buffer.Length; i++)
+      {
+        // these should be no negative ints so this is okay i believe?
+        res = res * 10 + (uint)CharUnicodeInfo.GetDecimalDigitValue((char)buffer[i]);
+      }
+      // this should wrap, idk if i should throw exception
+      return (UInt64)res;
+    }
+  }
 }
 

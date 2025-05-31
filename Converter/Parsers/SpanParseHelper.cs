@@ -28,12 +28,12 @@ namespace Converter.Parsers
     }
     
     // TODO: Add more limiters, first digit must be > 0, but second can be 0 higher
-    public (int, int) GetNextIndirectReference()
+    public (uint, uint) GetNextIndirectReference()
     {
-      (int a, int b) res;
+      (uint a, uint b) res;
       
-      res.a = GetNextInt32Strict();
-      res.b = GetNextInt32Strict();
+      res.a = GetNextUInt32Strict();
+      res.b = GetNextUInt32Strict();
       SkipWhiteSpace();
       if (_char != 'R')
         throw new InvalidDataException("Invalid trailer data. Expected R");
@@ -41,7 +41,7 @@ namespace Converter.Parsers
       return res;
     }
 
-    public int GetNextInt32Strict()
+    public uint GetNextUInt32Strict()
     {
       SkipWhiteSpace();
       int starter = _position;
@@ -55,11 +55,11 @@ namespace Converter.Parsers
 
       // TODO: maybe dont need new span just read from buffer directly
       ReadOnlySpan<byte> numberInBytes = _buffer.Slice(starter, _position - starter);
-      int result = 0;
+      uint result = 0;
       for (int i = 0; i < numberInBytes.Length; i++)
       {
         // these should be no negative ints so this is okay i believe?
-        result = result * 10 + (int)CharUnicodeInfo.GetDecimalDigitValue((char)numberInBytes[i]);
+        result = result * 10 + (uint)CharUnicodeInfo.GetDecimalDigitValue((char)numberInBytes[i]);
       }
       return result;
     }
@@ -120,7 +120,7 @@ namespace Converter.Parsers
         return false;
       return true;
     }
-    private void SkipWhiteSpace()
+    public void SkipWhiteSpace()
     {
       while (IsCurrentCharPdfWhiteSpace())
         ReadChar();
@@ -155,7 +155,7 @@ namespace Converter.Parsers
     {
       _buffer = buffer;
       _position = 0;
-      _readPosition = 0;-
+      _readPosition = 0;
     }
 
 
