@@ -70,6 +70,9 @@ namespace Tester
       Assert.IsTrue(cRefTableEntries[19] == c);
       c = new CRefEntry { TenDigitValue = 10660, GenerationNumber = 0, EntryType = (byte)'n' };
       Assert.IsTrue(cRefTableEntries[20] == c);
+
+      Assert.IsTrue(pdfFile.Catalog.PagesIR == (3, 0));
+
     }
   }
 }

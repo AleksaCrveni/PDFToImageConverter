@@ -7,9 +7,10 @@ namespace Converter.Parsers
   public ref struct SpanParseHelper
   {
     private ReadOnlySpan<byte> _buffer;
-    private int _position = 0; // current posion
+    public int _position = 0; // current posion
     private int _readPosition = 0; // next position
     private byte _char; // current char
+
     public SpanParseHelper(Span<byte> buffer)
     {
       _buffer = (ReadOnlySpan<byte>)buffer;
@@ -27,13 +28,26 @@ namespace Converter.Parsers
       return Encoding.Default.GetString(_buffer.Slice(starter, _position - starter));
     }
     
-    // TODO: Add more limiters, first digit must be > 0, but second can be 0 higher
-    public (uint, uint) GetNextIndirectReference()
+    public T GetNextName<T>() where T : Enum
     {
-      (uint a, uint b) res;
+      throw new NotImplementedException();
+    }
+    public Dictionary<object, object> GetNextDict()
+    {
+      throw new NotImplementedException();
+    }
+
+    public object GetNextNumberTree()
+    {
+      throw new NotImplementedException();
+    }
+    // TODO: Add more limiters, first digit must be > 0, but second can be 0 higher
+    public (int, int) GetNextIndirectReference()
+    {
+      (int a, int b) res;
       
-      res.a = GetNextUInt32Strict();
-      res.b = GetNextUInt32Strict();
+      res.a = GetNextInt32Strict();
+      res.b = GetNextInt32Strict();
       SkipWhiteSpace();
       if (_char != 'R')
         throw new InvalidDataException("Invalid trailer data. Expected R");
@@ -41,7 +55,7 @@ namespace Converter.Parsers
       return res;
     }
 
-    public uint GetNextUInt32Strict()
+    public int GetNextInt32Strict()
     {
       SkipWhiteSpace();
       int starter = _position;
@@ -55,15 +69,19 @@ namespace Converter.Parsers
 
       // TODO: maybe dont need new span just read from buffer directly
       ReadOnlySpan<byte> numberInBytes = _buffer.Slice(starter, _position - starter);
-      uint result = 0;
+      int result = 0;
       for (int i = 0; i < numberInBytes.Length; i++)
       {
         // these should be no negative ints so this is okay i believe?
-        result = result * 10 + (uint)CharUnicodeInfo.GetDecimalDigitValue((char)numberInBytes[i]);
+        result = result * 10 + (int)CharUnicodeInfo.GetDecimalDigitValue((char)numberInBytes[i]);
       }
       return result;
     }
 
+    public string[] GetNextArrayStrict()
+    {
+      throw new NotImplementedException();
+    }
     public string[] GetNextArrayKnownLengthStrict(int len)
     {
       string[] res = new string[len];

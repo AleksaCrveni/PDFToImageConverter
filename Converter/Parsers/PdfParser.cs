@@ -1,4 +1,6 @@
-﻿using System.Globalization;
+﻿using System;
+using System.Diagnostics;
+using System.Globalization;
 using System.Numerics;
 using System.Text;
 
@@ -11,6 +13,7 @@ namespace Converter.Parsers
     StringBuilder _sb;
     private readonly byte _newLineByte = 10;
     private readonly string _trailerConst = "trailer";
+  
     public PdfParser()
     {
       _sb = new StringBuilder();
@@ -71,10 +74,127 @@ namespace Converter.Parsers
       // TODO use parsehelper dont seek and copy again
       file.LastCrossReferenceOffset = ParseLastCrossRefByteOffset(stream);
       file.CrossReferenceEntries = ParseCrossReferenceTable(stream, file.LastCrossReferenceOffset, file.Trailer.Size);
+      file.Catalog = ParseCatalogDictionary(stream, file.Trailer.RootIR.Item1, file.CrossReferenceEntries, file.LastCrossReferenceOffset);
+    }
+
+    private Catalog ParseCatalogDictionary(Stream stream, int rootObjectIndex,  List<CRefEntry> crossReferenceEntries, long lastCrossReferenceIndex)
+    {
+      // Instead of reading one by one to see where end is, get next object position and have that as length to load
+      // Experimental!
+      long rootByteOffset = crossReferenceEntries[rootObjectIndex].TenDigitValue;
+      long minPositiveDiff = long.MaxValue;
+      int index = rootObjectIndex;
+      long diff;
+      for (int i = 0; i < crossReferenceEntries.Count; i++)
+      {
+        diff = crossReferenceEntries[i].TenDigitValue - rootByteOffset;
+        if (diff > 0 && diff < minPositiveDiff)
+        {
+          minPositiveDiff = diff;
+          index = i;
+        }
+      }
+
+      // Check this but for now assume that next thing is cross ref table
+      long nextObjectOffset = lastCrossReferenceIndex;
+      if (index != rootObjectIndex)
+        nextObjectOffset = crossReferenceEntries[index].TenDigitValue;
+
+      long catalogLength = minPositiveDiff;
+      // if this is bigger 8192 or double that then do see to do some kind of different processing
+      // I think that reading in bulk should be faster than reading 1 char by 1 from stream
+      Catalog catalog = new Catalog();
+      if (catalogLength <= 8192)
+      {
+        stream.Position = rootByteOffset;
+        Span<byte> catalogBuffer = stackalloc byte[(int)catalogLength];
+        SpanParseHelper helper = new SpanParseHelper(catalogBuffer);
+        int readBytes = stream.Read(catalogBuffer);
+        if (catalogBuffer.Length != readBytes)
+          throw new InvalidDataException("Invalid data");
+        FillCatalogFromSpan(ref helper, ref catalog);
+        // we maybe read a bit more sicne we read last object diff so make sure we are in correct position
+        
+        stream.Position = helper._position + 1;
+      } 
+      else
+      {
+        // heap alloc
+        FillCatalogFromStream(stream, rootByteOffset, rootByteOffset, ref catalog);
+      }
+
+      return catalog;
+    }
+
+    private Catalog FillCatalogFromSpan(ref SpanParseHelper helper, ref Catalog catalog)
+    {
+ 
+      string tokenString = helper.GetNextString();
+      int tokenInt = 0;
+      while (tokenString != string.Empty)
+      {
+        // Maybe move this to dictionary parsing
+        if (tokenString == "<<")
+        {
+          tokenString = helper.GetNextString();
+          while (tokenString != "" && tokenString != ">>")
+          {
+            // TODO: Probably move this to normal switch or if statement because of string alloc in case key is not found
+            object _ = tokenString switch
+            {
+              // Have some generic enum parser
+              "/Version" => catalog.Version = helper.GetNextName<PDFVersion>(),
+              "/Extensions" => catalog.Extensions = helper.GetNextDict(),
+              "/Pages" => catalog.PagesIR = helper.GetNextIndirectReference(),
+              "/PageLabels" => catalog.PageLabels = helper.GetNextNumberTree(),
+              "/Names" => catalog.Names = helper.GetNextDict(),
+              "/Dests" => catalog.DestsIR = helper.GetNextIndirectReference(),
+              "/ViewerPreferences" => catalog.ViewerPreferences = helper.GetNextDict(),
+              "/PageLayout" => catalog.PageLayout = helper.GetNextName<PageLayout>(),
+              "/PageMode" => catalog.PageMode = helper.GetNextName<PageMode>(),
+              "/Outlines" => catalog.OutlinesIR = helper.GetNextIndirectReference(),
+              "/Threads" => catalog.ThreadsIR = helper.GetNextIndirectReference(),
+              // not correct, leave for now
+              "/OpenAction" => catalog.OpenAction = helper.GetNextString(),
+              "/AA" => catalog.AA = helper.GetNextDict(),
+              "/URI" => catalog.URI = helper.GetNextDict(),
+              "/AcroForm" => catalog.AcroForm = helper.GetNextDict(),
+              "/MetaData" => catalog.MetadataIR = helper.GetNextIndirectReference(),
+              "/StructTreeRoot" => catalog.StructTreeRoot = helper.GetNextDict(),
+              "/MarkInfo" => catalog.MarkInfo = helper.GetNextDict(),
+              "/Lang" => catalog.Lang = helper.GetNextString(),
+              "/SpiderInfo" => catalog.SpiderInfo = helper.GetNextDict(),
+              "/OutputIntents" => catalog.OutputIntents = helper.GetNextArrayStrict(),
+              "/PieceInfo" => catalog.PieceInfo = helper.GetNextDict(),
+              "/OCProperties" => catalog.OCProperties = helper.GetNextDict(),
+              "/Perms" => catalog.Perms = helper.GetNextDict(),
+              "/Legal" => catalog.Legal = helper.GetNextDict(),
+              "/Requirements" => catalog.Requirements = helper.GetNextArrayStrict(),
+              "/Collection" => catalog.Collection = helper.GetNextDict(),
+              "/NeedsRendering" => catalog.NeedsRendering = helper.GetNextString() == "true",
+              _ => ""
+            };
+            tokenString = helper.GetNextString();
+          }
+          // Means that dict is corrupt
+          if (tokenString == "")
+            throw new InvalidDataException("Invalid dictionary");
+          break;
+        }
+        else
+        {
+          tokenString = helper.GetNextString();
+        }
+      }
+      return catalog;
+    }
+    private void FillCatalogFromStream(Stream stream, long startPosition, long length, ref Catalog catalog)
+    {
+      throw new NotImplementedException();
     }
 
     // TODO: This will work only for one section, not subsections.Fix it later!
-    private List<CRefEntry> ParseCrossReferenceTable(Stream stream, ulong byteOffset, uint cRefTableSize)
+    private List<CRefEntry> ParseCrossReferenceTable(Stream stream, long byteOffset, int cRefTableSize)
     {
       // TODO: I guess byteoffset should be long
       // i really feel i should be loading in more bytes in chunk
@@ -91,9 +211,9 @@ namespace Converter.Parsers
 
       Span<byte> nextLineBuffer = StreamParseHelper.GetNextLine(stream).AsSpan();
       SpanParseHelper parseHelper = new SpanParseHelper(nextLineBuffer);
-      uint startObj = parseHelper.GetNextUInt32Strict();
-      uint endObj = parseHelper.GetNextUInt32Strict();
-      uint sectionLen = endObj - startObj;
+      int startObj = parseHelper.GetNextInt32Strict();
+      int endObj = parseHelper.GetNextInt32Strict();
+      int sectionLen = endObj - startObj;
 
       // TODO: Think if you want list or array and fix this later
       CRefEntry[] entryArr = new CRefEntry[sectionLen];
@@ -109,7 +229,7 @@ namespace Converter.Parsers
           throw new InvalidDataException("Invalid data");
 
         entry = cRefEntries[i];
-        entry.TenDigitValue = ConvertBytesToUnsignedInt64(cRefEntryBuffer.Slice(0, 10));
+        entry.TenDigitValue = (long)ConvertBytesToUnsignedInt64(cRefEntryBuffer.Slice(0, 10));
         entry.GenerationNumber = ConvertBytesToUnsignedInt16(cRefEntryBuffer.Slice(11, 5));
         byte entryType = cRefEntryBuffer[17];
         if (entryType != (byte)'n' && entryType != (byte)'f')
@@ -141,11 +261,11 @@ namespace Converter.Parsers
               // TODO: Probably move this to normal switch or if statement because of string alloc in case key is not found
               object _ = tokenString switch
               {
-                "/Size" => trailer.Size = helper.GetNextUInt32Strict(),
+                "/Size" => trailer.Size = helper.GetNextInt32Strict(),
                 "/Root" => trailer.RootIR = helper.GetNextIndirectReference(),
                 "/Info" => trailer.InfoIR = helper.GetNextIndirectReference(),
                 "/Encrypt" => trailer.EncryptIR = helper.GetNextIndirectReference(),
-                "/Prev" => trailer.Prev = helper.GetNextUInt32Strict(),
+                "/Prev" => trailer.Prev = helper.GetNextInt32Strict(),
                 "/ID" => trailer.ID = helper.GetNextArrayKnownLengthStrict(2),
                 _ => ""
               };
@@ -251,7 +371,7 @@ namespace Converter.Parsers
     // NOTE: according to specification for NON cross reference stream PDF files, max lengh for byteoffset is 10 digits so 10^10 bytes (10gb) so ulong will be more than enough
     // NOTE: i can't seem to find max lenght for cross refernce stream PDF files
 
-    private ulong ParseLastCrossRefByteOffset(Stream stream)
+    private long ParseLastCrossRefByteOffset(Stream stream)
     {
       stream.Seek(-6, SeekOrigin.End);
       bool found = false;
@@ -292,13 +412,13 @@ namespace Converter.Parsers
       if (newLineIndex == buffer.Length - 2)
         throw new InvalidDataException("Invalid data");
       // get actual value
-      ulong value = 0;
+      long value = 0;
       // move newlineindex for one to get past \n to actual first digit
       for (index = ++newLineIndex; index < buffer.Length - 1; index++)
       {
         if (!char.IsDigit((char)buffer[index]))
           throw new InvalidDataException("Invalid data");
-        value = value * 10 + (ulong)CharUnicodeInfo.GetDecimalDigitValue((char)buffer[index]);
+        value = value * 10 + (long)CharUnicodeInfo.GetDecimalDigitValue((char)buffer[index]);
       }
       return value;
     }
