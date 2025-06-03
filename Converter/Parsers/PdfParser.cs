@@ -70,14 +70,14 @@ namespace Converter.Parsers
 
 
       SpanParseHelper parseHelper = new SpanParseHelper(footerBuffer);
-      file.Trailer = ParseTrailer(ref parseHelper);
+      ParseTrailer(file, ref parseHelper);
       // TODO use parsehelper dont seek and copy again
-      file.LastCrossReferenceOffset = ParseLastCrossRefByteOffset(stream);
-      file.CrossReferenceEntries = ParseCrossReferenceTable(stream, file.LastCrossReferenceOffset, file.Trailer.Size);
-      file.Catalog = ParseCatalogDictionary(stream, file.Trailer.RootIR.Item1, file.CrossReferenceEntries, file.LastCrossReferenceOffset);
+      ParseLastCrossRefByteOffset(file, stream);
+      ParseCrossReferenceTable(file, stream);
+      ParseCatalogDictionary(file, stream, file.Trailer.RootIR.Item1, file.CrossReferenceEntries, file.LastCrossReferenceOffset);
     }
 
-    private Catalog ParseCatalogDictionary(Stream stream, int rootObjectIndex,  List<CRefEntry> crossReferenceEntries, long lastCrossReferenceIndex)
+    private void ParseCatalogDictionary(PDFFile file, Stream stream, int rootObjectIndex,  List<CRefEntry> crossReferenceEntries, long lastCrossReferenceIndex)
     {
       // Instead of reading one by one to see where end is, get next object position and have that as length to load
       // Experimental!
@@ -123,7 +123,10 @@ namespace Converter.Parsers
         FillCatalogFromStream(stream, rootByteOffset, rootByteOffset, ref catalog);
       }
 
-      return catalog;
+      // Starting from PDF 1.4 version can be in catalog and it has advantage over header one
+      if (catalog.Version != PDFVersion.INVALID)
+        file.PdfVersion = catalog.Version;
+      file.Catalog = catalog;
     }
 
     private Catalog FillCatalogFromSpan(ref SpanParseHelper helper, ref Catalog catalog)
@@ -194,11 +197,11 @@ namespace Converter.Parsers
     }
 
     // TODO: This will work only for one section, not subsections.Fix it later!
-    private List<CRefEntry> ParseCrossReferenceTable(Stream stream, long byteOffset, int cRefTableSize)
+    private void ParseCrossReferenceTable(PDFFile file, Stream stream)
     {
       // TODO: I guess byteoffset should be long
       // i really feel i should be loading in more bytes in chunk
-      stream.Position = (long)byteOffset;
+      stream.Position = (long)file.LastCrossReferenceOffset;
 
       // make sure talbe is starting with xref keyword
       Span<byte> xrefBufferChar = stackalloc byte[4] { (byte)'x', (byte)'r', (byte)'e', (byte)'f' };
@@ -238,10 +241,10 @@ namespace Converter.Parsers
         cRefEntries[i] = entry;
       }
 
-      return cRefEntries;
+      file.CrossReferenceEntries = cRefEntries;
     }
     // TODO: test case when trailer is not complete ">>" can't be found after opening brackets
-    private Trailer ParseTrailer(ref SpanParseHelper helper)
+    private void ParseTrailer(PDFFile file, ref SpanParseHelper helper)
     {
       Trailer trailer = new Trailer();
       string tokenString = helper.GetNextString();
@@ -282,7 +285,7 @@ namespace Converter.Parsers
           tokenString = helper.GetNextString();
         }
       }
-      return trailer;
+      file.Trailer = trailer;
     }
     // TODO: account for this later
     // Comment from spec:
@@ -371,7 +374,7 @@ namespace Converter.Parsers
     // NOTE: according to specification for NON cross reference stream PDF files, max lengh for byteoffset is 10 digits so 10^10 bytes (10gb) so ulong will be more than enough
     // NOTE: i can't seem to find max lenght for cross refernce stream PDF files
 
-    private long ParseLastCrossRefByteOffset(Stream stream)
+    private void ParseLastCrossRefByteOffset(PDFFile file, Stream stream)
     {
       stream.Seek(-6, SeekOrigin.End);
       bool found = false;
@@ -420,7 +423,7 @@ namespace Converter.Parsers
           throw new InvalidDataException("Invalid data");
         value = value * 10 + (long)CharUnicodeInfo.GetDecimalDigitValue((char)buffer[index]);
       }
-      return value;
+      file.LastCrossReferenceOffset =  value;
     }
 
     // this is probably naive solution wihtout charset taken in account
