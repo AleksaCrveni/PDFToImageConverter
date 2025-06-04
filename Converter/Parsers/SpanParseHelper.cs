@@ -27,10 +27,47 @@ namespace Converter.Parsers
 
       return Encoding.Default.GetString(_buffer.Slice(starter, _position - starter));
     }
-    
-    public T GetNextName<T>() where T : Enum
+
+    public void GetNextStringAsSpan(ref ReadOnlySpan<byte> span)
     {
-      throw new NotImplementedException();
+      SkipWhiteSpace();
+      int starter = _position;
+      // don't have to check if _char is 0 if we reach end of the buffer becaseu its cheked in IsCurrentCharPdfWhiteSpace
+      while (!IsCurrentCharPdfWhiteSpace())
+      {
+        ReadChar();
+      }
+
+      span = (ReadOnlySpan<byte>)_buffer.Slice(starter, _position - starter);
+    }
+
+    // This will only check if next string is Enum, i dont want to loop over.
+    // This should avoid allocations unless Enum.Parse uses it and if _buffer is allocated on stack
+    public T GetNextName<T>(T? defaultValue = null) where T : struct, Enum
+    {
+      ReadOnlySpan<byte> span = new ReadOnlySpan<byte>();
+      GetNextStringAsSpan(ref span);
+
+      if (span.Length > 256)
+        throw new InvalidDataException("Invalid data");
+
+      if (span.Length == 0)
+        if (defaultValue != null)
+          return (T)defaultValue;
+        else
+          throw new InvalidDataException("Invalid data");
+      // because name starts with '/'
+      Span<char> spanOfChars = stackalloc char[span.Length-1];
+      for (int i = 0; i < spanOfChars.Length; i++)
+        spanOfChars[i] = (char)span[i+1];
+
+      if (!Enum.TryParse<T>((ReadOnlySpan<char>)spanOfChars, out T result))
+        if (defaultValue != null)
+          return (T)defaultValue;
+        else
+          throw new InvalidDataException("Invalid data");
+
+      return result;  
     }
     public Dictionary<object, object> GetNextDict()
     {

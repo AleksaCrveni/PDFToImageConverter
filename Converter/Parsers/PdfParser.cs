@@ -123,8 +123,8 @@ namespace Converter.Parsers
         FillCatalogFromStream(stream, rootByteOffset, rootByteOffset, ref catalog);
       }
 
-      // Starting from PDF 1.4 version can be in catalog and it has advantage over header one
-      if (catalog.Version != PDFVersion.INVALID)
+      // Starting from PDF 1.4 version can be in catalog and it has advantage over header one if its bigger
+      if (catalog.Version > PDFVersion.INVALID)
         file.PdfVersion = catalog.Version;
       file.Catalog = catalog;
     }
@@ -146,15 +146,15 @@ namespace Converter.Parsers
             object _ = tokenString switch
             {
               // Have some generic enum parser
-              "/Version" => catalog.Version = helper.GetNextName<PDFVersion>(),
+              "/Version" => catalog.Version = ParsePdfVersionFromCatalog(ref helper),
               "/Extensions" => catalog.Extensions = helper.GetNextDict(),
               "/Pages" => catalog.PagesIR = helper.GetNextIndirectReference(),
               "/PageLabels" => catalog.PageLabels = helper.GetNextNumberTree(),
               "/Names" => catalog.Names = helper.GetNextDict(),
               "/Dests" => catalog.DestsIR = helper.GetNextIndirectReference(),
               "/ViewerPreferences" => catalog.ViewerPreferences = helper.GetNextDict(),
-              "/PageLayout" => catalog.PageLayout = helper.GetNextName<PageLayout>(),
-              "/PageMode" => catalog.PageMode = helper.GetNextName<PageMode>(),
+              "/PageLayout" => catalog.PageLayout = helper.GetNextName<PageLayout>(PageLayout.SinglePage),
+              "/PageMode" => catalog.PageMode = helper.GetNextName<PageMode>(PageMode.UserNone),
               "/Outlines" => catalog.OutlinesIR = helper.GetNextIndirectReference(),
               "/Threads" => catalog.ThreadsIR = helper.GetNextIndirectReference(),
               // not correct, leave for now
@@ -293,11 +293,11 @@ namespace Converter.Parsers
     // as described in 7.5.5, if present, shall be used instead of version specified in the Header
     // TODO: I really should have just compared and parsed the string instead of trying to act smart
     // because i will have to parse entire file and heapallock anyways
+    // maybe later move this to be ref paramter
     private PDFVersion ParsePdfVersionFromHeader(Stream stream)
     {
       // We parse this first so we should already be at 0
       // stream.Seek(0, SeekOrigin.Begin);
-
       Span<byte> buffer = stackalloc byte[8];
       int bytesRead = stream.Read(buffer);
       if (bytesRead != buffer.Length)
@@ -364,6 +364,65 @@ namespace Converter.Parsers
         }
       }
     }
+
+    private PDFVersion ParsePdfVersionFromCatalog(ref SpanParseHelper helper)
+    {
+      ReadOnlySpan<byte> buffer = new ReadOnlySpan<byte>();
+      helper.GetNextStringAsSpan(ref buffer);
+      // Expect /M.m where M is major and m minor version
+      if (buffer.Length != 4)
+        throw new InvalidDataException("Invalid data!");
+      byte majorVersion = buffer[1];
+      if (majorVersion != (byte)0x31 && majorVersion != (byte)0x32)
+        throw new InvalidDataException("Invalid data");
+      if (buffer[2] != (byte)0x2e)
+        throw new InvalidDataException("Invalid data");
+      byte minorVersion = buffer[3];
+      if (majorVersion == (byte)0x31)
+      {
+        switch (minorVersion)
+        {
+          case (byte)0x30:
+            return PDFVersion.V1_0;
+            break;
+          case (byte)0x31:
+            return PDFVersion.V1_1;
+            break;
+          case (byte)0x32:
+            return PDFVersion.V1_2;
+            break;
+          case (byte)0x33:
+            return PDFVersion.V1_3;
+            break;
+          case (byte)0x34:
+            return PDFVersion.V1_4;
+            break;
+          case (byte)0x35:
+            return PDFVersion.V1_5;
+            break;
+          case (byte)0x36:
+            return PDFVersion.V1_6;
+            break;
+          case (byte)0x37:
+            return PDFVersion.V1_7;
+            break;
+          default:
+            throw new InvalidDataException("Invalid data");
+        }
+      }
+      else
+      {
+        switch (minorVersion)
+        {
+          case (byte)0x30:
+            return PDFVersion.V2_0;
+            break;
+          default:
+            throw new InvalidDataException("Invalid data");
+        }
+      }
+    }
+
     // TODO: Fix EOF finding
     // Adobe 1.3 PDF spec
     // Acrobat viewers require only that the %%EOF marker appear somewhere within the last 1024 bytes of the file.
