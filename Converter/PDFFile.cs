@@ -1,5 +1,9 @@
 ﻿using Converter.Parsers;
+using System.ComponentModel;
+using System.Drawing;
+using System.Dynamic;
 using System.Reflection.Metadata.Ecma335;
+using System.Runtime.Intrinsics.X86;
 using System.Runtime.Serialization;
 using System.Text;
 namespace Converter
@@ -11,6 +15,7 @@ namespace Converter
     public Trailer Trailer { get; set; }
     public List<CRefEntry> CrossReferenceEntries { get; set; }
     public Catalog Catalog { get; set; }
+    public PageTree PageTree { get; set; }
   }
 
   public enum PDFVersion
@@ -48,6 +53,12 @@ namespace Converter
     UseAttachments
   }
 
+  public enum Tabs
+  {
+    R,
+    C,
+    S
+  }
 
   // Spec reference on page 51
   // Table 15
@@ -135,4 +146,53 @@ namespace Converter
     public Dictionary<object, object> Collection;
     public bool NeedsRendering = false;
   }
+
+  public struct PageTree
+  {
+    public PageTree() { }
+    public void InitKids(int size)
+    {
+      KidsIRs = new (int, int)[size];
+    }
+    public (int, int)[] KidsIRs;
+    public (int, int) ParentIR = (-1, -1);
+    public int Count;
+    public Rectangle MediaBox;
+  }
+  // Table 30
+  // Resources - 
+  public struct PageInfo
+  {
+    public PageInfo() { }
+    public (int, int) ParentIR;
+    public DateTime LastModified;
+    public Dictionary<object, object> Resources; // use generic dict but later implement it right Table 33
+    public Rectangle MediaBox; // 7.9.5
+    public Rectangle CropBox; // defualt value is media box also check 14.11.2
+    public Rectangle BleedBox;
+    public Rectangle TrimBox;
+    public Rectangle ArtBox;
+    public Rectangle BoxColorInfo;
+    public List<byte[]> Contents;// do  list for now, not sure how to know how many streams there are. See if it can be span
+    public int Rotate;
+    public Dictionary<object, object> Group; // 11.4.7
+    public byte[] Thumb;
+    public List<(int, int)> B; // use list for now, idk size
+    public int Dur;
+    public Dictionary<object, object> Trans;
+    public object[] Annots;
+    public Dictionary<object, object> AA;
+    public byte[] Metadata;
+    public Dictionary<object, object> PieceInfo;
+    public int StructParents;
+    public string ID;
+    public int PZ;
+    public Dictionary<object, object> SeparationInfo;
+    public Tabs Tabs;
+    public object TemplateInstantiated; // not sure about this one 
+    public Dictionary<object, object> PresSteps;
+    public float UserUnit = 1.0f; // multiplies of 1/72 inch  
+    public Dictionary<object, object> VP;
+  }
+
 }

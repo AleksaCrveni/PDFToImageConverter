@@ -74,40 +74,33 @@ namespace Converter.Parsers
       // TODO use parsehelper dont seek and copy again
       ParseLastCrossRefByteOffset(file, stream);
       ParseCrossReferenceTable(file, stream);
-      ParseCatalogDictionary(file, stream, file.Trailer.RootIR.Item1, file.CrossReferenceEntries, file.LastCrossReferenceOffset);
+      ParseCatalogDictionary(file, stream);
+      ParseRootPageTree(file, stream);
+    }
+    private void ParseRootPageTree(PDFFile file, Stream stream)
+    {
+      int objectIndex = file.Catalog.PagesIR.Item1;
+      long objectByteOffset = file.CrossReferenceEntries[objectIndex].TenDigitValue;
+      long objectLength = GetDistanceToNextObject(objectIndex, objectByteOffset, file.CrossReferenceEntries, file.LastCrossReferenceOffset);
+      // make linked list or just flatten references????
+      // ok for now just load all and store it, later be smarter
+      
     }
 
-    private void ParseCatalogDictionary(PDFFile file, Stream stream, int rootObjectIndex,  List<CRefEntry> crossReferenceEntries, long lastCrossReferenceIndex)
+    private void ParseCatalogDictionary(PDFFile file, Stream stream)
     {
       // Instead of reading one by one to see where end is, get next object position and have that as length to load
       // Experimental!
-      long rootByteOffset = crossReferenceEntries[rootObjectIndex].TenDigitValue;
-      long minPositiveDiff = long.MaxValue;
-      int index = rootObjectIndex;
-      long diff;
-      for (int i = 0; i < crossReferenceEntries.Count; i++)
-      {
-        diff = crossReferenceEntries[i].TenDigitValue - rootByteOffset;
-        if (diff > 0 && diff < minPositiveDiff)
-        {
-          minPositiveDiff = diff;
-          index = i;
-        }
-      }
-
-      // Check this but for now assume that next thing is cross ref table
-      long nextObjectOffset = lastCrossReferenceIndex;
-      if (index != rootObjectIndex)
-        nextObjectOffset = crossReferenceEntries[index].TenDigitValue;
-
-      long catalogLength = minPositiveDiff;
+      int objectIndex = file.Trailer.RootIR.Item1;
+      long objectByteOffset = file.CrossReferenceEntries[objectIndex].TenDigitValue;
+      long objectLength = GetDistanceToNextObject(objectIndex, objectByteOffset, file.CrossReferenceEntries, file.LastCrossReferenceOffset);
       // if this is bigger 8192 or double that then do see to do some kind of different processing
       // I think that reading in bulk should be faster than reading 1 char by 1 from stream
       Catalog catalog = new Catalog();
-      if (catalogLength <= 8192)
+      if (objectLength <= 8192)
       {
-        stream.Position = rootByteOffset;
-        Span<byte> catalogBuffer = stackalloc byte[(int)catalogLength];
+        stream.Position = objectByteOffset;
+        Span<byte> catalogBuffer = stackalloc byte[(int)objectLength];
         SpanParseHelper helper = new SpanParseHelper(catalogBuffer);
         int readBytes = stream.Read(catalogBuffer);
         if (catalogBuffer.Length != readBytes)
@@ -120,7 +113,8 @@ namespace Converter.Parsers
       else
       {
         // heap alloc
-        FillCatalogFromStream(stream, rootByteOffset, rootByteOffset, ref catalog);
+        // NOT TESTED!!!!
+        FillCatalogFromStream(stream, objectByteOffset, objectLength, ref catalog);
       }
 
       // Starting from PDF 1.4 version can be in catalog and it has advantage over header one if its bigger
@@ -520,6 +514,26 @@ namespace Converter.Parsers
       }
       // this should wrap, idk if i should throw exception
       return (UInt64)res;
+    }
+    // I think if i count object number it would be a bit faster but this is fine too
+    private long GetDistanceToNextObject(int objectIndex, long rootByteOffset, List<CRefEntry> cRefEntries, long crossReferenceByteOffset)
+    {
+      long minPositiveDiff = long.MaxValue;
+      int index = objectIndex;
+      long diff;
+      for (int i = 0; i < cRefEntries.Count; i++)
+      {
+        diff = cRefEntries[i].TenDigitValue - rootByteOffset;
+        if (diff > 0 && diff < minPositiveDiff)
+        {
+          minPositiveDiff = diff;
+          index = i;
+        }
+      }
+      // means that this is last object so next object is assumed to be cross reference table
+      if (index == rootByteOffset)
+        minPositiveDiff = crossReferenceByteOffset;
+      return rootByteOffset - minPositiveDiff;
     }
   }
 }
