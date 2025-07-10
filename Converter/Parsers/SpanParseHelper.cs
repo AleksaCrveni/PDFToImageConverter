@@ -1,4 +1,8 @@
-﻿using System.Globalization;
+﻿using System;
+using System.ComponentModel.DataAnnotations;
+using System.Diagnostics;
+using System.Drawing;
+using System.Globalization;
 using System.Text;
 
 
@@ -10,8 +14,10 @@ namespace Converter.Parsers
     public int _position = 0; // current posion
     private int _readPosition = 0; // next position
     private byte _char; // current char
+    private const int MAX_STRING_SPAN_ALLOC_SIZE = 4096;
 
-    public SpanParseHelper(Span<byte> buffer)
+
+    public SpanParseHelper(ref Span<byte> buffer)
     {
       _buffer = (ReadOnlySpan<byte>)buffer;
     }
@@ -28,7 +34,8 @@ namespace Converter.Parsers
       return Encoding.Default.GetString(_buffer.Slice(starter, _position - starter));
     }
 
-    public void GetNextStringAsSpan(ref ReadOnlySpan<byte> span)
+    // NOTE: this works only for small values
+    public void GetNextStringAsReadOnlySpan(ref ReadOnlySpan<byte> span)
     {
       SkipWhiteSpace();
       int starter = _position;
@@ -37,8 +44,7 @@ namespace Converter.Parsers
       {
         ReadChar();
       }
-
-      span = (ReadOnlySpan<byte>)_buffer.Slice(starter, _position - starter);
+      span = _buffer.Slice(starter, _position - starter);
     }
 
     // This will only check if next string is Enum, i dont want to loop over.
@@ -46,7 +52,7 @@ namespace Converter.Parsers
     public T GetNextName<T>(T? defaultValue = null) where T : struct, Enum
     {
       ReadOnlySpan<byte> span = new ReadOnlySpan<byte>();
-      GetNextStringAsSpan(ref span);
+      GetNextStringAsReadOnlySpan(ref span);
 
       if (span.Length > 256)
         throw new InvalidDataException("Invalid data");
@@ -106,7 +112,7 @@ namespace Converter.Parsers
 
       // TODO: maybe dont need new span just read from buffer directly
       ReadOnlySpan<byte> numberInBytes = _buffer.Slice(starter, _position - starter);
-      int result = 0;
+      int result = -1;
       for (int i = 0; i < numberInBytes.Length; i++)
       {
         // these should be no negative ints so this is okay i believe?
@@ -115,23 +121,39 @@ namespace Converter.Parsers
       return result;
     }
 
-    public string[] GetNextArrayStrict()
+    public List<string> GetNextArrayStrict()
     {
-      throw new NotImplementedException();
+      List<string> array = new List<string>();
+      SkipWhiteSpace();
+      if (_char != '[')
+        throw new InvalidDataException("Invalid array data. Expected Array");
+      ReadChar();
+      string nextElement = ReadArrayElement();
+      while (nextElement != "]" && nextElement != "")
+      {
+        array.Add(nextElement);
+        nextElement = ReadArrayElement();
+      }
+
+      if (_char != ']')
+        throw new InvalidDataException("Invalid array data. Expected Array");
+      ReadChar();
+      return array;
     }
+
     public string[] GetNextArrayKnownLengthStrict(int len)
     {
       string[] res = new string[len];
       SkipWhiteSpace();
       if (_char != '[')
-        throw new InvalidDataException("Invalid trailer data. Expected Array");
+        throw new InvalidDataException("Invalid array data. Expected Array");
       ReadChar();
       for (int i = 0; i < len; i++)
         res[i] = ReadArrayElement();
 
       SkipWhiteSpace();
       if (_char != ']')
-        throw new InvalidDataException("Invalid trailer data. Expected Array");
+        throw new InvalidDataException("Invalid array data. Expected Array");
       ReadChar();
       return res;
     }
@@ -139,14 +161,14 @@ namespace Converter.Parsers
     {
       SkipWhiteSpace();
       if (_char != '<')
-        throw new InvalidDataException("Invalid trailer data. Expected Array");
+        throw new InvalidDataException("Invalid array data. Expected Array");
       // Move to actual array start
       ReadChar();
       int starter = _position;
       while (_char != '>' && _char != 0x00)
         ReadChar();
       if (_char == 0x00)
-        throw new InvalidDataException("Invalid trailer data. Expected Array");
+        throw new InvalidDataException("Invalid array data. Expected Array");
       string res = Encoding.Default.GetString(_buffer.Slice(starter, _position - starter));
 
       // Move to next from '>'
@@ -162,6 +184,148 @@ namespace Converter.Parsers
         throw new InvalidDataException("Invalid trailer data. Expected digit");
       return _char;
     }
+    public Rect  GetNextRectangle()
+    {
+      // .... reference aloc
+      Rect rect = new Rect();
+      SkipWhiteSpace();
+      if (_char != '[')
+        throw new InvalidDataException("Invalid Rectangle data. Expected [");
+      int a = GetNextInt32Strict();
+      if (a == -1)
+        throw new InvalidDataException("Invalid Rectangle data. Expected number");
+      int b = GetNextInt32Strict();
+      if (b == -1)
+        throw new InvalidDataException("Invalid Rectangle data. Expected number");
+      int c = GetNextInt32Strict();
+      if (c == -1)
+        throw new InvalidDataException("Invalid Rectangle data. Expected number");
+      int d = GetNextInt32Strict();
+      if (d == -1)
+        throw new InvalidDataException("Invalid Rectangle data. Expected number");
+      SkipWhiteSpace();
+      if (_char != ']')
+        throw new InvalidDataException("Invalid Rectangle data. Expected ]");
+      rect.FillRect(a, b, c, d);
+      return rect;
+    }
+
+    public List<(int, int)> GetNextIndirectReferenceList()
+    {
+      // its ok since its list atm..
+      List<(int, int)> list = new();
+      SkipWhiteSpace();
+      if (_char != '[')
+        throw new InvalidDataException("Invalid Rectangle data. Expected [");
+      SkipWhiteSpace();
+      while(_char != ']')
+      {
+        list.Add(GetNextIndirectReference());
+        SkipWhiteSpace();
+      }
+      return list;
+    }
+
+    // TODO: This should return span not actual byte[]
+
+    public double GetNextDouble()
+    {
+      SkipWhiteSpace();
+      int start = _position;
+      while (!IsCurrentCharPdfWhiteSpace())
+      {
+        ReadChar();
+      }
+
+      // TODO: if this will work for 32 bit do some better check and fix later
+      int diff = _position - start;
+      if (diff > 64)
+        throw new InvalidDataException("Expected 64 bit double");
+      Span<byte> bytes = stackalloc byte[diff];
+      // its ok since bytes are on stack
+      _buffer.Slice(start, _position - start).CopyTo(bytes);
+      if (BitConverter.IsLittleEndian)
+        bytes.Reverse();
+      return BitConverter.ToDouble(bytes);
+    }
+    public byte[] GetNextStream()
+    {
+      SkipWhiteSpace();
+      int start = _position;
+      while (!IsCurrentCharPdfWhiteSpace())
+      {
+        ReadChar();
+      }
+      return _buffer.Slice(start, _position - start).ToArray();
+    }
+
+    // NOTE: max value lenght to match is MAX_STRING_SPAN_ALLOC_SIZE bytes
+    // TODO: Refactor this later
+    public bool ExpectNext(string valToMatch)
+    {
+
+      // use span not to allocate another string when getting new string
+      int strSize = valToMatch.Length * sizeof(Char);
+      if (strSize > MAX_STRING_SPAN_ALLOC_SIZE)
+        throw new InvalidDataException("String to match too big!");
+
+      Span<byte> bytesToMatch = stackalloc byte[strSize];
+      // only works for little endian, add check perhaps
+      Encoding.Unicode.GetBytes(valToMatch.AsSpan(), bytesToMatch);
+      ReadOnlySpan<byte> nextStringInBytes = new ReadOnlySpan<byte>();
+      GetNextStringAsReadOnlySpan(ref nextStringInBytes);
+      int smallerLength = bytesToMatch.Length > nextStringInBytes.Length ? nextStringInBytes.Length : bytesToMatch.Length;
+      // limit search because i want to  use this only on small strings not longs stream arrays that may come out as a string?
+      smallerLength = smallerLength < MAX_STRING_SPAN_ALLOC_SIZE ? smallerLength : MAX_STRING_SPAN_ALLOC_SIZE;
+      for (int i = 0; i < smallerLength; i++)
+      {
+        // does this even work with dfifferent encodings........
+        if (bytesToMatch[i] != nextStringInBytes[i])
+        {
+          return false;
+        }
+      }
+      return true;
+    }
+    public bool GoToNextStringMatch(string valToMatch)
+    {
+      // use span not to allocate another string when getting new string
+      int strSize = valToMatch.Length * sizeof(Char);
+      if (strSize > MAX_STRING_SPAN_ALLOC_SIZE)
+        throw new InvalidDataException("String to match too big!");
+
+      Span<byte> bytesToMatch = stackalloc byte[strSize];
+      // only works for little endian, add check perhaps
+      Encoding.Unicode.GetBytes(valToMatch.AsSpan(), bytesToMatch);
+      ReadOnlySpan<byte> nextStringInBytes = new ReadOnlySpan<byte>();
+      GetNextStringAsReadOnlySpan(ref nextStringInBytes);
+      int smallerLength = 0;
+      bool isMatched = false;
+      // this loop looks so cursed
+      do
+      {
+
+        smallerLength = bytesToMatch.Length > nextStringInBytes.Length ? nextStringInBytes.Length : bytesToMatch.Length;
+        // limit search because i want to  use this only on small strings not longs stream arrays that may come out as a string?
+        smallerLength = smallerLength < MAX_STRING_SPAN_ALLOC_SIZE ? smallerLength : MAX_STRING_SPAN_ALLOC_SIZE;
+        int i = 0;
+        for (i = 0; i < smallerLength; i++)
+        {
+          // does this even work with dfifferent encodings........
+          if (bytesToMatch[i] != nextStringInBytes[i])
+          {
+            GetNextStringAsReadOnlySpan(ref nextStringInBytes);
+            i = smallerLength + 2;
+          }
+        }
+        // refactor this later........
+        if (i != smallerLength + 2)
+          isMatched = true;
+      } while (!isMatched && nextStringInBytes.Length != 0);
+
+      return isMatched;     
+    }
+
     // can this be inlined?
     private bool IsByteDigit(byte b)
     {
@@ -212,7 +376,5 @@ namespace Converter.Parsers
       _position = 0;
       _readPosition = 0;
     }
-
-
   }
 }

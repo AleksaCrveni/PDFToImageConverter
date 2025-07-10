@@ -1,7 +1,6 @@
-﻿using System;
-using System.Diagnostics;
+﻿
 using System.Globalization;
-using System.Numerics;
+using System.IO;
 using System.Text;
 
 namespace Converter.Parsers
@@ -13,7 +12,7 @@ namespace Converter.Parsers
     StringBuilder _sb;
     private readonly byte _newLineByte = 10;
     private readonly string _trailerConst = "trailer";
-  
+
     public PdfParser()
     {
       _sb = new StringBuilder();
@@ -48,73 +47,230 @@ namespace Converter.Parsers
     // return some kind of struct
     public PDFFile Parse(string filepath)
     {
-      var stream = (Stream)File.OpenRead(filepath);
-      // go to end to find byte offset to cross refernce table
       PDFFile file = new PDFFile();
-      ReadInitialData(stream, file);
+      file.Stream = File.OpenRead(filepath);
+      
+      // go to end to find byte offset to cross refernce table
+      
+      ReadInitialData(file);
       return file;
     }
 
     // Read PDFVersion, Byte offset for last cross reference table, file trailer
 
-    void ReadInitialData(Stream stream, PDFFile file)
+    void ReadInitialData(PDFFile file)
     {
 
-      file.PdfVersion = ParsePdfVersionFromHeader(stream);
+      file.PdfVersion = ParsePdfVersionFromHeader(file.Stream);
       // Read last 1024 bytes and trailer, startxref, (last)cross reference tables bytes and %%EOF
-      stream.Seek(-1024, SeekOrigin.End);
+      file.Stream.Seek(-1024, SeekOrigin.End);
       Span<byte> footerBuffer = stackalloc byte[1024];
-      int readBytes = stream.Read(footerBuffer);
+      int readBytes = file.Stream.Read(footerBuffer);
       if (readBytes != footerBuffer.Length)
         throw new InvalidDataException("Invalid data");
 
 
-      SpanParseHelper parseHelper = new SpanParseHelper(footerBuffer);
+      SpanParseHelper parseHelper = new SpanParseHelper(ref footerBuffer);
       ParseTrailer(file, ref parseHelper);
       // TODO use parsehelper dont seek and copy again
-      ParseLastCrossRefByteOffset(file, stream);
-      ParseCrossReferenceTable(file, stream);
-      ParseCatalogDictionary(file, stream);
-      ParseRootPageTree(file, stream);
+      ParseLastCrossRefByteOffset(file);
+      ParseCrossReferenceTable(file);
+      ParseCatalogDictionary(file);
+      ParseRootPageTree(file);
     }
-    private void ParseRootPageTree(PDFFile file, Stream stream)
+    private void ParseRootPageTree(PDFFile file)
     {
       int objectIndex = file.Catalog.PagesIR.Item1;
       long objectByteOffset = file.CrossReferenceEntries[objectIndex].TenDigitValue;
-      long objectLength = GetDistanceToNextObject(objectIndex, objectByteOffset, file.CrossReferenceEntries, file.LastCrossReferenceOffset);
+      long objectLength = GetDistanceToNextObject(objectIndex, objectByteOffset, file);
       // make linked list or just flatten references????
       // ok for now just load all and store it, later be smarter
+      PageTree rootPageTree = new PageTree();
+      if (objectLength <= 8192*2)
+      {
+        file.Stream.Position = objectByteOffset;
+        Span<byte> pageBuffer = stackalloc byte[(int)objectLength];
+        SpanParseHelper helper = new SpanParseHelper(ref pageBuffer);
+        int readBytes = file.Stream.Read(pageBuffer);
+        // do i need this...?
+        if (pageBuffer.Length != readBytes)
+          throw new InvalidDataException("Invalid data");
+        FillRootPageTreeFromSpan(ref file, ref helper, ref rootPageTree);
+      }
+      else
+      {
+        FillRootPageTreeFromStream(file.Stream, objectByteOffset, objectLength, ref rootPageTree);
+      }
       
     }
+    private void FillRootPageTreeFromSpan(ref PDFFile file, ref SpanParseHelper helper, ref PageTree root)
+    {
+      string tokenString = helper.GetNextString();
+      int tokenInt = 0;
+      PageTree rootNode = new PageTree();
+      //
+      FillRootPageTreeInfo(ref helper, ref root);
+      List<PageTree> pageTrees = new List<PageTree>();
+      List<PageInfo> pages = new List<PageInfo>();
+      pageTrees.Add(rootNode);
+      for (int i = 0; i < root.KidsIRs.Count; i++)
+      {
+        FillAllPageTreeAndInformation(root.KidsIRs[i], pageTrees, pages, file);
+      }
 
-    private void ParseCatalogDictionary(PDFFile file, Stream stream)
+      // go over kids and call FillAllPageTreeAndInformation
+      file.PageTrees = pageTrees;
+      file.PageInformation = pages;
+    }
+
+    private void FillRootPageTreeInfo(ref SpanParseHelper helper, ref PageTree pageTree)
+    { 
+      // testing, idk if this is good idea, i maybe able to do something more with it later
+      if (!helper.ExpectNext("<<"))
+        throw new InvalidDataException("Invalid Root Page Tree Info, expected start of dict");
+      string tokenString = helper.GetNextString();
+      while (tokenString != "" && tokenString != ">>")
+      {
+        object _ = tokenString switch
+        {
+          // Have some generic enum parser
+          "/Parent" => pageTree.ParentIR = helper.GetNextIndirectReference(),
+          "/Count" => pageTree.Count = helper.GetNextInt32Strict(),
+          "/MediaBox" => pageTree.MediaBox = helper.GetNextRectangle(),
+          "/Kids" => pageTree.KidsIRs = helper.GetNextIndirectReferenceList(),
+          _ => ""
+        };
+        tokenString = helper.GetNextString();
+      }
+
+      if (tokenString == "")
+        throw new InvalidDataException("Invalid dictionary");
+    }
+    // THIS FILLS UP BOTH PAGEINFO AND PAGE TREE INFO
+    private void FillAllPageTreeAndInformation((int, int) kidPositionIR, List<PageTree> pageTrees, List<PageInfo> pages, PDFFile file)
+    {
+      long objectByteOffset = file.CrossReferenceEntries[kidPositionIR.Item1].TenDigitValue;
+      long objectLength = GetDistanceToNextObject(kidPositionIR.Item1, objectByteOffset, file);
+      
+      if (objectLength > 8192 * 2)
+      {
+        // TODO: Do better span or heap alloct diff
+        throw new NotImplementedException(); 
+      }
+
+      file.Stream.Position = objectByteOffset;
+      Span<byte> pageBuffer = stackalloc byte[(int)objectLength];
+      SpanParseHelper helper = new SpanParseHelper(ref pageBuffer);
+      int readBytes = file.Stream.Read(pageBuffer);
+      // do i need this...?
+      if (pageBuffer.Length != readBytes)
+        throw new InvalidDataException("Invalid data");
+      if (!helper.ExpectNext("<<"))
+        throw new InvalidDataException("Invalid Root Page Tree Info, expected start of dict");
+
+      if (!helper.ExpectNext("/Type"))
+        throw new InvalidDataException("Invalid Root Page Tree Info, expected start of dict");
+
+      string tokenString = helper.GetNextString();
+      if (tokenString == "/Pages")
+      {
+        PageTree pageTree = new PageTree();
+        while (tokenString != "" && tokenString != ">>")
+        {
+          object _ = tokenString switch
+          {
+            // Have some generic enum parser
+            "/Parent" => pageTree.ParentIR = helper.GetNextIndirectReference(),
+            "/Count" => pageTree.Count = helper.GetNextInt32Strict(),
+            "/MediaBox" => pageTree.MediaBox = helper.GetNextRectangle(),
+            "/Kids" => pageTree.KidsIRs = helper.GetNextIndirectReferenceList(),
+            _ => ""
+          };
+          tokenString = helper.GetNextString();
+        }
+        pageTrees.Add(pageTree);
+        for (int i = 0; i < pageTree.KidsIRs.Count; i++)
+        {
+          FillAllPageTreeAndInformation(pageTree.KidsIRs[i], pageTrees, pages, file);
+        }
+      }
+      else if (tokenString == "/Page")
+      {
+        PageInfo pageInfo = new PageInfo();
+        while (tokenString != "" && tokenString != ">>")
+        {
+          object _ = tokenString switch
+          {
+            // Have some generic enum parser
+            "/Parent" => pageInfo.ParentIR = helper.GetNextIndirectReference(),
+            "/LastModified" => pageInfo.LastModified = DateTime.UtcNow, // TODO: Fix this when you know how date format looks like!
+            "/Resources" => pageInfo.Resources = helper.GetNextDict(),
+            "/MediaBox" => pageInfo.MediaBox = helper.GetNextRectangle(),
+            "/CropBox" => pageInfo.CropBox = helper.GetNextRectangle(),
+            "/BleedBox" => pageInfo.BleedBox = helper.GetNextRectangle(),
+            "/TrimBox" => pageInfo.TrimBox = helper.GetNextRectangle(),
+            "/ArtBox" => pageInfo.ArtBox = helper.GetNextRectangle(),
+            "/BoxColorInfo" => pageInfo.BoxColorInfo = helper.GetNextDict(),
+            "/Contents" => pageInfo.Contents = helper.GetNextStream(),
+            "/Rotate" => pageInfo.Rotate = helper.GetNextInt32Strict(),
+            "/Group" => pageInfo.Group = helper.GetNextDict(),
+            "/Thumb" => pageInfo.Thumb = helper.GetNextStream(),
+            "/B" => pageInfo.B = helper.GetNextIndirectReferenceList(),
+            "/Dur" => pageInfo.Dur = helper.GetNextDouble(),
+            "/Trans" => pageInfo.Trans = helper.GetNextDict(),
+            "/Annots" => pageInfo.Annots = helper.GetNextArrayStrict(),
+            "/AA" => pageInfo.AA = helper.GetNextDict(),
+            "/Metadata" => pageInfo.Metadata = helper.GetNextStream(),
+            "/PieceInfo" => pageInfo.PieceInfo = helper.GetNextDict(),
+            "/StructParents" => pageInfo.StructParents = helper.GetNextInt32Strict(),
+            "/ID" => pageInfo.ID = helper.GetNextArrayStrict(),
+            "/PZ" => pageInfo.PZ = helper.GetNextInt32Strict(),
+            "/SeparationInfo" => pageInfo.SeparationInfo = helper.GetNextDict(),
+            "/Tabs" => pageInfo.Tabs = helper.GetNextName<Tabs>(),
+            "/TemplateInstantiated" => pageInfo.TemplateInstantiated = helper.GetNextString(),
+            "/PresSteps" => pageInfo.PresSteps = helper.GetNextDict(),
+            "/UserUnit" => pageInfo.UserUnit = helper.GetNextDouble(),
+            "/VP" => pageInfo.VP = helper.GetNextDict(),
+            _ => ""
+          };
+          tokenString = helper.GetNextString();
+        }
+        pages.Add(pageInfo);
+      }
+    }
+
+    private void FillRootPageTreeFromStream(Stream stream, long startPosition, long length, ref PageTree root)
+    {
+      throw new NotImplementedException();
+    }
+    private void ParseCatalogDictionary(PDFFile file)
     {
       // Instead of reading one by one to see where end is, get next object position and have that as length to load
       // Experimental!
       int objectIndex = file.Trailer.RootIR.Item1;
       long objectByteOffset = file.CrossReferenceEntries[objectIndex].TenDigitValue;
-      long objectLength = GetDistanceToNextObject(objectIndex, objectByteOffset, file.CrossReferenceEntries, file.LastCrossReferenceOffset);
+      long objectLength = GetDistanceToNextObject(objectIndex, objectByteOffset, file);
       // if this is bigger 8192 or double that then do see to do some kind of different processing
       // I think that reading in bulk should be faster than reading 1 char by 1 from stream
       Catalog catalog = new Catalog();
       if (objectLength <= 8192)
       {
-        stream.Position = objectByteOffset;
+        file.Stream.Position = objectByteOffset;
         Span<byte> catalogBuffer = stackalloc byte[(int)objectLength];
-        SpanParseHelper helper = new SpanParseHelper(catalogBuffer);
-        int readBytes = stream.Read(catalogBuffer);
+        SpanParseHelper helper = new SpanParseHelper(ref catalogBuffer);
+        int readBytes = file.Stream.Read(catalogBuffer);
         if (catalogBuffer.Length != readBytes)
           throw new InvalidDataException("Invalid data");
         FillCatalogFromSpan(ref helper, ref catalog);
         // we maybe read a bit more sicne we read last object diff so make sure we are in correct position
         
-        stream.Position = helper._position + 1;
+        file.Stream.Position = helper._position + 1;
       } 
       else
       {
         // heap alloc
         // NOT TESTED!!!!
-        FillCatalogFromStream(stream, objectByteOffset, objectLength, ref catalog);
+        FillCatalogFromStream(file.Stream, objectByteOffset, objectLength, ref catalog);
       }
 
       // Starting from PDF 1.4 version can be in catalog and it has advantage over header one if its bigger
@@ -123,7 +279,7 @@ namespace Converter.Parsers
       file.Catalog = catalog;
     }
 
-    private Catalog FillCatalogFromSpan(ref SpanParseHelper helper, ref Catalog catalog)
+    private void FillCatalogFromSpan(ref SpanParseHelper helper, ref Catalog catalog)
     {
  
       string tokenString = helper.GetNextString();
@@ -183,7 +339,6 @@ namespace Converter.Parsers
           tokenString = helper.GetNextString();
         }
       }
-      return catalog;
     }
     private void FillCatalogFromStream(Stream stream, long startPosition, long length, ref Catalog catalog)
     {
@@ -191,23 +346,23 @@ namespace Converter.Parsers
     }
 
     // TODO: This will work only for one section, not subsections.Fix it later!
-    private void ParseCrossReferenceTable(PDFFile file, Stream stream)
+    private void ParseCrossReferenceTable(PDFFile file)
     {
       // TODO: I guess byteoffset should be long
       // i really feel i should be loading in more bytes in chunk
-      stream.Position = (long)file.LastCrossReferenceOffset;
+      file.Stream.Position = (long)file.LastCrossReferenceOffset;
 
       // make sure talbe is starting with xref keyword
       Span<byte> xrefBufferChar = stackalloc byte[4] { (byte)'x', (byte)'r', (byte)'e', (byte)'f' };
       Span<byte> xrefBuffer = stackalloc byte[4];
-      int readBytes = stream.Read(xrefBuffer);
+      int readBytes = file.Stream.Read(xrefBuffer);
       if (xrefBuffer.Length != readBytes)
         throw new InvalidDataException("Invalid data");
       if (!AreSpansEqual(xrefBuffer, xrefBufferChar, 4))
         throw new InvalidDataException("Invalid data");
 
-      Span<byte> nextLineBuffer = StreamParseHelper.GetNextLine(stream).AsSpan();
-      SpanParseHelper parseHelper = new SpanParseHelper(nextLineBuffer);
+      Span<byte> nextLineBuffer = StreamParseHelper.GetNextLine(file.Stream).AsSpan();
+      SpanParseHelper parseHelper = new SpanParseHelper(ref nextLineBuffer);
       int startObj = parseHelper.GetNextInt32Strict();
       int endObj = parseHelper.GetNextInt32Strict();
       int sectionLen = endObj - startObj;
@@ -221,7 +376,7 @@ namespace Converter.Parsers
       CRefEntry entry;
       for (int i = (int)startObj; i < endObj; i++)
       {
-        readBytes = stream.Read(cRefEntryBuffer);
+        readBytes = file.Stream.Read(cRefEntryBuffer);
         if (readBytes != cRefEntryBuffer.Length)
           throw new InvalidDataException("Invalid data");
 
@@ -362,7 +517,7 @@ namespace Converter.Parsers
     private PDFVersion ParsePdfVersionFromCatalog(ref SpanParseHelper helper)
     {
       ReadOnlySpan<byte> buffer = new ReadOnlySpan<byte>();
-      helper.GetNextStringAsSpan(ref buffer);
+      helper.GetNextStringAsReadOnlySpan(ref buffer);
       // Expect /M.m where M is major and m minor version
       if (buffer.Length != 4)
         throw new InvalidDataException("Invalid data!");
@@ -427,9 +582,9 @@ namespace Converter.Parsers
     // NOTE: according to specification for NON cross reference stream PDF files, max lengh for byteoffset is 10 digits so 10^10 bytes (10gb) so ulong will be more than enough
     // NOTE: i can't seem to find max lenght for cross refernce stream PDF files
 
-    private void ParseLastCrossRefByteOffset(PDFFile file, Stream stream)
+    private void ParseLastCrossRefByteOffset(PDFFile file)
     {
-      stream.Seek(-6, SeekOrigin.End);
+      file.Stream.Seek(-6, SeekOrigin.End);
       bool found = false;
       sbyte index = 0;
 
@@ -439,7 +594,7 @@ namespace Converter.Parsers
       // not sure if this is needed, but validate if %%EOF exists
       Span<byte> _eofBytes = stackalloc byte[6] { 37, 37, 69, 79, 70, 10 };
       Span<byte> _eofByteBuffer = stackalloc byte[6];
-      int bytesRead = stream.Read(_eofByteBuffer);
+      int bytesRead = file.Stream.Read(_eofByteBuffer);
       if (bytesRead != _eofByteBuffer.Length)
         throw new InvalidDataException("Invalid data");
 
@@ -450,10 +605,10 @@ namespace Converter.Parsers
       }
 
       // go to max possible position where cross reference offset byte count might start
-      stream.Seek(-_eofByteBuffer.Length - buffer.Length, SeekOrigin.End);
+      file.Stream.Seek(-_eofByteBuffer.Length - buffer.Length, SeekOrigin.End);
 
       // try to read byte count offset for cross reference table
-      bytesRead = stream.Read(buffer);
+      bytesRead = file.Stream.Read(buffer);
       if (bytesRead != buffer.Length)
         throw new InvalidDataException("Invalid data");
 
@@ -516,14 +671,14 @@ namespace Converter.Parsers
       return (UInt64)res;
     }
     // I think if i count object number it would be a bit faster but this is fine too
-    private long GetDistanceToNextObject(int objectIndex, long rootByteOffset, List<CRefEntry> cRefEntries, long crossReferenceByteOffset)
+    private long GetDistanceToNextObject(int objectIndex, long rootByteOffset, PDFFile file)
     {
       long minPositiveDiff = long.MaxValue;
       int index = objectIndex;
       long diff;
-      for (int i = 0; i < cRefEntries.Count; i++)
+      for (int i = 0; i < file.CrossReferenceEntries.Count; i++)
       {
-        diff = cRefEntries[i].TenDigitValue - rootByteOffset;
+        diff = file.CrossReferenceEntries[i].TenDigitValue - rootByteOffset;
         if (diff > 0 && diff < minPositiveDiff)
         {
           minPositiveDiff = diff;
@@ -532,9 +687,8 @@ namespace Converter.Parsers
       }
       // means that this is last object so next object is assumed to be cross reference table
       if (index == rootByteOffset)
-        minPositiveDiff = crossReferenceByteOffset;
+        minPositiveDiff = file.LastCrossReferenceOffset;
       return rootByteOffset - minPositiveDiff;
     }
   }
 }
-

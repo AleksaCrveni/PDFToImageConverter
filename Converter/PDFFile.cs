@@ -15,7 +15,10 @@ namespace Converter
     public Trailer Trailer { get; set; }
     public List<CRefEntry> CrossReferenceEntries { get; set; }
     public Catalog Catalog { get; set; }
-    public PageTree PageTree { get; set; }
+    // 0 will be root
+    public List<PageTree> PageTrees { get; set; }
+    public List<PageInfo> PageInformation { get; set; }
+    public Stream Stream { get; set; }
   }
 
   public enum PDFVersion
@@ -137,27 +140,24 @@ namespace Converter
     public Dictionary<object, object> MarkInfo;
     public string Lang;
     public Dictionary<object, object> SpiderInfo;
-    public object[] OutputIntents;
+    public List<string> OutputIntents;
     public Dictionary<object, object> PieceInfo;
     public Dictionary<object, object> OCProperties;
     public Dictionary<object, object> Perms;
     public Dictionary<object, object> Legal;
-    public object[] Requirements;
+    public List<string> Requirements;
     public Dictionary<object, object> Collection;
     public bool NeedsRendering = false;
   }
 
+  // Table 29
+  // TODO: Add page atrributes
   public struct PageTree
   {
-    public PageTree() { }
-    public void InitKids(int size)
-    {
-      KidsIRs = new (int, int)[size];
-    }
-    public (int, int)[] KidsIRs;
-    public (int, int) ParentIR = (-1, -1);
+    public List<(int, int)> KidsIRs;
+    public (int, int) ParentIR;
     public int Count;
-    public Rectangle MediaBox;
+    public Rect MediaBox;
   }
   // Table 30
   // Resources - 
@@ -167,32 +167,51 @@ namespace Converter
     public (int, int) ParentIR;
     public DateTime LastModified;
     public Dictionary<object, object> Resources; // use generic dict but later implement it right Table 33
-    public Rectangle MediaBox; // 7.9.5
-    public Rectangle CropBox; // defualt value is media box also check 14.11.2
-    public Rectangle BleedBox;
-    public Rectangle TrimBox;
-    public Rectangle ArtBox;
-    public Rectangle BoxColorInfo;
-    public List<byte[]> Contents;// do  list for now, not sure how to know how many streams there are. See if it can be span
+    public Rect MediaBox; // 7.9.5
+    public Rect CropBox; // defualt value is media box also check 14.11.2
+    public Rect BleedBox;
+    public Rect TrimBox;
+    public Rect ArtBox;
+    public Dictionary<object, object> BoxColorInfo;
+    public byte[] Contents;// do  list for now, not sure how to know how many streams there are. See if it can be span
     public int Rotate;
     public Dictionary<object, object> Group; // 11.4.7
     public byte[] Thumb;
     public List<(int, int)> B; // use list for now, idk size
-    public int Dur;
+    public double Dur;
     public Dictionary<object, object> Trans;
-    public object[] Annots;
+    public List<string> Annots;
     public Dictionary<object, object> AA;
     public byte[] Metadata;
     public Dictionary<object, object> PieceInfo;
     public int StructParents;
-    public string ID;
+    public List<string> ID;
     public int PZ;
     public Dictionary<object, object> SeparationInfo;
     public Tabs Tabs;
     public object TemplateInstantiated; // not sure about this one 
     public Dictionary<object, object> PresSteps;
-    public float UserUnit = 1.0f; // multiplies of 1/72 inch  
+    public double UserUnit = 1.0; // multiplies of 1/72 inch  
     public Dictionary<object, object> VP;
+  }
+
+  // 7.9.5
+  // TODO: check if we can use 16 bit ints
+  public struct Rect()
+  {
+    public void FillRect(int a, int b, int c, int d)
+    {
+      llX = (Int16)a;
+      llY = (Int16)b;
+      urX = (Int16)c;
+      urY = (Int16)d;
+    }
+    // ll -> lower left
+    // ur -> upper right
+    public Int16 llX;
+    public Int16 llY;
+    public Int16 urX;
+    public Int16 urY;
   }
 
 }
