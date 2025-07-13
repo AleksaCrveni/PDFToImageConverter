@@ -1,5 +1,6 @@
 ﻿using Converter.Parsers;
 using System.ComponentModel;
+using System.Diagnostics.CodeAnalysis;
 using System.Drawing;
 using System.Dynamic;
 using System.Reflection.Metadata.Ecma335;
@@ -166,14 +167,14 @@ namespace Converter
     public PageInfo() { }
     public (int, int) ParentIR;
     public DateTime LastModified;
-    public Dictionary<object, object> Resources; // use generic dict but later implement it right Table 33
+    public (int, int) ResourcesIR; // use generic dict but later implement it right Table 33
     public Rect MediaBox; // 7.9.5
     public Rect CropBox; // defualt value is media box also check 14.11.2
     public Rect BleedBox;
     public Rect TrimBox;
     public Rect ArtBox;
     public Dictionary<object, object> BoxColorInfo;
-    public byte[] Contents;// do  list for now, not sure how to know how many streams there are. See if it can be span
+    public (int, int) ContentsIR; // I dontknow if this can be array of IR, docs aren't clear, search more samples
     public int Rotate;
     public Dictionary<object, object> Group; // 11.4.7
     public byte[] Thumb;
@@ -205,6 +206,33 @@ namespace Converter
       llY = (Int16)b;
       urX = (Int16)c;
       urY = (Int16)d;
+    }
+
+    public static bool operator == (Rect a, Rect b)
+    {
+      if (a.urX != b.urX)
+        return false;
+      if (a.urY != b.urY)
+        return false;
+      if (a.llX != b.llX)
+        return false;
+      if (a.llY != b.llY)
+        return false;
+
+      return true;
+    }
+    public static bool operator != (Rect a, Rect b)
+    {
+      if (a.urX == b.urX)
+        return false;
+      if (a.urY == b.urY)
+        return false;
+      if (a.llX == b.llX)
+        return false;
+      if (a.llY == b.llY)
+        return false;
+
+      return true;
     }
     // ll -> lower left
     // ur -> upper right

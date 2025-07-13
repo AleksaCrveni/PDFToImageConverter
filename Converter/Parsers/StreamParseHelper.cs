@@ -9,6 +9,7 @@ namespace Converter.Parsers
     private static byte LF = 0x0a;
     // just retrives CONTENT of next line, so withopt CR and LF bytes, but position will be moved to the END
     // of the line so next time its read normally
+    // TODO: OPTIMIZE THIS READ IN BULK and search 
     public static byte[] GetNextLine(Stream stream)
     {
       // Make sure to move to another line first

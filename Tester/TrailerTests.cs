@@ -73,6 +73,18 @@ namespace Tester
 
       Assert.IsTrue(pdfFile.Catalog.PagesIR == (3, 0));
 
+      Assert.IsTrue(pdfFile.PageTrees.Count == 1);
+      Assert.IsTrue(pdfFile.PageTrees[0].Count == 1);
+      Rect rect = new Rect();
+      rect.FillRect(0, 0, 595, 842);
+      Assert.IsTrue(pdfFile.PageTrees[0].MediaBox == rect);
+      Assert.IsTrue(pdfFile.PageTrees[0].KidsIRs.Count == 1);
+      Assert.IsTrue(pdfFile.PageTrees[0].KidsIRs[0] == (2, 0));
+      Assert.IsTrue(pdfFile.PageInformation.Count == 1);
+      Assert.IsTrue(pdfFile.PageInformation[0].ParentIR == (3, 0));
+      Assert.IsTrue(pdfFile.PageInformation[0].ResourcesIR == (6, 0));
+      Assert.IsTrue(pdfFile.PageInformation[0].ContentsIR == (4, 0));
+      Assert.IsTrue(pdfFile.PageInformation[0].MediaBox == rect);
     }
   }
 }

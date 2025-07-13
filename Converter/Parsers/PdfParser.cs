@@ -95,7 +95,7 @@ namespace Converter.Parsers
         // do i need this...?
         if (pageBuffer.Length != readBytes)
           throw new InvalidDataException("Invalid data");
-        FillRootPageTreeFromSpan(ref file, ref helper, ref rootPageTree);
+        FillRootPageTreeFromSpan(file, ref helper, ref rootPageTree);
       }
       else
       {
@@ -103,16 +103,13 @@ namespace Converter.Parsers
       }
       
     }
-    private void FillRootPageTreeFromSpan(ref PDFFile file, ref SpanParseHelper helper, ref PageTree root)
+    private void FillRootPageTreeFromSpan(PDFFile file, ref SpanParseHelper helper, ref PageTree root)
     {
-      string tokenString = helper.GetNextString();
-      int tokenInt = 0;
-      PageTree rootNode = new PageTree();
       //
       FillRootPageTreeInfo(ref helper, ref root);
       List<PageTree> pageTrees = new List<PageTree>();
       List<PageInfo> pages = new List<PageInfo>();
-      pageTrees.Add(rootNode);
+      pageTrees.Add(root);
       for (int i = 0; i < root.KidsIRs.Count; i++)
       {
         FillAllPageTreeAndInformation(root.KidsIRs[i], pageTrees, pages, file);
@@ -126,7 +123,9 @@ namespace Converter.Parsers
     private void FillRootPageTreeInfo(ref SpanParseHelper helper, ref PageTree pageTree)
     { 
       // testing, idk if this is good idea, i maybe able to do something more with it later
-      if (!helper.ExpectNext("<<"))
+      // When you jump to object it starts at 3 so you have to skip first and second int and 'obj'
+      // This is strict if i want to make it less strict use MatchNextString which will skip all until string is matched
+      if (!helper.ExpectNextUTF8("<<", 3))
         throw new InvalidDataException("Invalid Root Page Tree Info, expected start of dict");
       string tokenString = helper.GetNextString();
       while (tokenString != "" && tokenString != ">>")
@@ -165,10 +164,10 @@ namespace Converter.Parsers
       // do i need this...?
       if (pageBuffer.Length != readBytes)
         throw new InvalidDataException("Invalid data");
-      if (!helper.ExpectNext("<<"))
+      if (!helper.ExpectNextUTF8("<<", 3))
         throw new InvalidDataException("Invalid Root Page Tree Info, expected start of dict");
 
-      if (!helper.ExpectNext("/Type"))
+      if (!helper.ExpectNextUTF8("/Type"))
         throw new InvalidDataException("Invalid Root Page Tree Info, expected start of dict");
 
       string tokenString = helper.GetNextString();
@@ -204,14 +203,14 @@ namespace Converter.Parsers
             // Have some generic enum parser
             "/Parent" => pageInfo.ParentIR = helper.GetNextIndirectReference(),
             "/LastModified" => pageInfo.LastModified = DateTime.UtcNow, // TODO: Fix this when you know how date format looks like!
-            "/Resources" => pageInfo.Resources = helper.GetNextDict(),
+            "/Resources" => pageInfo.ResourcesIR = helper.GetNextIndirectReference(),
             "/MediaBox" => pageInfo.MediaBox = helper.GetNextRectangle(),
             "/CropBox" => pageInfo.CropBox = helper.GetNextRectangle(),
             "/BleedBox" => pageInfo.BleedBox = helper.GetNextRectangle(),
             "/TrimBox" => pageInfo.TrimBox = helper.GetNextRectangle(),
             "/ArtBox" => pageInfo.ArtBox = helper.GetNextRectangle(),
             "/BoxColorInfo" => pageInfo.BoxColorInfo = helper.GetNextDict(),
-            "/Contents" => pageInfo.Contents = helper.GetNextStream(),
+            "/Contents" => pageInfo.ContentsIR = helper.GetNextIndirectReference(),
             "/Rotate" => pageInfo.Rotate = helper.GetNextInt32Strict(),
             "/Group" => pageInfo.Group = helper.GetNextDict(),
             "/Thumb" => pageInfo.Thumb = helper.GetNextStream(),
@@ -671,6 +670,9 @@ namespace Converter.Parsers
       return (UInt64)res;
     }
     // I think if i count object number it would be a bit faster but this is fine too
+   
+    // NOTE: THIS WILL count until next object start so it will count endobj and (i.e) 8 0 obj or longer byte, it should be ok for now
+    // TODO: count until object end remove endobj 
     private long GetDistanceToNextObject(int objectIndex, long rootByteOffset, PDFFile file)
     {
       long minPositiveDiff = long.MaxValue;
@@ -686,9 +688,9 @@ namespace Converter.Parsers
         }
       }
       // means that this is last object so next object is assumed to be cross reference table
-      if (index == rootByteOffset)
-        minPositiveDiff = file.LastCrossReferenceOffset;
-      return rootByteOffset - minPositiveDiff;
+      if (index == objectIndex)
+        return file.LastCrossReferenceOffset - rootByteOffset;
+      return minPositiveDiff;
     }
   }
 }

@@ -3,6 +3,7 @@ using System.ComponentModel.DataAnnotations;
 using System.Diagnostics;
 using System.Drawing;
 using System.Globalization;
+using System.Runtime.Intrinsics.Arm;
 using System.Text;
 
 
@@ -87,6 +88,7 @@ namespace Converter.Parsers
     // TODO: Add more limiters, first digit must be > 0, but second can be 0 higher
     public (int, int) GetNextIndirectReference()
     {
+      SkipWhiteSpace();
       (int a, int b) res;
       
       res.a = GetNextInt32Strict();
@@ -112,7 +114,35 @@ namespace Converter.Parsers
 
       // TODO: maybe dont need new span just read from buffer directly
       ReadOnlySpan<byte> numberInBytes = _buffer.Slice(starter, _position - starter);
-      int result = -1;
+      int result = 0;
+      for (int i = 0; i < numberInBytes.Length; i++)
+      {
+        // these should be no negative ints so this is okay i believe?
+        result = result * 10 + (int)CharUnicodeInfo.GetDecimalDigitValue((char)numberInBytes[i]);
+      }
+      return result;
+    }
+
+    // Non completely loose, only disregard last provided byte decided byte
+    public int GetNextInt32WithExpectedNonDigitEnd(byte nonDigit)
+    {
+      SkipWhiteSpace();
+      int starter = _position;
+      // don't have to check if _char is 0 if we reach end of the buffer becaseu its cheked in IsCurrentCharPdfWhiteSpace
+      while (!IsCurrentCharPdfWhiteSpace())
+      {
+        if (IsCurrentByteDigit())
+          ReadChar();
+        else
+          break;
+      }
+
+      // TODO: maybe dont need new span just read from buffer directly
+      int len = _position - starter;
+      if (_char == nonDigit)
+        ReadChar();
+      ReadOnlySpan<byte> numberInBytes = _buffer.Slice(starter, len);
+      int result = 0;
       for (int i = 0; i < numberInBytes.Length; i++)
       {
         // these should be no negative ints so this is okay i believe?
@@ -191,21 +221,23 @@ namespace Converter.Parsers
       SkipWhiteSpace();
       if (_char != '[')
         throw new InvalidDataException("Invalid Rectangle data. Expected [");
+      // reach char because if there is no space between [ and next number skipspace wont move char
+      // and if we move and next char is also whitespace it will be moved regardless
+      ReadChar();
       int a = GetNextInt32Strict();
-      if (a == -1)
+      if (a < 0)
         throw new InvalidDataException("Invalid Rectangle data. Expected number");
       int b = GetNextInt32Strict();
-      if (b == -1)
+      if (b < 0)
         throw new InvalidDataException("Invalid Rectangle data. Expected number");
       int c = GetNextInt32Strict();
-      if (c == -1)
+      if (c < 0)
         throw new InvalidDataException("Invalid Rectangle data. Expected number");
-      int d = GetNextInt32Strict();
-      if (d == -1)
+      // used this function because string number is sending with ], there is space in between from what i've seen
+      int d = GetNextInt32WithExpectedNonDigitEnd((byte)']');
+      if (d < 0)
         throw new InvalidDataException("Invalid Rectangle data. Expected number");
-      SkipWhiteSpace();
-      if (_char != ']')
-        throw new InvalidDataException("Invalid Rectangle data. Expected ]");
+      // keep this in case there is rectangle with space after last digit
       rect.FillRect(a, b, c, d);
       return rect;
     }
@@ -217,6 +249,7 @@ namespace Converter.Parsers
       SkipWhiteSpace();
       if (_char != '[')
         throw new InvalidDataException("Invalid Rectangle data. Expected [");
+      ReadChar();
       SkipWhiteSpace();
       while(_char != ']')
       {
@@ -260,18 +293,23 @@ namespace Converter.Parsers
     }
 
     // NOTE: max value lenght to match is MAX_STRING_SPAN_ALLOC_SIZE bytes
+    // NOTE: order is to skip next x words, i.e Expect Next 3rd to be etc
+    // NOTE: do not use this for variables expectation because we dont know if variable is UTF8 or 16
     // TODO: Refactor this later
-    public bool ExpectNext(string valToMatch)
+      
+    public bool ExpectNextUTF8(string valToMatch, int order = 0)
     {
-
+      for (int i = 0; i < order; i++)
+        SkipNextString();
       // use span not to allocate another string when getting new string
-      int strSize = valToMatch.Length * sizeof(Char);
+      // count sizeof char to be 1 because we use this internally for expecting UTF8s
+      int strSize = valToMatch.Length; //* sizeof(Char);
       if (strSize > MAX_STRING_SPAN_ALLOC_SIZE)
         throw new InvalidDataException("String to match too big!");
-
+       
       Span<byte> bytesToMatch = stackalloc byte[strSize];
       // only works for little endian, add check perhaps
-      Encoding.Unicode.GetBytes(valToMatch.AsSpan(), bytesToMatch);
+      Encoding.UTF8.GetBytes(valToMatch.AsSpan(), bytesToMatch);
       ReadOnlySpan<byte> nextStringInBytes = new ReadOnlySpan<byte>();
       GetNextStringAsReadOnlySpan(ref nextStringInBytes);
       int smallerLength = bytesToMatch.Length > nextStringInBytes.Length ? nextStringInBytes.Length : bytesToMatch.Length;
@@ -287,6 +325,7 @@ namespace Converter.Parsers
       }
       return true;
     }
+
     public bool GoToNextStringMatch(string valToMatch)
     {
       // use span not to allocate another string when getting new string
@@ -326,6 +365,14 @@ namespace Converter.Parsers
       return isMatched;     
     }
 
+    public void SkipNextString()
+    {
+      SkipWhiteSpace();
+      while (!IsCurrentCharPdfWhiteSpace())
+      {
+        ReadChar();
+      }
+    }
     // can this be inlined?
     private bool IsByteDigit(byte b)
     {
@@ -339,6 +386,7 @@ namespace Converter.Parsers
         return false;
       return true;
     }
+    // maybe first i should readchar
     public void SkipWhiteSpace()
     {
       while (IsCurrentCharPdfWhiteSpace())
