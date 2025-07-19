@@ -532,28 +532,20 @@ namespace Converter.Parsers
         {
           case (byte)0x30:
             return PDFVersion.V1_0;
-            break;
           case (byte)0x31:
             return PDFVersion.V1_1;
-            break;
           case (byte)0x32:
             return PDFVersion.V1_2;
-            break;
           case (byte)0x33:
             return PDFVersion.V1_3;
-            break;
           case (byte)0x34:
             return PDFVersion.V1_4;
-            break;
           case (byte)0x35:
             return PDFVersion.V1_5;
-            break;
           case (byte)0x36:
             return PDFVersion.V1_6;
-            break;
           case (byte)0x37:
             return PDFVersion.V1_7;
-            break;
           default:
             throw new InvalidDataException("Invalid data");
         }
