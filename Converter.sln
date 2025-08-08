@@ -9,6 +9,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "StringToByteConverter", "St
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Tester", "Tester\Tester.csproj", "{6078D1D1-1F3D-45A0-B840-29804379952B}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BenchAndSmallTests", "BenchAndSmallTests\BenchAndSmallTests.csproj", "{43851D22-1EA2-4F1D-BBF4-44420B98FF77}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -27,6 +29,10 @@ Global
 		{6078D1D1-1F3D-45A0-B840-29804379952B}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{6078D1D1-1F3D-45A0-B840-29804379952B}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{6078D1D1-1F3D-45A0-B840-29804379952B}.Release|Any CPU.Build.0 = Release|Any CPU
+		{43851D22-1EA2-4F1D-BBF4-44420B98FF77}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{43851D22-1EA2-4F1D-BBF4-44420B98FF77}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{43851D22-1EA2-4F1D-BBF4-44420B98FF77}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{43851D22-1EA2-4F1D-BBF4-44420B98FF77}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
