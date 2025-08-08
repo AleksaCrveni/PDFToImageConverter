@@ -7,6 +7,7 @@ namespace Converter.Parsers
 {
   // Note to myself - when dealing with variables that are indirect references add 'IR' on the end of the name
   // TODO: Am I stupid or i can just compare characters directly instead of bytes........................
+  // TODO: Decide constats for magic numbers for stackallock
   public class PdfParser
   {
     StringBuilder _sb;
@@ -54,13 +55,12 @@ namespace Converter.Parsers
       
       ReadInitialData(file);
       return file;
-    }
 
+    }
     // Read PDFVersion, Byte offset for last cross reference table, file trailer
 
     void ReadInitialData(PDFFile file)
     {
-
       file.PdfVersion = ParsePdfVersionFromHeader(file.Stream);
       // Read last 1024 bytes and trailer, startxref, (last)cross reference tables bytes and %%EOF
       file.Stream.Seek(-1024, SeekOrigin.End);
@@ -77,33 +77,85 @@ namespace Converter.Parsers
       ParseCrossReferenceTable(file);
       ParseCatalogDictionary(file);
       ParseRootPageTree(file);
+      ParsePagesData(file);
+    }
+
+    private void ParsePagesData(PDFFile file)
+    {
+      PageInfo pInfo;
+      for (int i = 0; i < file.PageInformation.Count; i++)
+      {
+        // Process Resources
+        ResourceDict resourceDict = new ResourceDict();
+        ParseResourceDictionary(file, file.PageInformation[i].ResourcesIR, ref resourceDict);
+        pInfo = file.PageInformation[i];
+        pInfo.ResourceDictionary = resourceDict;
+        file.PageInformation[i] = pInfo;
+      }
+    }
+
+    // TODO: Use Buffer stack/heap like bellow!
+    private void ParseResourceDictionary(PDFFile file, (int objIndex, int) objectPosition, ref ResourceDict resourceDict)
+    {
+      int objectIndex = objectPosition.objIndex;
+      long objectByteOffset = file.CrossReferenceEntries[objectIndex].TenDigitValue;
+      long objectLength = GetDistanceToNextObject(objectIndex, objectByteOffset, file);
+      // do it like this, operations should be same only difference is where underleying memory will be stored
+      Span<byte> buffer = objectLength <= 8192 * 2 ? stackalloc byte[(int)objectLength] : new byte[objectLength];
+      file.Stream.Position = objectByteOffset;
+      SpanParseHelper helper = new SpanParseHelper(ref buffer);
+      int readBytes = file.Stream.Read(buffer);
+      if (buffer.Length != readBytes)
+        throw new InvalidDataException("Invalid Data");
+      if (helper.ExpectNextUTF8("<<", 3))
+        throw new InvalidDataException("Invalid Data");
+      string tokenString = helper.GetNextString();
+      while (tokenString != "" && tokenString != ">>")
+      {
+        object _ = tokenString switch
+        {
+          "/ExtGState" => resourceDict.ExtGState = helper.GetNextDict(),
+          "/ColorSpace" => resourceDict.ColorSpace = helper.GetNextDict(),
+          "/Pattern" => resourceDict.Pattern = helper.GetNextDict(),
+          "/Shading" => resourceDict.Shading = helper.GetNextDict(),
+          "/XObject" => resourceDict.XObject = helper.GetNextDict(),
+          "/Font" => resourceDict.Font = helper.GetNextDict(),
+          "/ProcSet" => resourceDict.ProcSet = helper.GetNextArrayStrict(),
+          "/Properties" => resourceDict.Properties = helper.GetNextDict(),
+          _ => ""
+        };
+        tokenString = helper.GetNextString();        
+      }
+
+      if (tokenString == "")
+        throw new InvalidDataException("Invalid dictionary");
+    }
+
+    private void ParsePageContents(PDFFile file, (int objIndex, int) objectPosition)
+    {
+
     }
     private void ParseRootPageTree(PDFFile file)
     {
       int objectIndex = file.Catalog.PagesIR.Item1;
       long objectByteOffset = file.CrossReferenceEntries[objectIndex].TenDigitValue;
       long objectLength = GetDistanceToNextObject(objectIndex, objectByteOffset, file);
+      PageTree rootPageTree = new PageTree();
+
+      Span<byte> buffer = objectLength <= 8192 * 2 ? stackalloc byte[(int)objectLength] : new byte[objectLength];
+
       // make linked list or just flatten references????
       // ok for now just load all and store it, later be smarter
-      PageTree rootPageTree = new PageTree();
-      if (objectLength <= 8192*2)
-      {
-        file.Stream.Position = objectByteOffset;
-        Span<byte> pageBuffer = stackalloc byte[(int)objectLength];
-        SpanParseHelper helper = new SpanParseHelper(ref pageBuffer);
-        int readBytes = file.Stream.Read(pageBuffer);
-        // do i need this...?
-        if (pageBuffer.Length != readBytes)
-          throw new InvalidDataException("Invalid data");
-        FillRootPageTreeFromSpan(file, ref helper, ref rootPageTree);
-      }
-      else
-      {
-        FillRootPageTreeFromStream(file.Stream, objectByteOffset, objectLength, ref rootPageTree);
-      }
-      
+      file.Stream.Position = objectByteOffset;
+      Span<byte> pageBuffer = stackalloc byte[(int)objectLength];
+      SpanParseHelper helper = new SpanParseHelper(ref pageBuffer);
+      int readBytes = file.Stream.Read(pageBuffer);
+      // do i need this...?
+      if (pageBuffer.Length != readBytes)
+        throw new InvalidDataException("Invalid data");
+      FillRootPageTreeFrom(file, ref helper, ref rootPageTree);
     }
-    private void FillRootPageTreeFromSpan(PDFFile file, ref SpanParseHelper helper, ref PageTree root)
+    private void FillRootPageTreeFrom(PDFFile file, ref SpanParseHelper helper, ref PageTree root)
     {
       //
       FillRootPageTreeInfo(ref helper, ref root);
@@ -121,7 +173,7 @@ namespace Converter.Parsers
     }
 
     private void FillRootPageTreeInfo(ref SpanParseHelper helper, ref PageTree pageTree)
-    { 
+    {
       // testing, idk if this is good idea, i maybe able to do something more with it later
       // When you jump to object it starts at 3 so you have to skip first and second int and 'obj'
       // This is strict if i want to make it less strict use MatchNextString which will skip all until string is matched
@@ -158,11 +210,12 @@ namespace Converter.Parsers
       }
 
       file.Stream.Position = objectByteOffset;
-      Span<byte> pageBuffer = stackalloc byte[(int)objectLength];
-      SpanParseHelper helper = new SpanParseHelper(ref pageBuffer);
-      int readBytes = file.Stream.Read(pageBuffer);
+      Span<byte> buffer = objectLength <= 8192 * 2 ? stackalloc byte[(int)objectLength] : new byte[objectLength];
+     
+      SpanParseHelper helper = new SpanParseHelper(ref buffer);
+      int readBytes = file.Stream.Read(buffer);
       // do i need this...?
-      if (pageBuffer.Length != readBytes)
+      if (buffer.Length != readBytes)
         throw new InvalidDataException("Invalid data");
       if (!helper.ExpectNextUTF8("<<", 3))
         throw new InvalidDataException("Invalid Root Page Tree Info, expected start of dict");
@@ -238,10 +291,6 @@ namespace Converter.Parsers
       }
     }
 
-    private void FillRootPageTreeFromStream(Stream stream, long startPosition, long length, ref PageTree root)
-    {
-      throw new NotImplementedException();
-    }
     private void ParseCatalogDictionary(PDFFile file)
     {
       // Instead of reading one by one to see where end is, get next object position and have that as length to load
@@ -252,25 +301,17 @@ namespace Converter.Parsers
       // if this is bigger 8192 or double that then do see to do some kind of different processing
       // I think that reading in bulk should be faster than reading 1 char by 1 from stream
       Catalog catalog = new Catalog();
-      if (objectLength <= 8192)
-      {
-        file.Stream.Position = objectByteOffset;
-        Span<byte> catalogBuffer = stackalloc byte[(int)objectLength];
-        SpanParseHelper helper = new SpanParseHelper(ref catalogBuffer);
-        int readBytes = file.Stream.Read(catalogBuffer);
-        if (catalogBuffer.Length != readBytes)
-          throw new InvalidDataException("Invalid data");
-        FillCatalogFromSpan(ref helper, ref catalog);
-        // we maybe read a bit more sicne we read last object diff so make sure we are in correct position
-        
-        file.Stream.Position = helper._position + 1;
-      } 
-      else
-      {
-        // heap alloc
-        // NOT TESTED!!!!
-        FillCatalogFromStream(file.Stream, objectByteOffset, objectLength, ref catalog);
-      }
+      file.Stream.Position = objectByteOffset;
+      Span<byte> buffer = objectLength <= 8192 ? stackalloc byte[(int)objectLength] : new byte[objectLength];
+
+      SpanParseHelper helper = new SpanParseHelper(ref buffer);
+      int readBytes = file.Stream.Read(buffer);
+      if (buffer.Length != readBytes)
+        throw new InvalidDataException("Invalid data");
+      FillCatalogFromSpan(ref helper, ref catalog);
+
+      // we maybe read a bit more sicne we read last object diff so make sure we are in correct position
+      file.Stream.Position = helper._position + 1;
 
       // Starting from PDF 1.4 version can be in catalog and it has advantage over header one if its bigger
       if (catalog.Version > PDFVersion.INVALID)
@@ -339,10 +380,6 @@ namespace Converter.Parsers
         }
       }
     }
-    private void FillCatalogFromStream(Stream stream, long startPosition, long length, ref Catalog catalog)
-    {
-      throw new NotImplementedException();
-    }
 
     // TODO: This will work only for one section, not subsections.Fix it later!
     private void ParseCrossReferenceTable(PDFFile file)
@@ -360,7 +397,7 @@ namespace Converter.Parsers
       if (!AreSpansEqual(xrefBuffer, xrefBufferChar, 4))
         throw new InvalidDataException("Invalid data");
 
-      Span<byte> nextLineBuffer = StreamParseHelper.GetNextLine(file.Stream).AsSpan();
+      Span<byte> nextLineBuffer = StreamHelper.GetNextLineAsSpan(file.Stream);
       SpanParseHelper parseHelper = new SpanParseHelper(ref nextLineBuffer);
       int startObj = parseHelper.GetNextInt32Strict();
       int endObj = parseHelper.GetNextInt32Strict();

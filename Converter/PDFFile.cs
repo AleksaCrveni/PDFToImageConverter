@@ -194,6 +194,21 @@ namespace Converter
     public Dictionary<object, object> PresSteps;
     public double UserUnit = 1.0; // multiplies of 1/72 inch  
     public Dictionary<object, object> VP;
+    // This is actual data from ResourcesIR dictionary
+    public ResourceDict ResourceDictionary;
+  }
+  
+  // Table 33
+  public struct ResourceDict()
+  {
+    public Dictionary<object, object> ExtGState;
+    public Dictionary<object, object> ColorSpace;
+    public Dictionary<object, object> Pattern;
+    public Dictionary<object, object> Shading;
+    public Dictionary<object, object> XObject;
+    public Dictionary<object, object> Font;
+    public List<string> ProcSet;
+    public Dictionary<object, object> Properties;
   }
 
   // 7.9.5
