@@ -107,7 +107,7 @@ namespace Converter.Parsers
       int readBytes = file.Stream.Read(buffer);
       if (buffer.Length != readBytes)
         throw new InvalidDataException("Invalid Data");
-      if (helper.ExpectNextUTF8("<<", 3))
+      if (!helper.ExpectNextUTF8("<<", 3))
         throw new InvalidDataException("Invalid Data");
       string tokenString = helper.GetNextString();
       while (tokenString != "" && tokenString != ">>")
@@ -454,7 +454,7 @@ namespace Converter.Parsers
                 "/Info" => trailer.InfoIR = helper.GetNextIndirectReference(),
                 "/Encrypt" => trailer.EncryptIR = helper.GetNextIndirectReference(),
                 "/Prev" => trailer.Prev = helper.GetNextInt32Strict(),
-                "/ID" => trailer.ID = helper.GetNextArrayKnownLengthStrict(2),
+                "/ID" => trailer.ID = helper.GetNextArrayKnownLengthStrict(2, byteString: true),
                 _ => ""
               };
               tokenString = helper.GetNextString();

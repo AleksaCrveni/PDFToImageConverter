@@ -76,9 +76,10 @@ namespace Converter.Parsers
 
       return result;  
     }
+    // FIX THIS
     public Dictionary<object, object> GetNextDict()
     {
-      throw new NotImplementedException();
+      return new Dictionary<object, object>();
     }
 
     public object GetNextNumberTree()
@@ -151,27 +152,28 @@ namespace Converter.Parsers
       return result;
     }
 
-    public List<string> GetNextArrayStrict()
+    public List<string> GetNextArrayStrict(bool byteString = false)
     {
       List<string> array = new List<string>();
       SkipWhiteSpace();
       if (_char != '[')
         throw new InvalidDataException("Invalid array data. Expected Array");
       ReadChar();
-      string nextElement = ReadArrayElement();
+      string nextElement = byteString ? ReadByteString() : GetNextString();
       while (nextElement != "]" && nextElement != "")
       {
         array.Add(nextElement);
-        nextElement = ReadArrayElement();
+        nextElement = byteString ? ReadByteString() : GetNextString();
       }
 
-      if (_char != ']')
+      if (nextElement != "]")
         throw new InvalidDataException("Invalid array data. Expected Array");
       ReadChar();
       return array;
     }
 
-    public string[] GetNextArrayKnownLengthStrict(int len)
+    // bytestring true means that array elements will be byte array so exclude < and >
+    public string[] GetNextArrayKnownLengthStrict(int len, bool byteString = false)
     {
       string[] res = new string[len];
       SkipWhiteSpace();
@@ -179,7 +181,9 @@ namespace Converter.Parsers
         throw new InvalidDataException("Invalid array data. Expected Array");
       ReadChar();
       for (int i = 0; i < len; i++)
-        res[i] = ReadArrayElement();
+      {
+        res[i] = byteString ? ReadByteString() : GetNextString();
+      }
 
       SkipWhiteSpace();
       if (_char != ']')
@@ -187,7 +191,9 @@ namespace Converter.Parsers
       ReadChar();
       return res;
     }
-    public string ReadArrayElement()
+     
+    // byte string is starting with < and ending with >
+    public string ReadByteString()
     {
       SkipWhiteSpace();
       if (_char != '<')
@@ -296,7 +302,6 @@ namespace Converter.Parsers
     // NOTE: order is to skip next x words, i.e Expect Next 3rd to be etc
     // NOTE: do not use this for variables expectation because we dont know if variable is UTF8 or 16
     // TODO: Refactor this later
-      
     public bool ExpectNextUTF8(string valToMatch, int order = 0)
     {
       for (int i = 0; i < order; i++)

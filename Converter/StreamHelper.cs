@@ -28,7 +28,8 @@ namespace Converter
         endPosition = stream.Position;
 
       byte[] arr = new byte[endPosition - startPosition];
-      int bytesRead = stream.Read(arr, (int)startPosition, arr.Length);
+      stream.Position = startPosition;
+      int bytesRead = stream.Read(arr, 0, arr.Length);
       // This should always be same, if its not there is a bug
       if (bytesRead != arr.Length)
         throw new Exception("Exception durring next line position");
@@ -37,6 +38,7 @@ namespace Converter
     }
     private static long GetNextNewLinePosition(Stream stream)
     {
+      long startPosition = stream.Position;
       Span<byte> buffer = stackalloc byte[STACK_ALLOC_SIZE];
       int bytesRead = stream.Read(buffer);
       // EOF
@@ -49,7 +51,7 @@ namespace Converter
       // NUL || HORIZONTAL TAB (HT) || LINE FEED (LF) || FORM FEED (FF) || CARRIAGE RETURN (CR) || SPACE (SP
       bool skipped = false;
       bool reloadedBuffer = false;
-      long startPosition = stream.Position;
+
       // skip to start of nextline
       while (!skipped)
       {
@@ -111,6 +113,7 @@ namespace Converter
         startPosition++;
       }
 
+      stream.Position = startPosition;
       return startPosition;
     }
   }
