@@ -1,5 +1,6 @@
 ﻿using System;
 using System.ComponentModel.DataAnnotations;
+using System.Data;
 using System.Diagnostics;
 using System.Drawing;
 using System.Globalization;
@@ -36,6 +37,7 @@ namespace Converter.Parsers
     }
 
     // NOTE: this works only for small values
+    // NOTE: this may not work as I think it does (stack alloacted)
     public void GetNextStringAsReadOnlySpan(ref ReadOnlySpan<byte> span)
     {
       SkipWhiteSpace();
@@ -48,15 +50,48 @@ namespace Converter.Parsers
       span = _buffer.Slice(starter, _position - starter);
     }
 
+    // This can be used even for array or name
+    public List<T> GetListOfNames<T>(List<T>? defaultValue = null) where T : struct, Enum
+    {
+      List<T> result = new List<T>();
+      SkipWhiteSpace();
+      // single name
+      if (_char != '[')
+      {
+        result.Add(GetNextName<T>());
+        ReadChar(); // is this ok?
+        return result;
+      }
+
+      SkipWhiteSpace();
+      while (_char != ']')
+      {
+        result.Add(GetNextName<T>());
+      }
+
+      ReadChar();
+      return result;
+    }
+
     // This will only check if next string is Enum, i dont want to loop over.
     // This should avoid allocations unless Enum.Parse uses it and if _buffer is allocated on stack
+    // TODO: Optimize this, why am i creating span var instead of just using slice????????????????
+    // TODO: in case of Filter it can be null, see if it needs to be changed here or in Enum, first find exsample
     public T GetNextName<T>(T? defaultValue = null) where T : struct, Enum
     {
-      ReadOnlySpan<byte> span = new ReadOnlySpan<byte>();
-      GetNextStringAsReadOnlySpan(ref span);
+      Span<byte> span = stackalloc byte[256];
 
-      if (span.Length > 256)
-        throw new InvalidDataException("Invalid data");
+      SkipWhiteSpace();
+      int starter = _position;
+      // don't have to check if _char is 0 if we reach end of the buffer becaseu its cheked in IsCurrentCharPdfWhiteSpace
+      // check for ] in case we are doing array, its special char , it should never appear in name AFAIK  
+      while (!IsCurrentCharPdfWhiteSpace() || _char == ']')
+      {
+        ReadChar();
+      }
+      if (_position - starter > 256)
+        throw new InvalidDataException("Name too long!");
+      _buffer.Slice(starter, _position - starter).CopyTo(span);
 
       if (span.Length == 0)
         if (defaultValue != null)
@@ -64,7 +99,8 @@ namespace Converter.Parsers
         else
           throw new InvalidDataException("Invalid data");
       // because name starts with '/'
-      Span<char> spanOfChars = stackalloc char[span.Length-1];
+      // optimize this, don't need whole span.Lenght but do something with _position diff
+      Span<char> spanOfChars = stackalloc char[_position - starter - 1];
       for (int i = 0; i < spanOfChars.Length; i++)
         spanOfChars[i] = (char)span[i+1];
 

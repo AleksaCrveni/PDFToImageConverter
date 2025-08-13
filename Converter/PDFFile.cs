@@ -195,7 +195,8 @@ namespace Converter
     public double UserUnit = 1.0; // multiplies of 1/72 inch  
     public Dictionary<object, object> VP;
     // This is actual data from ResourcesIR dictionary
-    public ResourceDict ResourceDictionary;
+    public ResourceDict ResourceDict;
+    public ContentDict ContentDict;
   }
   
   // Table 33
@@ -210,6 +211,31 @@ namespace Converter
     public List<string> ProcSet;
     public Dictionary<object, object> Properties;
   }
+
+  // 7.4.1 & Table 5
+  // TODO: Expand this
+  public struct ContentDict
+  {
+    // for some reason some pdf files have this as IR instead of direct value
+    // so just in case i will support both for length
+    public long Length;
+    public List<Filter> Filters;
+  }
+
+  public enum Filter
+  { 
+    ASCIIHexDecode,
+    ASCII85Decode,
+    LZWDecode,
+    FlateDecode,
+    RunLengthDecode,
+    CCITTFaxDecode,
+    JBIG2Decode,
+    DCTDecode,
+    JPXDecode,
+    Crypt
+  }
+
 
   // 7.9.5
   // TODO: check if we can use 16 bit ints

@@ -12,6 +12,7 @@ namespace Converter.Parsers
   {
     private readonly byte _newLineByte = 10;
     private readonly string _trailerConst = "trailer";
+    private readonly int KB = 1024;
 
     public void SaveStingRepresentationToDisk(string filepath)
     {
@@ -74,6 +75,7 @@ namespace Converter.Parsers
       ParsePagesData(file);
     }
 
+    // TODO: process resource and content in parallel?
     private void ParsePagesData(PDFFile file)
     {
       PageInfo pInfo;
@@ -83,19 +85,88 @@ namespace Converter.Parsers
         ResourceDict resourceDict = new ResourceDict();
         ParseResourceDictionary(file, file.PageInformation[i].ResourcesIR, ref resourceDict);
         pInfo = file.PageInformation[i];
-        pInfo.ResourceDictionary = resourceDict;
+        pInfo.ResourceDict = resourceDict;
+
+        // Process Contents
+        ContentDict contentDict = new ContentDict();
+        ParsePageContents(file, file.PageInformation[i].ContentsIR, ref contentDict);
+        pInfo.ContentDict = contentDict;
         file.PageInformation[i] = pInfo;
       }
     }
 
-    // TODO: Use Buffer stack/heap like bellow!
+    // TODO: swap everythin to switch case from switch expression
+    private void ParsePageContents(PDFFile file, (int objIndex, int) objectPosition, ref ContentDict contentDict)
+    {
+      // Parse stream Dict
+      int objectIndex = objectPosition.objIndex;
+      long objectByteOffset = file.CrossReferenceEntries[objectIndex].TenDigitValue;
+      // just do 1KB, because i want to just read stream dict, then i will read stream separately
+      Span<byte> buffer = stackalloc byte[KB];
+      SpanParseHelper helper = new SpanParseHelper(ref buffer);
+      file.Stream.Position = objectByteOffset;
+      int readBytes = file.Stream.Read(buffer);
+      if (buffer.Length != readBytes)
+        throw new InvalidDataException("Invalid Data");
+      if (!helper.ExpectNextUTF8("<<", 3))
+        throw new InvalidDataException("Missing stream dictionary!");
+      // TODO: expand this
+      string tokenString = helper.GetNextString();
+      while (tokenString != "" && tokenString != ">>")
+      {
+        switch (tokenString)
+        {
+          // docs say that this is direct value, but i've seen it being IR in some files so account for that?
+          case "/Length":
+            // TODO: Can this be long? test later with huge files
+            int firstNumber = helper.GetNextInt32Strict();
+            tokenString = helper.GetNextString();
+
+            if (tokenString[0] != '/')
+            {
+              // its IR value so read it all and temporary jump to read value
+              long IRByteOffset = file.CrossReferenceEntries[firstNumber].TenDigitValue;
+              long currPosition = file.Stream.Position;
+              file.Stream.Position = IRByteOffset;
+
+              Span<byte> irBuffer = stackalloc byte[KB / 4]; // 256
+              SpanParseHelper irHelper = new SpanParseHelper(ref irBuffer);
+              file.Stream.Read(irBuffer);
+              irHelper.SkipNextString(); // object id
+              irHelper.SkipNextString(); // seocnd number
+              irHelper.SkipNextString(); // 'obj'
+              firstNumber = irHelper.GetNextInt32Strict();
+
+              helper.SkipNextString(); // R
+              tokenString = helper.GetNextString();
+              file.Stream.Position = currPosition;
+            }
+            contentDict.Length = firstNumber;
+            // continue because we alreayd loaded next string
+            continue;
+          case "/Filter":
+            // this will work even if there is one filter and its not date
+            contentDict.Filters = helper.GetListOfNames<Filter>();
+            break;
+          default:
+            break;
+        }
+
+        tokenString = helper.GetNextString();
+      }
+
+      if (tokenString == "")
+        throw new InvalidDataException("Invalid dictionary");
+
+      // Parse stream
+    }
     private void ParseResourceDictionary(PDFFile file, (int objIndex, int) objectPosition, ref ResourceDict resourceDict)
     {
       int objectIndex = objectPosition.objIndex;
       long objectByteOffset = file.CrossReferenceEntries[objectIndex].TenDigitValue;
       long objectLength = GetDistanceToNextObject(objectIndex, objectByteOffset, file);
       // do it like this, operations should be same only difference is where underleying memory will be stored
-      Span<byte> buffer = objectLength <= 8192 * 2 ? stackalloc byte[(int)objectLength] : new byte[objectLength];
+      Span<byte> buffer = objectLength <= KB * 8 ? stackalloc byte[(int)objectLength] : new byte[objectLength];
       file.Stream.Position = objectByteOffset;
       SpanParseHelper helper = new SpanParseHelper(ref buffer);
       int readBytes = file.Stream.Read(buffer);
@@ -136,7 +207,7 @@ namespace Converter.Parsers
       long objectLength = GetDistanceToNextObject(objectIndex, objectByteOffset, file);
       PageTree rootPageTree = new PageTree();
 
-      Span<byte> buffer = objectLength <= 8192 * 2 ? stackalloc byte[(int)objectLength] : new byte[objectLength];
+      Span<byte> buffer = objectLength <= KB * 8 ? stackalloc byte[(int)objectLength] : new byte[objectLength];
 
       // make linked list or just flatten references????
       // ok for now just load all and store it, later be smarter
@@ -197,7 +268,7 @@ namespace Converter.Parsers
       long objectByteOffset = file.CrossReferenceEntries[kidPositionIR.Item1].TenDigitValue;
       long objectLength = GetDistanceToNextObject(kidPositionIR.Item1, objectByteOffset, file);
       
-      if (objectLength > 8192 * 2)
+      if (objectLength > KB * 8)
       {
         // TODO: Do better span or heap alloct diff
         throw new NotImplementedException(); 
@@ -292,11 +363,11 @@ namespace Converter.Parsers
       int objectIndex = file.Trailer.RootIR.Item1;
       long objectByteOffset = file.CrossReferenceEntries[objectIndex].TenDigitValue;
       long objectLength = GetDistanceToNextObject(objectIndex, objectByteOffset, file);
-      // if this is bigger 8192 or double that then do see to do some kind of different processing
+      // if this is bigger 4096 or double that then do see to do some kind of different processing
       // I think that reading in bulk should be faster than reading 1 char by 1 from stream
       Catalog catalog = new Catalog();
       file.Stream.Position = objectByteOffset;
-      Span<byte> buffer = objectLength <= 8192 ? stackalloc byte[(int)objectLength] : new byte[objectLength];
+      Span<byte> buffer = objectLength <= KB * 8 ? stackalloc byte[(int)objectLength] : new byte[objectLength];
 
       SpanParseHelper helper = new SpanParseHelper(ref buffer);
       int readBytes = file.Stream.Read(buffer);
