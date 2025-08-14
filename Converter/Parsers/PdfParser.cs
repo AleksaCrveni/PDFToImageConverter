@@ -379,7 +379,7 @@ namespace Converter.Parsers
       file.Stream.Position = helper._position + 1;
 
       // Starting from PDF 1.4 version can be in catalog and it has advantage over header one if its bigger
-      if (catalog.Version > PDFVersion.INVALID)
+      if (catalog.Version > PDFVersion.Null)
         file.PdfVersion = catalog.Version;
       file.Catalog = catalog;
     }

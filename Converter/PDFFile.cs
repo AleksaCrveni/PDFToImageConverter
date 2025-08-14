@@ -11,7 +11,7 @@ namespace Converter
 {
   public class PDFFile
   {
-    public PDFVersion PdfVersion { get; set; } = PDFVersion.INVALID;
+    public PDFVersion PdfVersion { get; set; } = PDFVersion.Null;
     public long LastCrossReferenceOffset { get; set; }
     public Trailer Trailer { get; set; }
     public List<CRefEntry> CrossReferenceEntries { get; set; }
@@ -24,7 +24,7 @@ namespace Converter
 
   public enum PDFVersion
   {
-    INVALID,
+    Null = 0,
     V1_0,
     V1_1,
     V1_2,
@@ -59,6 +59,7 @@ namespace Converter
 
   public enum Tabs
   {
+    Null = 0,
     R,
     C,
     S
@@ -119,7 +120,7 @@ namespace Converter
   public struct Catalog
   {
     public Catalog() { }
-    public PDFVersion Version = PDFVersion.INVALID;
+    public PDFVersion Version = PDFVersion.Null;
     public Dictionary<object, object> Extensions;
     public (int, int) PagesIR;
     public object PageLabels;
@@ -223,7 +224,8 @@ namespace Converter
   }
 
   public enum Filter
-  { 
+  {
+    Null = 0,
     ASCIIHexDecode,
     ASCII85Decode,
     LZWDecode,

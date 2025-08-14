@@ -75,12 +75,8 @@ namespace Converter.Parsers
 
     // This will only check if next string is Enum, i dont want to loop over.
     // This should avoid allocations unless Enum.Parse uses it and if _buffer is allocated on stack
-    // TODO: Optimize this, why am i creating span var instead of just using slice????????????????
-    // TODO: in case of Filter it can be null, see if it needs to be changed here or in Enum, first find exsample
     public T GetNextName<T>(T? defaultValue = null) where T : struct, Enum
     {
-      Span<byte> span = stackalloc byte[256];
-
       SkipWhiteSpace();
       int starter = _position;
       // don't have to check if _char is 0 if we reach end of the buffer becaseu its cheked in IsCurrentCharPdfWhiteSpace
@@ -91,21 +87,23 @@ namespace Converter.Parsers
       }
       if (_position - starter > 256)
         throw new InvalidDataException("Name too long!");
-      _buffer.Slice(starter, _position - starter).CopyTo(span);
+      ReadOnlySpan<byte> sliceName = _buffer.Slice(starter, _position - starter);
 
-      if (span.Length == 0)
+      if (sliceName.Length == 0)
         if (defaultValue != null)
           return (T)defaultValue;
         else
           throw new InvalidDataException("Invalid data");
-      // because name starts with '/'
-      // optimize this, don't need whole span.Lenght but do something with _position diff
-      Span<char> spanOfChars = stackalloc char[_position - starter - 1];
+
+      // because name starts with '/' we have do -1
+      // this needs to be done because Enum.TryParse accepts only <char>
+      Span<char> spanOfChars = stackalloc char[sliceName.Length - 1];
       for (int i = 0; i < spanOfChars.Length; i++)
-        spanOfChars[i] = (char)span[i+1];
+        spanOfChars[i] = (char)sliceName[i+1];
 
       if (!Enum.TryParse<T>((ReadOnlySpan<char>)spanOfChars, out T result))
         if (defaultValue != null)
+          // this will return (T)0, so default values should be first in enums
           return (T)defaultValue;
         else
           throw new InvalidDataException("Invalid data");
