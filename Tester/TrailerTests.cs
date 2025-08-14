@@ -85,6 +85,9 @@ namespace Tester
       Assert.IsTrue(pdfFile.PageInformation[0].ResourcesIR == (6, 0));
       Assert.IsTrue(pdfFile.PageInformation[0].ContentsIR == (4, 0));
       Assert.IsTrue(pdfFile.PageInformation[0].MediaBox == rect);
+
+      Assert.IsTrue(pdfFile.PageInformation[0].ContentDict.Length == 166);
+      Assert.IsTrue(pdfFile.PageInformation[0].ContentDict.Filters[0] == Filter.FlateDecode);
     }
   }
 }
