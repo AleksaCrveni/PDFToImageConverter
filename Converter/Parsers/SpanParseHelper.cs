@@ -17,18 +17,23 @@ namespace Converter.Parsers
     private int _readPosition = 0; // next position
     private byte _char; // current char
     private const int MAX_STRING_SPAN_ALLOC_SIZE = 4096;
-
+    //                                              (,    ),    <,    >,    [,    ],    {,    },    /,    %
+    private static readonly byte[] delimiters = [0x28, 0x29, 0x3C, 0x3E, 0x5B, 0x5D, 0x7B, 0x7D, 0x2F, 0x25];
 
     public SpanParseHelper(ref Span<byte> buffer)
     {
       _buffer = (ReadOnlySpan<byte>)buffer;
     }
-    public string GetNextString()
+    // it should stop at next special char, but it should exclude them!
+    // if special char is first token its ok!
+    // this is mostly used to get 'keys' in dictionaries
+    // for values there will be specific functions called based on key
+    public string GetNextToken()
     {
-      SkipWhiteSpace();
+      SkipWhiteSpaceAndDelimiters();
       int starter = _position;
       // don't have to check if _char is 0 if we reach end of the buffer becaseu its cheked in IsCurrentCharPdfWhiteSpace
-      while (!IsCurrentCharPdfWhiteSpace())
+      while (!IsCurrentCharPdfWhiteSpace() && !delimiters.Contains(_char))
       {
         ReadChar();
       }
@@ -40,7 +45,7 @@ namespace Converter.Parsers
     // NOTE: this may not work as I think it does (stack alloacted)
     public void GetNextStringAsReadOnlySpan(ref ReadOnlySpan<byte> span)
     {
-      SkipWhiteSpace();
+      SkipWhiteSpaceAndDelimiters();
       int starter = _position;
       // don't have to check if _char is 0 if we reach end of the buffer becaseu its cheked in IsCurrentCharPdfWhiteSpace
       while (!IsCurrentCharPdfWhiteSpace())
@@ -54,7 +59,7 @@ namespace Converter.Parsers
     public List<T> GetListOfNames<T>(List<T>? defaultValue = null) where T : struct, Enum
     {
       List<T> result = new List<T>();
-      SkipWhiteSpace();
+      SkipWhiteSpaceAndDelimiters();
       // single name
       if (_char != '[')
       {
@@ -63,7 +68,7 @@ namespace Converter.Parsers
         return result;
       }
 
-      SkipWhiteSpace();
+      SkipWhiteSpaceAndDelimiters();
       while (_char != ']')
       {
         result.Add(GetNextName<T>());
@@ -77,7 +82,7 @@ namespace Converter.Parsers
     // This should avoid allocations unless Enum.Parse uses it and if _buffer is allocated on stack
     public T GetNextName<T>(T? defaultValue = null) where T : struct, Enum
     {
-      SkipWhiteSpace();
+      SkipWhiteSpaceAndDelimiters();
       int starter = _position;
       // don't have to check if _char is 0 if we reach end of the buffer becaseu its cheked in IsCurrentCharPdfWhiteSpace
       // check for ] in case we are doing array, its special char , it should never appear in name AFAIK  
@@ -123,27 +128,25 @@ namespace Converter.Parsers
     // TODO: Add more limiters, first digit must be > 0, but second can be 0 higher
     public (int, int) GetNextIndirectReference()
     {
-      SkipWhiteSpace();
+      SkipWhiteSpaceAndDelimiters();
       (int a, int b) res;
       
-      res.a = GetNextInt32Strict();
-      res.b = GetNextInt32Strict();
-      SkipWhiteSpace();
+      res.a = GetNextInt32();
+      res.b = GetNextInt32();
+      SkipWhiteSpaceAndDelimiters();
       if (_char != 'R')
         throw new InvalidDataException("Invalid trailer data. Expected R");
       ReadChar();
       return res;
     }
 
-    public int GetNextInt32Strict()
+    public int GetNextInt32()
     {
-      SkipWhiteSpace();
+      SkipWhiteSpaceAndDelimiters();
       int starter = _position;
       // don't have to check if _char is 0 if we reach end of the buffer becaseu its cheked in IsCurrentCharPdfWhiteSpace
-      while (!IsCurrentCharPdfWhiteSpace())
+      while (!IsCurrentCharPdfWhiteSpace() && IsCurrentByteDigit())
       {
-        if (!IsCurrentByteDigit())
-          throw new InvalidDataException("Invalid trailer data. Expected digit");
         ReadChar();
       }
 
@@ -161,7 +164,7 @@ namespace Converter.Parsers
     // Non completely loose, only disregard last provided byte decided byte
     public int GetNextInt32WithExpectedNonDigitEnd(byte nonDigit)
     {
-      SkipWhiteSpace();
+      SkipWhiteSpaceAndDelimiters();
       int starter = _position;
       // don't have to check if _char is 0 if we reach end of the buffer becaseu its cheked in IsCurrentCharPdfWhiteSpace
       while (!IsCurrentCharPdfWhiteSpace())
@@ -189,15 +192,15 @@ namespace Converter.Parsers
     public List<string> GetNextArrayStrict(bool byteString = false)
     {
       List<string> array = new List<string>();
-      SkipWhiteSpace();
+      SkipWhiteSpaceAndDelimiters();
       if (_char != '[')
         throw new InvalidDataException("Invalid array data. Expected Array");
       ReadChar();
-      string nextElement = byteString ? ReadByteString() : GetNextString();
+      string nextElement = byteString ? ReadByteString() : GetNextToken();
       while (nextElement != "]" && nextElement != "")
       {
         array.Add(nextElement);
-        nextElement = byteString ? ReadByteString() : GetNextString();
+        nextElement = byteString ? ReadByteString() : GetNextToken();
       }
 
       if (nextElement != "]")
@@ -210,16 +213,16 @@ namespace Converter.Parsers
     public string[] GetNextArrayKnownLengthStrict(int len, bool byteString = false)
     {
       string[] res = new string[len];
-      SkipWhiteSpace();
+      SkipWhiteSpaceAndDelimiters();
       if (_char != '[')
         throw new InvalidDataException("Invalid array data. Expected Array");
       ReadChar();
       for (int i = 0; i < len; i++)
       {
-        res[i] = byteString ? ReadByteString() : GetNextString();
+        res[i] = byteString ? ReadByteString() : GetNextToken();
       }
 
-      SkipWhiteSpace();
+      SkipWhiteSpaceAndDelimiters();
       if (_char != ']')
         throw new InvalidDataException("Invalid array data. Expected Array");
       ReadChar();
@@ -229,7 +232,7 @@ namespace Converter.Parsers
     // byte string is starting with < and ending with >
     public string ReadByteString()
     {
-      SkipWhiteSpace();
+      SkipWhiteSpaceAndDelimiters();
       if (_char != '<')
         throw new InvalidDataException("Invalid array data. Expected Array");
       // Move to actual array start
@@ -248,7 +251,7 @@ namespace Converter.Parsers
 
     public byte GetNextDigitStrict()
     {
-      SkipWhiteSpace();
+      SkipWhiteSpaceAndDelimiters();
       // throw because strict
       if (_char == 0x00 || !IsCurrentByteDigit())
         throw new InvalidDataException("Invalid trailer data. Expected digit");
@@ -258,19 +261,19 @@ namespace Converter.Parsers
     {
       // .... reference aloc
       Rect rect = new Rect();
-      SkipWhiteSpace();
+      SkipWhiteSpaceAndDelimiters();
       if (_char != '[')
         throw new InvalidDataException("Invalid Rectangle data. Expected [");
       // reach char because if there is no space between [ and next number skipspace wont move char
       // and if we move and next char is also whitespace it will be moved regardless
       ReadChar();
-      int a = GetNextInt32Strict();
+      int a = GetNextInt32();
       if (a < 0)
         throw new InvalidDataException("Invalid Rectangle data. Expected number");
-      int b = GetNextInt32Strict();
+      int b = GetNextInt32();
       if (b < 0)
         throw new InvalidDataException("Invalid Rectangle data. Expected number");
-      int c = GetNextInt32Strict();
+      int c = GetNextInt32();
       if (c < 0)
         throw new InvalidDataException("Invalid Rectangle data. Expected number");
       // used this function because string number is sending with ], there is space in between from what i've seen
@@ -286,15 +289,15 @@ namespace Converter.Parsers
     {
       // its ok since its list atm..
       List<(int, int)> list = new();
-      SkipWhiteSpace();
+      SkipWhiteSpaceAndDelimiters();
       if (_char != '[')
         throw new InvalidDataException("Invalid Rectangle data. Expected [");
       ReadChar();
-      SkipWhiteSpace();
+      SkipWhiteSpaceAndDelimiters();
       while(_char != ']')
       {
         list.Add(GetNextIndirectReference());
-        SkipWhiteSpace();
+        SkipWhiteSpaceAndDelimiters();
       }
       return list;
     }
@@ -303,7 +306,7 @@ namespace Converter.Parsers
 
     public double GetNextDouble()
     {
-      SkipWhiteSpace();
+      SkipWhiteSpaceAndDelimiters();
       int start = _position;
       while (!IsCurrentCharPdfWhiteSpace())
       {
@@ -323,7 +326,7 @@ namespace Converter.Parsers
     }
     public byte[] GetNextStream()
     {
-      SkipWhiteSpace();
+      SkipWhiteSpaceAndDelimiters();
       int start = _position;
       while (!IsCurrentCharPdfWhiteSpace())
       {
@@ -406,7 +409,7 @@ namespace Converter.Parsers
 
     public void SkipNextString()
     {
-      SkipWhiteSpace();
+      SkipWhiteSpaceAndDelimiters();
       while (!IsCurrentCharPdfWhiteSpace())
       {
         ReadChar();
@@ -429,6 +432,12 @@ namespace Converter.Parsers
     public void SkipWhiteSpace()
     {
       while (IsCurrentCharPdfWhiteSpace())
+        ReadChar();
+    }
+
+    public void SkipWhiteSpaceAndDelimiters()
+    {
+      while (IsCurrentCharPdfWhiteSpace() || delimiters.Contains<byte>(_char))
         ReadChar();
     }
 
