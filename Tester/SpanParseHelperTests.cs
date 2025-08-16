@@ -7,6 +7,13 @@ namespace Tester
   [TestClass]
   public sealed class SpanParseHelperTests
   {
+    private enum GenericEnum
+    {
+      Enum1,
+      Enum2,
+      Enum3,
+      Enum4
+    }
     public SpanParseHelperTests()
     {
 
@@ -91,6 +98,46 @@ namespace Tester
 
       nextToken = helper.GetNextToken();
       Debug.Assert(nextToken == "word");
+    }
+
+    [TestMethod]
+    public void GetNextGenericNameSuccess()
+    {
+      string input = "/Enum3//";
+      Span<byte> buffer = new byte[input.Length];
+      for (int i = 0; i < input.Length; i++)
+        buffer[i] = (byte)input[i];
+      SpanParseHelper helper = new SpanParseHelper(ref buffer);
+
+      GenericEnum f = helper.GetNextName<GenericEnum>();
+      Debug.Assert(f == GenericEnum.Enum3);
+    }
+
+    [TestMethod]
+    public void GetNextGenericNameDefault()
+    {
+      string input = "/Enum0//";
+      Span<byte> buffer = new byte[input.Length];
+      for (int i = 0; i < input.Length; i++)
+        buffer[i] = (byte)input[i];
+      SpanParseHelper helper = new SpanParseHelper(ref buffer);
+
+      GenericEnum f = helper.GetNextName<GenericEnum>();
+      Debug.Assert(f == GenericEnum.Enum1);
+    }
+
+    [TestMethod]
+    public void GetNextGenericNameListSuccess()
+    {
+      string input = "[ /Enum1 /Enum2 ]";
+      Span<byte> buffer = new byte[input.Length];
+      for (int i = 0; i < input.Length; i++)
+        buffer[i] = (byte)input[i];
+      SpanParseHelper helper = new SpanParseHelper(ref buffer);
+
+      List<GenericEnum> f = helper.GetListOfNames<GenericEnum>();
+      Debug.Assert(f[0] == GenericEnum.Enum1);
+      Debug.Assert(f[1] == GenericEnum.Enum2);
     }
 
     [TestMethod]

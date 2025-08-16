@@ -53,6 +53,12 @@ namespace Converter.Parsers
       end = _position;
     }
 
+    private void GoToNextNonPdfWhiteSpace()
+    {
+      while (IsCurrentCharPdfWhiteSpace())
+        ReadChar();
+    }
+
     // NOTE: this works only for small values
     // NOTE: this may not work as I think it does (stack alloacted)
     public void GetNextStringAsReadOnlySpan(ref ReadOnlySpan<byte> span)
@@ -68,11 +74,16 @@ namespace Converter.Parsers
     }
 
     // This can be used even for array or name
-    public List<T> GetListOfNames<T>(List<T>? defaultValue = null) where T : struct, Enum
+    // since its impossible to know wether defautl value is expcted or not
+    // when calling this method you should check if your value is (T)0 because 
+    // I added default Null value where there isn't default value
+    public List<T> GetListOfNames<T>() where T : struct, Enum
     {
+      // fix this next, make GetNextDelimiter and check if its ] to know its end of array
+      // can do that for dictionaries as well if needed
       List<T> result = new List<T>();
-      SkipWhiteSpaceAndDelimiters();
-      // single name
+      GoToNextNonPdfWhiteSpace();
+      // single name support
       if (_char != '[')
       {
         result.Add(GetNextName<T>());
@@ -80,10 +91,10 @@ namespace Converter.Parsers
         return result;
       }
 
-      SkipWhiteSpaceAndDelimiters();
       while (_char != ']')
       {
         result.Add(GetNextName<T>());
+        GoToNextNonPdfWhiteSpace();
       }
 
       ReadChar();
@@ -98,7 +109,7 @@ namespace Converter.Parsers
       int end = 0;
       GetNextTokenPositionInt32(ref start, ref end);
       int len = end - start;
-      if (len> 256)
+      if (len > 256)
         throw new InvalidDataException("Name too long!");
       if (len == 0)
           return default(T);
@@ -111,8 +122,9 @@ namespace Converter.Parsers
       if (!Enum.TryParse<T>((ReadOnlySpan<char>)spanOfChars, out T result))
         return default(T);
 
-      return result;  
+      return result;
     }
+
     // FIX THIS
     public Dictionary<object, object> GetNextDict()
     {
