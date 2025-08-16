@@ -221,6 +221,7 @@ namespace Converter
     // so just in case i will support both for length
     public long Length;
     public List<Filter> Filters;
+    public string DecodedStreamData;
   }
 
   public enum Filter

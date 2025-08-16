@@ -446,8 +446,8 @@ namespace Converter.Parsers
               "Names" => catalog.Names = helper.GetNextDict(),
               "Dests" => catalog.DestsIR = helper.GetNextIndirectReference(),
               "ViewerPreferences" => catalog.ViewerPreferences = helper.GetNextDict(),
-              "PageLayout" => catalog.PageLayout = helper.GetNextName<PageLayout>(PageLayout.SinglePage),
-              "PageMode" => catalog.PageMode = helper.GetNextName<PageMode>(PageMode.UserNone),
+              "PageLayout" => catalog.PageLayout = helper.GetNextName<PageLayout>(),
+              "PageMode" => catalog.PageMode = helper.GetNextName<PageMode>(),
               "Outlines" => catalog.OutlinesIR = helper.GetNextIndirectReference(),
               "Threads" => catalog.ThreadsIR = helper.GetNextIndirectReference(),
               // not correct, leave for now

@@ -1,10 +1,6 @@
-﻿using Converter.Parsers;
-using System;
-using System.Collections.Generic;
+﻿using Converter;
+using Converter.Parsers;
 using System.Diagnostics;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace Tester
 {
@@ -95,6 +91,19 @@ namespace Tester
 
       nextToken = helper.GetNextToken();
       Debug.Assert(nextToken == "word");
+    }
+
+    [TestMethod]
+    public void GetNextNameFilterTest()
+    {
+      string input = "/LZWDecode//";
+      Span<byte> buffer = new byte[input.Length];
+      for (int i = 0; i < input.Length; i++)
+        buffer[i] = (byte)input[i];
+      SpanParseHelper helper = new SpanParseHelper(ref buffer);
+
+      Filter f = helper.GetNextName<Filter>();
+      Debug.Assert(f == Filter.LZWDecode);
     }
   }
 }

@@ -41,6 +41,18 @@ namespace Converter.Parsers
       return Encoding.Default.GetString(_buffer.Slice(starter, _position - starter));
     }
 
+    // this gives positions of start and end of next token
+    public void GetNextTokenPositionInt32(ref int start, ref int end)
+    {
+      SkipWhiteSpaceAndDelimiters();
+      start = _position;
+      while (!IsCurrentCharPdfWhiteSpace() && !delimiters.Contains(_char))
+      {
+        ReadChar();
+      }
+      end = _position;
+    }
+
     // NOTE: this works only for small values
     // NOTE: this may not work as I think it does (stack alloacted)
     public void GetNextStringAsReadOnlySpan(ref ReadOnlySpan<byte> span)
@@ -80,38 +92,24 @@ namespace Converter.Parsers
 
     // This will only check if next string is Enum, i dont want to loop over.
     // This should avoid allocations unless Enum.Parse uses it and if _buffer is allocated on stack
-    public T GetNextName<T>(T? defaultValue = null) where T : struct, Enum
+    public T GetNextName<T>() where T : struct, Enum
     {
-      SkipWhiteSpaceAndDelimiters();
-      int starter = _position;
-      // don't have to check if _char is 0 if we reach end of the buffer becaseu its cheked in IsCurrentCharPdfWhiteSpace
-      // check for ] in case we are doing array, its special char , it should never appear in name AFAIK  
-      while (!IsCurrentCharPdfWhiteSpace() || _char == ']')
-      {
-        ReadChar();
-      }
-      if (_position - starter > 256)
+      int start = 0;
+      int end = 0;
+      GetNextTokenPositionInt32(ref start, ref end);
+      int len = end - start;
+      if (len> 256)
         throw new InvalidDataException("Name too long!");
-      ReadOnlySpan<byte> sliceName = _buffer.Slice(starter, _position - starter);
+      if (len == 0)
+          return default(T);
 
-      if (sliceName.Length == 0)
-        if (defaultValue != null)
-          return (T)defaultValue;
-        else
-          throw new InvalidDataException("Invalid data");
-
-      // because name starts with '/' we have do -1
       // this needs to be done because Enum.TryParse accepts only <char>
-      Span<char> spanOfChars = stackalloc char[sliceName.Length - 1];
+      Span<char> spanOfChars = stackalloc char[len];
       for (int i = 0; i < spanOfChars.Length; i++)
-        spanOfChars[i] = (char)sliceName[i+1];
+        spanOfChars[i] = (char)_buffer[start + i]; // no need to make another slice, just use main buffer and offset
 
       if (!Enum.TryParse<T>((ReadOnlySpan<char>)spanOfChars, out T result))
-        if (defaultValue != null)
-          // this will return (T)0, so default values should be first in enums
-          return (T)defaultValue;
-        else
-          throw new InvalidDataException("Invalid data");
+        return default(T);
 
       return result;  
     }
