@@ -52,10 +52,17 @@ namespace Converter.Parsers
       }
       end = _position;
     }
-
+    // this will go to delimiter or regular character
     private void GoToNextNonPdfWhiteSpace()
     {
       while (IsCurrentCharPdfWhiteSpace())
+        ReadChar();
+    }
+
+    // this goes just to delimiter
+    private void GoToNextDelimiter()
+    {
+      while (!delimiters.Contains(_char))
         ReadChar();
     }
 
