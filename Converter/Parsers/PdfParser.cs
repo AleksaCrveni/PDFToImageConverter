@@ -12,7 +12,6 @@ namespace Converter.Parsers
   public class PdfParser
   {
     private readonly byte _newLineByte = 10;
-    private readonly string _trailerConst = "trailer";
     private readonly int KB = 1024;
 
     public void SaveStingRepresentationToDisk(string filepath)
@@ -535,48 +534,48 @@ namespace Converter.Parsers
     private void ParseTrailer(PDFFile file, ref SpanParseHelper helper)
     {
       Trailer trailer = new Trailer();
-      string tokenString = helper.GetNextToken();
-      int tokenInt = 0;
+
+      string tokenString = "-";
       while (tokenString != string.Empty)
       {
-        if (tokenString == _trailerConst)
+        if (tokenString == "trailer")
         {
-          tokenString = helper.GetNextToken();
-
-          // SOMETIMES THERE IS NO SPACE AFTER << so have to check jsut 2 chars, not sure if i have to do this elsewhere
-          if (tokenString.Length >= 2 && tokenString[0] == '<' && tokenString[1] == '<')
+          // is this needed, why dont I just get next token
+          bool startOfDictFound = false;
+          while (!startOfDictFound)
           {
-            if (tokenString.Length == 2)
-              tokenString = helper.GetNextToken();
-            else
-            {
-              tokenString = tokenString.Substring(2);
-            }
-            while (tokenString != "" && !tokenString.EndsWith(">>"))
-            {
-              // TODO: Probably move this to normal switch or if statement because of string alloc in case key is not found
-              object _ = tokenString switch
-              {
-                "Size" => trailer.Size = helper.GetNextInt32(),
-                "Root" => trailer.RootIR = helper.GetNextIndirectReference(),
-                "Info" => trailer.InfoIR = helper.GetNextIndirectReference(),
-                "Encrypt" => trailer.EncryptIR = helper.GetNextIndirectReference(),
-                "Prev" => trailer.Prev = helper.GetNextInt32(),
-                "ID" => trailer.ID = helper.GetNextArrayKnownLengthStrict(2, byteString: true),
-                _ => ""
-              };
-              tokenString = helper.GetNextToken();
-            }
-            // Means that dict is corrupt
-            if (tokenString == "")
-              throw new InvalidDataException("Invalid dictionary");
-            break;
+            helper.ReadUntilNonWhiteSpaceDelimiter();
+            if (helper._char == '<')
+              startOfDictFound = helper.IsCurrentCharacterSameAsNext();
           }
-        }
-        else
-        {
           tokenString = helper.GetNextToken();
-        }
+          while (tokenString != "")
+          {
+            // TODO: Probably move this to normal switch or if statement because of string alloc in case key is not found
+            object _ = tokenString switch
+            {
+              "Size" => trailer.Size = helper.GetNextInt32(),
+              "Root" => trailer.RootIR = helper.GetNextIndirectReference(),
+              "Info" => trailer.InfoIR = helper.GetNextIndirectReference(),
+              "Encrypt" => trailer.EncryptIR = helper.GetNextIndirectReference(),
+              "Prev" => trailer.Prev = helper.GetNextInt32(),
+              "ID" => trailer.ID = helper.GetNextArrayKnownLengthStrict(2),
+              _ => ""
+            };
+
+            
+            // end of dict
+            helper.ReadUntilNonWhiteSpaceDelimiter();
+            if (helper._char == '>' && helper.IsCurrentCharacterSameAsNext())
+              break;
+            tokenString = helper.GetNextToken();
+          }
+          // Means that dict is corrupt
+          if (tokenString == "")
+            throw new InvalidDataException("Invalid dictionary");
+          break;
+        }   
+        tokenString = helper.GetNextToken();
       }
       file.Trailer = trailer;
     }

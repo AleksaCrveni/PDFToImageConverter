@@ -5,6 +5,7 @@ using System.Diagnostics;
 using System.Drawing;
 using System.Globalization;
 using System.Runtime.Intrinsics.Arm;
+using System.Security.Cryptography;
 using System.Text;
 
 
@@ -15,7 +16,7 @@ namespace Converter.Parsers
     private ReadOnlySpan<byte> _buffer;
     public int _position = 0; // current posion
     private int _readPosition = 0; // next position
-    private byte _char; // current char
+    public byte _char; // current char
     private const int MAX_STRING_SPAN_ALLOC_SIZE = 4096;
     //                                              (,    ),    <,    >,    [,    ],    {,    },    /,    %
     private static readonly byte[] delimiters = [0x28, 0x29, 0x3C, 0x3E, 0x5B, 0x5D, 0x7B, 0x7D, 0x2F, 0x25];
@@ -29,6 +30,7 @@ namespace Converter.Parsers
     // this is mostly used to get 'keys' in dictionaries
     // for values there will be specific functions called based on key
     public string GetNextToken()
+
     {
       SkipWhiteSpaceAndDelimiters();
       int starter = _position;
@@ -53,19 +55,29 @@ namespace Converter.Parsers
       end = _position;
     }
     // this will go to delimiter or regular character
-    private void GoToNextNonPdfWhiteSpace()
+    public void GoToNextNonPdfWhiteSpace()
     {
       while (IsCurrentCharPdfWhiteSpace())
         ReadChar();
     }
 
-    // this goes just to delimiter
-    private void GoToNextDelimiter()
+    // this goes just to delimiter or if we are on delimiter do nothing
+    public void ReadUntilNonWhiteSpaceDelimiter()
     {
-      while (!delimiters.Contains(_char))
+      while (!delimiters.Contains(_char) && _readPosition < _buffer.Length)
         ReadChar();
     }
 
+    // this will be only helper function of this kind because
+    // dict is only structure that uses repeated delimiter for start
+    // this may not work in the future if we do moving buffer but now its OK!
+    public bool IsCurrentCharacterSameAsNext()
+    {
+      // if next char is in buffer and if _char is same as next char
+      if (_readPosition < _buffer.Length && _char == _buffer[_readPosition])
+        return true;
+      return false;
+    }
     // NOTE: this works only for small values
     // NOTE: this may not work as I think it does (stack alloacted)
     public void GetNextStringAsReadOnlySpan(ref ReadOnlySpan<byte> span)
@@ -227,19 +239,22 @@ namespace Converter.Parsers
     }
 
     // bytestring true means that array elements will be byte array so exclude < and >
-    public string[] GetNextArrayKnownLengthStrict(int len, bool byteString = false)
+    public string[] GetNextArrayKnownLengthStrict(int len)
     {
       string[] res = new string[len];
-      SkipWhiteSpaceAndDelimiters();
+      ReadUntilNonWhiteSpaceDelimiter();
       if (_char != '[')
         throw new InvalidDataException("Invalid array data. Expected Array");
-      ReadChar();
+
       for (int i = 0; i < len; i++)
       {
-        res[i] = byteString ? ReadByteString() : GetNextToken();
+        SkipWhiteSpaceAndDelimiters();
+        res[i] = GetNextToken();
+        
       }
-
-      SkipWhiteSpaceAndDelimiters();
+      // move to next, so current isn't skipped
+      ReadChar();
+      ReadUntilNonWhiteSpaceDelimiter();
       if (_char != ']')
         throw new InvalidDataException("Invalid array data. Expected Array");
       ReadChar();
@@ -469,8 +484,7 @@ namespace Converter.Parsers
       return false;
     }
 
-
-    private void ReadChar()
+    public void ReadChar()
     {
       if (_readPosition >= _buffer.Length)
         _char = (byte)0x00;
