@@ -31,73 +31,73 @@ namespace Tester
       SpanParseHelper helper = new SpanParseHelper(ref buffer);
 
       string nextToken = helper.GetNextToken();
-      Debug.Assert(nextToken == "Type");
+      Assert.IsTrue(nextToken == "Type");
 
       nextToken = helper.GetNextToken();
-      Debug.Assert(nextToken == "Annot");
+      Assert.IsTrue(nextToken == "Annot");
 
       nextToken = helper.GetNextToken();
-      Debug.Assert(nextToken == "Subtype");
+      Assert.IsTrue(nextToken == "Subtype");
 
       nextToken = helper.GetNextToken();
-      Debug.Assert(nextToken == "Link");
+      Assert.IsTrue(nextToken == "Link");
 
       nextToken = helper.GetNextToken();
-      Debug.Assert(nextToken == "Border");
+      Assert.IsTrue(nextToken == "Border");
 
       nextToken = helper.GetNextToken();
-      Debug.Assert(nextToken == "0");
+      Assert.IsTrue(nextToken == "0");
 
       nextToken = helper.GetNextToken();
-      Debug.Assert(nextToken == "0");
+      Assert.IsTrue(nextToken == "0");
 
       nextToken = helper.GetNextToken();
-      Debug.Assert(nextToken == "0");
+      Assert.IsTrue(nextToken == "0");
 
       nextToken = helper.GetNextToken();
-      Debug.Assert(nextToken == "Rect");
+      Assert.IsTrue(nextToken == "Rect");
 
       nextToken = helper.GetNextToken();
-      Debug.Assert(nextToken == "92");
+      Assert.IsTrue(nextToken == "92");
 
       nextToken = helper.GetNextToken();
-      Debug.Assert(nextToken == "355.7");
+      Assert.IsTrue(nextToken == "355.7");
 
       nextToken = helper.GetNextToken();
-      Debug.Assert(nextToken == "189.9");
+      Assert.IsTrue(nextToken == "189.9");
 
       nextToken = helper.GetNextToken();
-      Debug.Assert(nextToken == "371.4");
+      Assert.IsTrue(nextToken == "371.4");
 
       nextToken = helper.GetNextToken();
-      Debug.Assert(nextToken == "A");
+      Assert.IsTrue(nextToken == "A");
 
       nextToken = helper.GetNextToken();
-      Debug.Assert(nextToken == "Type");
+      Assert.IsTrue(nextToken == "Type");
 
       nextToken = helper.GetNextToken();
-      Debug.Assert(nextToken == "Action");
+      Assert.IsTrue(nextToken == "Action");
 
       nextToken = helper.GetNextToken();
-      Debug.Assert(nextToken == "S");
+      Assert.IsTrue(nextToken == "S");
 
       nextToken = helper.GetNextToken();
-      Debug.Assert(nextToken == "URI");
+      Assert.IsTrue(nextToken == "URI");
 
       nextToken = helper.GetNextToken();
-      Debug.Assert(nextToken == "URI");
+      Assert.IsTrue(nextToken == "URI");
 
       nextToken = helper.GetNextToken();
-      Debug.Assert(nextToken == "https:");
+      Assert.IsTrue(nextToken == "https:");
 
       nextToken = helper.GetNextToken();
-      Debug.Assert(nextToken == "products.office.com");
+      Assert.IsTrue(nextToken == "products.office.com");
 
       nextToken = helper.GetNextToken();
-      Debug.Assert(nextToken == "en-us");
+      Assert.IsTrue(nextToken == "en-us");
 
       nextToken = helper.GetNextToken();
-      Debug.Assert(nextToken == "word");
+      Assert.IsTrue(nextToken == "word");
     }
 
     [TestMethod]
@@ -110,7 +110,7 @@ namespace Tester
       SpanParseHelper helper = new SpanParseHelper(ref buffer);
 
       GenericEnum f = helper.GetNextName<GenericEnum>();
-      Debug.Assert(f == GenericEnum.Enum3);
+      Assert.IsTrue(f == GenericEnum.Enum3);
     }
 
     [TestMethod]
@@ -123,7 +123,7 @@ namespace Tester
       SpanParseHelper helper = new SpanParseHelper(ref buffer);
 
       GenericEnum f = helper.GetNextName<GenericEnum>();
-      Debug.Assert(f == GenericEnum.Enum1);
+      Assert.IsTrue(f == GenericEnum.Enum1);
     }
 
     [TestMethod]
@@ -136,8 +136,8 @@ namespace Tester
       SpanParseHelper helper = new SpanParseHelper(ref buffer);
 
       List<GenericEnum> f = helper.GetListOfNames<GenericEnum>();
-      Debug.Assert(f[0] == GenericEnum.Enum1);
-      Debug.Assert(f[1] == GenericEnum.Enum2);
+      Assert.IsTrue(f[0] == GenericEnum.Enum1);
+      Assert.IsTrue(f[1] == GenericEnum.Enum2);
     }
 
     [TestMethod]
@@ -150,7 +150,7 @@ namespace Tester
       SpanParseHelper helper = new SpanParseHelper(ref buffer);
 
       Filter f = helper.GetNextName<Filter>();
-      Debug.Assert(f == Filter.LZWDecode);
+      Assert.IsTrue(f == Filter.LZWDecode);
     }
   }
 }
