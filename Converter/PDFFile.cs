@@ -244,12 +244,12 @@ namespace Converter
   // TODO: check if we can use 16 bit ints
   public struct Rect()
   {
-    public void FillRect(int a, int b, int c, int d)
+    public void FillRect(double a, double b, double c, double d)
     {
-      llX = (Int16)a;
-      llY = (Int16)b;
-      urX = (Int16)c;
-      urY = (Int16)d;
+      llX = (double)a;
+      llY = (double)b;
+      urX = (double)c;
+      urY = (double)d;
     }
 
     public static bool operator == (Rect a, Rect b)
@@ -280,10 +280,10 @@ namespace Converter
     }
     // ll -> lower left
     // ur -> upper right
-    public Int16 llX;
-    public Int16 llY;
-    public Int16 urX;
-    public Int16 urY;
+    public double llX;
+    public double llY;
+    public double urX;
+    public double urY;
   }
 
 }

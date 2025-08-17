@@ -4,9 +4,11 @@ using System.Data;
 using System.Diagnostics;
 using System.Drawing;
 using System.Globalization;
+using System.Runtime.InteropServices;
 using System.Runtime.Intrinsics.Arm;
 using System.Security.Cryptography;
 using System.Text;
+using System.Xml.Serialization;
 
 
 namespace Converter.Parsers
@@ -174,7 +176,7 @@ namespace Converter.Parsers
       SkipWhiteSpaceAndDelimiters();
       int starter = _position;
       // don't have to check if _char is 0 if we reach end of the buffer becaseu its cheked in IsCurrentCharPdfWhiteSpace
-      while (!IsCurrentCharPdfWhiteSpace() && IsCurrentByteDigit())
+      while (IsCurrentByteDigit())
       {
         ReadChar();
       }
@@ -190,6 +192,32 @@ namespace Converter.Parsers
       return result;
     }
 
+    // do 64 for just in case, not sure if its specified max precision
+    public double GetNextDouble()
+    {
+      SkipWhiteSpaceAndDelimiters();
+      int starter = _position;
+      // don't have to check if _char is 0 if we reach end of the buffer becaseu its cheked in IsCurrentCharPdfWhiteSpace;
+      // long is ok, there won't be as big numbers in pdf files
+      long result = 0;
+      int baseIndex = 0;
+      // significant
+      while (IsCurrentByteDigit() || _char == '.')
+      {
+        if (_char == '.')
+        {
+          baseIndex = _position - starter;
+          ReadChar();
+          continue;
+        }
+        result = result * 10 + CharUnicodeInfo.GetDecimalDigitValue((char)_char);
+        ReadChar();
+      }
+      // == 1 means for some reason last char was 
+      if (baseIndex == 0 || _position - baseIndex - starter == 1)
+        return result;
+      return result / (Math.Pow(10, (_position - baseIndex - starter - 1)));
+    }
     // Non completely loose, only disregard last provided byte decided byte
     public int GetNextInt32WithExpectedNonDigitEnd(byte nonDigit)
     {
@@ -289,29 +317,32 @@ namespace Converter.Parsers
         throw new InvalidDataException("Invalid trailer data. Expected digit");
       return _char;
     }
-    public Rect  GetNextRectangle()
+    public Rect GetNextRectangle()
     {
       // .... reference aloc
       Rect rect = new Rect();
-      SkipWhiteSpaceAndDelimiters();
+      ReadUntilNonWhiteSpaceDelimiter();
       if (_char != '[')
         throw new InvalidDataException("Invalid Rectangle data. Expected [");
       // reach char because if there is no space between [ and next number skipspace wont move char
       // and if we move and next char is also whitespace it will be moved regardless
-      ReadChar();
-      int a = GetNextInt32();
+      double a = GetNextDouble();
       if (a < 0)
         throw new InvalidDataException("Invalid Rectangle data. Expected number");
-      int b = GetNextInt32();
+      double b = GetNextDouble();
       if (b < 0)
         throw new InvalidDataException("Invalid Rectangle data. Expected number");
-      int c = GetNextInt32();
+      double c = GetNextDouble();
       if (c < 0)
         throw new InvalidDataException("Invalid Rectangle data. Expected number");
       // used this function because string number is sending with ], there is space in between from what i've seen
-      int d = GetNextInt32WithExpectedNonDigitEnd((byte)']');
+      double d = GetNextDouble();
       if (d < 0)
         throw new InvalidDataException("Invalid Rectangle data. Expected number");
+
+      ReadUntilNonWhiteSpaceDelimiter();
+      if (_char != ']')
+        throw new InvalidDataException("Invalid Rectangle data. Expected ]");
       // keep this in case there is rectangle with space after last digit
       rect.FillRect(a, b, c, d);
       return rect;
@@ -334,28 +365,6 @@ namespace Converter.Parsers
       return list;
     }
 
-    // TODO: This should return span not actual byte[]
-
-    public double GetNextDouble()
-    {
-      SkipWhiteSpaceAndDelimiters();
-      int start = _position;
-      while (!IsCurrentCharPdfWhiteSpace())
-      {
-        ReadChar();
-      }
-
-      // TODO: if this will work for 32 bit do some better check and fix later
-      int diff = _position - start;
-      if (diff > 64)
-        throw new InvalidDataException("Expected 64 bit double");
-      Span<byte> bytes = stackalloc byte[diff];
-      // its ok since bytes are on stack
-      _buffer.Slice(start, _position - start).CopyTo(bytes);
-      if (BitConverter.IsLittleEndian)
-        bytes.Reverse();
-      return BitConverter.ToDouble(bytes);
-    }
     public byte[] GetNextStream()
     {
       SkipWhiteSpaceAndDelimiters();
@@ -370,11 +379,14 @@ namespace Converter.Parsers
     // NOTE: max value lenght to match is MAX_STRING_SPAN_ALLOC_SIZE bytes
     // NOTE: order is to skip next x words, i.e Expect Next 3rd to be etc
     // NOTE: do not use this for variables expectation because we dont know if variable is UTF8 or 16
-    // TODO: Refactor this later
+    // TODO: Keep this, but maybe there will be used, for now it feels weird to use because string may contain
+    // delimiters
+    [Obsolete("Do not use for now because it will skip over non white space delimiters, use  UntilNextDelimiter() and ReadChar()")]
     public bool ExpectNextUTF8(string valToMatch, int order = 0)
     {
+      // this will skip delimiters so may not work as expected
       for (int i = 0; i < order; i++)
-        SkipNextString();
+        SkipNextToken();
       // use span not to allocate another string when getting new string
       // count sizeof char to be 1 because we use this internally for expecting UTF8s
       int strSize = valToMatch.Length; //* sizeof(Char);
@@ -439,7 +451,7 @@ namespace Converter.Parsers
       return isMatched;     
     }
 
-    public void SkipNextString()
+    public void SkipNextToken()
     {
       SkipWhiteSpaceAndDelimiters();
       while (!IsCurrentCharPdfWhiteSpace())

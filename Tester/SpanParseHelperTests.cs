@@ -151,6 +151,47 @@ namespace Tester
 
       Filter f = helper.GetNextName<Filter>();
       Assert.IsTrue(f == Filter.LZWDecode);
+}
+
+    [TestMethod]
+    public void GetNextRectangle()
+    {
+      string input = "[92 355.7 189.9 371.4]";
+      Span<byte> buffer = new byte[input.Length];
+      for (int i = 0; i < input.Length; i++)
+        buffer[i] = (byte)input[i];
+      SpanParseHelper helper = new SpanParseHelper(ref buffer);
+
+      Rect r = helper.GetNextRectangle();
+      Rect testR = new Rect();
+      testR.FillRect(92, 355.7, 189.9, 371.4);
+      Assert.IsTrue(r == testR);
+    }
+
+    [TestMethod]
+    public void GetNextFloat32WholeSuccess()
+    {
+      string input = "127";
+      Span<byte> buffer = new byte[input.Length];
+      for (int i = 0; i < input.Length; i++)
+        buffer[i] = (byte)input[i];
+      SpanParseHelper helper = new SpanParseHelper(ref buffer);
+
+      double f = helper.GetNextDouble();
+      Assert.IsTrue(f == 127);
+    }
+
+    [TestMethod]
+    public void GetNextFloat32SignificantAndBaseSuccess()
+    {
+      string input = "127.523";
+      Span<byte> buffer = new byte[input.Length];
+      for (int i = 0; i < input.Length; i++)
+        buffer[i] = (byte)input[i];
+      SpanParseHelper helper = new SpanParseHelper(ref buffer);
+
+      double f = helper.GetNextDouble();
+      Assert.IsTrue(f == 127.523);
     }
   }
 }

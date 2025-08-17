@@ -113,16 +113,23 @@ namespace Converter.Parsers
       int readBytes = file.Stream.Read(buffer);
       if (readBytes == 0)
         throw new InvalidDataException("Unexpected EOS!");
-      if (!helper.ExpectNextUTF8("<<", 3))
-        throw new InvalidDataException("Missing stream dictionary!");
+
+      bool startDictFound = false;
+      while (!startDictFound)
+      {
+        helper.ReadUntilNonWhiteSpaceDelimiter();
+        if (helper._char == '<')
+          startDictFound = helper.IsCurrentCharacterSameAsNext();
+      }
+
       // TODO: expand this
       string tokenString = helper.GetNextToken();
-      while (tokenString != "" && tokenString != ">>")
+      while (tokenString != "")
       {
         switch (tokenString)
         {
           // docs say that this is direct value, but i've seen it being IR in some files so account for that?
-          case "/Length":
+          case "Length":
             // TODO: Can this be long? test later with huge files
             int firstNumber = helper.GetNextInt32();
             tokenString = helper.GetNextToken();
@@ -137,19 +144,19 @@ namespace Converter.Parsers
               Span<byte> irBuffer = stackalloc byte[KB / 4]; // 256
               SpanParseHelper irHelper = new SpanParseHelper(ref irBuffer);
               file.Stream.Read(irBuffer);
-              irHelper.SkipNextString(); // object id
-              irHelper.SkipNextString(); // seocnd number
-              irHelper.SkipNextString(); // 'obj'
+              irHelper.SkipNextToken(); // object id
+              irHelper.SkipNextToken(); // seocnd number
+              irHelper.SkipNextToken(); // 'obj'
               firstNumber = irHelper.GetNextInt32();
 
-              helper.SkipNextString(); // R
+              helper.SkipNextToken(); // R
               tokenString = helper.GetNextToken();
               file.Stream.Position = currPosition;
             }
             contentDict.Length = firstNumber;
             // continue because we alreayd loaded next string
             continue;
-          case "/Filter":
+          case "Filter":
             // this will work even if there is one filter and its not date
             contentDict.Filters = helper.GetListOfNames<Filter>();
             break;
@@ -157,6 +164,8 @@ namespace Converter.Parsers
             break;
         }
 
+        if (helper._char == '>' && helper.IsCurrentCharacterSameAsNext())
+          break;
         tokenString = helper.GetNextToken();
       }
 
@@ -202,6 +211,7 @@ namespace Converter.Parsers
       int objectIndex = objectPosition.objIndex;
       long objectByteOffset = file.CrossReferenceEntries[objectIndex].TenDigitValue;
       long objectLength = GetDistanceToNextObject(objectIndex, objectByteOffset, file);
+
       // do it like this, operations should be same only difference is where underleying memory will be stored
       Span<byte> buffer = objectLength <= KB * 8 ? stackalloc byte[(int)objectLength] : new byte[objectLength];
       file.Stream.Position = objectByteOffset;
@@ -209,10 +219,17 @@ namespace Converter.Parsers
       int readBytes = file.Stream.Read(buffer);
       if (buffer.Length != readBytes)
         throw new InvalidDataException("Invalid Data");
-      if (!helper.ExpectNextUTF8("<<", 3))
-        throw new InvalidDataException("Invalid Data");
+
+      bool dictStartFound = false;
+      while (!dictStartFound)
+      {
+        helper.ReadUntilNonWhiteSpaceDelimiter();
+        if (helper._char == '<')
+          dictStartFound = helper.IsCurrentCharacterSameAsNext();
+      }
+
       string tokenString = helper.GetNextToken();
-      while (tokenString != "" && tokenString != ">>")
+      while (tokenString != "")
       {
         object _ = tokenString switch
         {
@@ -226,6 +243,10 @@ namespace Converter.Parsers
           "Properties" => resourceDict.Properties = helper.GetNextDict(),
           _ => ""
         };
+
+        helper.ReadUntilNonWhiteSpaceDelimiter();
+        if (helper._char == '>' && helper.IsCurrentCharacterSameAsNext())
+          break;
         tokenString = helper.GetNextToken();        
       }
 
@@ -276,13 +297,16 @@ namespace Converter.Parsers
 
     private void FillRootPageTreeInfo(ref SpanParseHelper helper, ref PageTree pageTree)
     {
-      // testing, idk if this is good idea, i maybe able to do something more with it later
-      // When you jump to object it starts at 3 so you have to skip first and second int and 'obj'
-      // This is strict if i want to make it less strict use MatchNextString which will skip all until string is matched
-      if (!helper.ExpectNextUTF8("<<", 3))
-        throw new InvalidDataException("Invalid Root Page Tree Info, expected start of dict");
+      bool dictStartFound = false;
+      while (!dictStartFound)
+      {
+        helper.ReadUntilNonWhiteSpaceDelimiter();
+        if (helper._char == '<')
+          dictStartFound = helper.IsCurrentCharacterSameAsNext();
+      }
+
       string tokenString = helper.GetNextToken();
-      while (tokenString != "" && tokenString != ">>")
+      while (tokenString != "")
       {
         object _ = tokenString switch
         {
@@ -293,6 +317,11 @@ namespace Converter.Parsers
           "Kids" => pageTree.KidsIRs = helper.GetNextIndirectReferenceList(),
           _ => ""
         };
+
+        helper.ReadUntilNonWhiteSpaceDelimiter();
+        if (helper._char == '>' && helper.IsCurrentCharacterSameAsNext())
+          break;
+
         tokenString = helper.GetNextToken();
       }
 
@@ -304,32 +333,35 @@ namespace Converter.Parsers
     {
       long objectByteOffset = file.CrossReferenceEntries[kidPositionIR.Item1].TenDigitValue;
       long objectLength = GetDistanceToNextObject(kidPositionIR.Item1, objectByteOffset, file);
-      
-      if (objectLength > KB * 8)
-      {
-        // TODO: Do better span or heap alloct diff
-        throw new NotImplementedException(); 
-      }
 
       file.Stream.Position = objectByteOffset;
-      Span<byte> buffer = objectLength <= 8192 * 2 ? stackalloc byte[(int)objectLength] : new byte[objectLength];
+      Span<byte> buffer = objectLength <= KB * 8 ? stackalloc byte[(int)objectLength] : new byte[objectLength];
      
       SpanParseHelper helper = new SpanParseHelper(ref buffer);
       int readBytes = file.Stream.Read(buffer);
       // do i need this...?
       if (buffer.Length != readBytes)
         throw new InvalidDataException("Invalid data");
-      if (!helper.ExpectNextUTF8("<<", 3))
-        throw new InvalidDataException("Invalid Root Page Tree Info, expected start of dict");
 
-      if (!helper.ExpectNextUTF8("/Type"))
-        throw new InvalidDataException("Invalid Root Page Tree Info, expected start of dict");
+      // start of dict
+      bool dictStartFound = false;
+      while (!dictStartFound)
+      {
+        helper.ReadUntilNonWhiteSpaceDelimiter();
+        if (helper._char == '<')
+          dictStartFound = helper.IsCurrentCharacterSameAsNext();
+      }
 
+      // need to know if this is first key, maybe dont need to check and just skip and expect data
       string tokenString = helper.GetNextToken();
-      if (tokenString == "/Pages")
+      if (tokenString != "Type")
+        throw new InvalidDataException("Expected Page info type key!");
+
+      tokenString = helper.GetNextToken();
+      if (tokenString == "Pages")
       {
         PageTree pageTree = new PageTree();
-        while (tokenString != "" && tokenString != ">>")
+        while (tokenString != "")
         {
           object _ = tokenString switch
           {
@@ -340,6 +372,10 @@ namespace Converter.Parsers
             "Kids" => pageTree.KidsIRs = helper.GetNextIndirectReferenceList(),
             _ => ""
           };
+
+          helper.ReadUntilNonWhiteSpaceDelimiter();
+          if (helper._char == '>' && helper.IsCurrentCharacterSameAsNext())
+            break;
           tokenString = helper.GetNextToken();
         }
         pageTrees.Add(pageTree);
@@ -348,10 +384,10 @@ namespace Converter.Parsers
           FillAllPageTreeAndInformation(pageTree.KidsIRs[i], pageTrees, pages, file);
         }
       }
-      else if (tokenString == "/Page")
+      else if (tokenString == "Page")
       {
         PageInfo pageInfo = new PageInfo();
-        while (tokenString != "" && tokenString != ">>")
+        while (tokenString != "")
         {
           object _ = tokenString switch
           {
@@ -387,6 +423,10 @@ namespace Converter.Parsers
             "VP" => pageInfo.VP = helper.GetNextDict(),
             _ => ""
           };
+
+          helper.ReadUntilNonWhiteSpaceDelimiter();
+          if (helper._char == '>' && helper.IsCurrentCharacterSameAsNext())
+            break;
           tokenString = helper.GetNextToken();
         }
         pages.Add(pageInfo);
@@ -410,7 +450,7 @@ namespace Converter.Parsers
       int readBytes = file.Stream.Read(buffer);
       if (buffer.Length != readBytes)
         throw new InvalidDataException("Invalid data");
-      FillCatalogFromSpan(ref helper, ref catalog);
+      FillCatalog(ref helper, ref catalog);
 
       // we maybe read a bit more sicne we read last object diff so make sure we are in correct position
       file.Stream.Position = helper._position + 1;
@@ -421,66 +461,64 @@ namespace Converter.Parsers
       file.Catalog = catalog;
     }
 
-    private void FillCatalogFromSpan(ref SpanParseHelper helper, ref Catalog catalog)
+    private void FillCatalog(ref SpanParseHelper helper, ref Catalog catalog)
     {
- 
-      string tokenString = helper.GetNextToken();
-      int tokenInt = 0;
-      while (tokenString != string.Empty)
+      bool startOfDictFound = false;
+      while (!startOfDictFound)
       {
-        // Maybe move this to dictionary parsing
-        if (tokenString == "<<")
-        {
-          tokenString = helper.GetNextToken();
-          while (tokenString != "" && tokenString != ">>")
-          {
-            // TODO: Probably move this to normal switch or if statement because of string alloc in case key is not found
-            object _ = tokenString switch
-            {
-              // Have some generic enum parser
-              "Version" => catalog.Version = ParsePdfVersionFromCatalog(ref helper),
-              "Extensions" => catalog.Extensions = helper.GetNextDict(),
-              "Pages" => catalog.PagesIR = helper.GetNextIndirectReference(),
-              "PageLabels" => catalog.PageLabels = helper.GetNextNumberTree(),
-              "Names" => catalog.Names = helper.GetNextDict(),
-              "Dests" => catalog.DestsIR = helper.GetNextIndirectReference(),
-              "ViewerPreferences" => catalog.ViewerPreferences = helper.GetNextDict(),
-              "PageLayout" => catalog.PageLayout = helper.GetNextName<PageLayout>(),
-              "PageMode" => catalog.PageMode = helper.GetNextName<PageMode>(),
-              "Outlines" => catalog.OutlinesIR = helper.GetNextIndirectReference(),
-              "Threads" => catalog.ThreadsIR = helper.GetNextIndirectReference(),
-              // not correct, leave for now
-              "OpenAction" => catalog.OpenAction = helper.GetNextToken(),
-              "AA" => catalog.AA = helper.GetNextDict(),
-              "URI" => catalog.URI = helper.GetNextDict(),
-              "AcroForm" => catalog.AcroForm = helper.GetNextDict(),
-              "MetaData" => catalog.MetadataIR = helper.GetNextIndirectReference(),
-              "StructTreeRoot" => catalog.StructTreeRoot = helper.GetNextDict(),
-              "MarkInfo" => catalog.MarkInfo = helper.GetNextDict(),
-              "Lang" => catalog.Lang = helper.GetNextToken(),
-              "SpiderInfo" => catalog.SpiderInfo = helper.GetNextDict(),
-              "OutputIntents" => catalog.OutputIntents = helper.GetNextArrayStrict(),
-              "PieceInfo" => catalog.PieceInfo = helper.GetNextDict(),
-              "OCProperties" => catalog.OCProperties = helper.GetNextDict(),
-              "Perms" => catalog.Perms = helper.GetNextDict(),
-              "Legal" => catalog.Legal = helper.GetNextDict(),
-              "Requirements" => catalog.Requirements = helper.GetNextArrayStrict(),
-              "Collection" => catalog.Collection = helper.GetNextDict(),
-              "NeedsRendering" => catalog.NeedsRendering = helper.GetNextToken() == "true",
-              _ => ""
-            };
-            tokenString = helper.GetNextToken();
-          }
-          // Means that dict is corrupt
-          if (tokenString == "")
-            throw new InvalidDataException("Invalid dictionary");
-          break;
-        }
-        else
-        {
-          tokenString = helper.GetNextToken();
-        }
+        helper.ReadUntilNonWhiteSpaceDelimiter();
+        if (helper._char == '<')
+          startOfDictFound = helper.IsCurrentCharacterSameAsNext();
       }
+      string tokenString = helper.GetNextToken();
+      // Maybe move this to dictionary parsing
+      tokenString = helper.GetNextToken();
+      while (tokenString != "")
+      {
+        // TODO: Probably move this to normal switch or if statement because of string alloc in case key is not found
+        object _ = tokenString switch
+        {
+          // Have some generic enum parser
+          "Version" => catalog.Version = ParsePdfVersionFromCatalog(ref helper),
+          "Extensions" => catalog.Extensions = helper.GetNextDict(),
+          "Pages" => catalog.PagesIR = helper.GetNextIndirectReference(),
+          "PageLabels" => catalog.PageLabels = helper.GetNextNumberTree(),
+          "Names" => catalog.Names = helper.GetNextDict(),
+          "Dests" => catalog.DestsIR = helper.GetNextIndirectReference(),
+          "ViewerPreferences" => catalog.ViewerPreferences = helper.GetNextDict(),
+          "PageLayout" => catalog.PageLayout = helper.GetNextName<PageLayout>(),
+          "PageMode" => catalog.PageMode = helper.GetNextName<PageMode>(),
+          "Outlines" => catalog.OutlinesIR = helper.GetNextIndirectReference(),
+          "Threads" => catalog.ThreadsIR = helper.GetNextIndirectReference(),
+          // not correct, leave for now
+          "OpenAction" => catalog.OpenAction = helper.GetNextToken(),
+          "AA" => catalog.AA = helper.GetNextDict(),
+          "URI" => catalog.URI = helper.GetNextDict(),
+          "AcroForm" => catalog.AcroForm = helper.GetNextDict(),
+          "MetaData" => catalog.MetadataIR = helper.GetNextIndirectReference(),
+          "StructTreeRoot" => catalog.StructTreeRoot = helper.GetNextDict(),
+          "MarkInfo" => catalog.MarkInfo = helper.GetNextDict(),
+          "Lang" => catalog.Lang = helper.GetNextToken(),
+          "SpiderInfo" => catalog.SpiderInfo = helper.GetNextDict(),
+          "OutputIntents" => catalog.OutputIntents = helper.GetNextArrayStrict(),
+          "PieceInfo" => catalog.PieceInfo = helper.GetNextDict(),
+          "OCProperties" => catalog.OCProperties = helper.GetNextDict(),
+          "Perms" => catalog.Perms = helper.GetNextDict(),
+          "Legal" => catalog.Legal = helper.GetNextDict(),
+          "Requirements" => catalog.Requirements = helper.GetNextArrayStrict(),
+          "Collection" => catalog.Collection = helper.GetNextDict(),
+          "NeedsRendering" => catalog.NeedsRendering = helper.GetNextToken() == "true",
+          _ => ""
+        };
+
+        helper.ReadUntilNonWhiteSpaceDelimiter();
+        if (helper._char == '>' && helper.IsCurrentCharacterSameAsNext())
+          break;
+        tokenString = helper.GetNextToken();
+      }
+      // Means that dict is corrupt
+      if (tokenString == "")
+        throw new InvalidDataException("Invalid dictionary");
     }
 
     // TODO: This will work only for one section, not subsections.Fix it later!
