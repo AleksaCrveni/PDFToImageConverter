@@ -246,21 +246,27 @@ namespace Converter.Parsers
       return result;
     }
 
-    public List<string> GetNextArrayStrict(bool byteString = false)
+    public List<string> GetNextArrayStrict()
     {
       List<string> array = new List<string>();
-      SkipWhiteSpaceAndDelimiters();
+      ReadUntilNonWhiteSpaceDelimiter();
       if (_char != '[')
         throw new InvalidDataException("Invalid array data. Expected Array");
       ReadChar();
-      string nextElement = byteString ? ReadByteString() : GetNextToken();
-      while (nextElement != "]" && nextElement != "")
+
+      string nextElement = GetNextToken();
+      while (nextElement != "")
       {
         array.Add(nextElement);
-        nextElement = byteString ? ReadByteString() : GetNextToken();
+
+        SkipWhiteSpace();
+        if (_char == ']')
+          break;
+
+        nextElement = GetNextToken();       
       }
 
-      if (nextElement != "]")
+      if (nextElement == "")
         throw new InvalidDataException("Invalid array data. Expected Array");
       ReadChar();
       return array;
@@ -278,7 +284,6 @@ namespace Converter.Parsers
       {
         SkipWhiteSpaceAndDelimiters();
         res[i] = GetNextToken();
-        
       }
       // move to next, so current isn't skipped
       ReadChar();
@@ -343,8 +348,10 @@ namespace Converter.Parsers
       ReadUntilNonWhiteSpaceDelimiter();
       if (_char != ']')
         throw new InvalidDataException("Invalid Rectangle data. Expected ]");
+      ReadChar();
       // keep this in case there is rectangle with space after last digit
       rect.FillRect(a, b, c, d);
+      
       return rect;
     }
 
@@ -352,7 +359,7 @@ namespace Converter.Parsers
     {
       // its ok since its list atm..
       List<(int, int)> list = new();
-      SkipWhiteSpaceAndDelimiters();
+      ReadUntilNonWhiteSpaceDelimiter();
       if (_char != '[')
         throw new InvalidDataException("Invalid Rectangle data. Expected [");
       ReadChar();
@@ -360,8 +367,9 @@ namespace Converter.Parsers
       while(_char != ']')
       {
         list.Add(GetNextIndirectReference());
-        SkipWhiteSpaceAndDelimiters();
+        ReadUntilNonWhiteSpaceDelimiter();
       }
+      ReadChar();
       return list;
     }
 
