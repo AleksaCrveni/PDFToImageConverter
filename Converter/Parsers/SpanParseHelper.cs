@@ -10,7 +10,6 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Xml.Serialization;
 
-
 namespace Converter.Parsers
 {
   public ref struct SpanParseHelper
@@ -23,6 +22,7 @@ namespace Converter.Parsers
     //                                              (,    ),    <,    >,    [,    ],    {,    },    /,    %
     private static readonly byte[] delimiters = [0x28, 0x29, 0x3C, 0x3E, 0x5B, 0x5D, 0x7B, 0x7D, 0x2F, 0x25];
 
+    // TODO: do 0x00 check whenever looping ReadByte()
     public SpanParseHelper(ref Span<byte> buffer)
     {
       _buffer = (ReadOnlySpan<byte>)buffer;
@@ -64,6 +64,7 @@ namespace Converter.Parsers
     }
 
     // this goes just to delimiter or if we are on delimiter do nothing
+    // TODO: THINK IF IT SHOULD JUST MOVE TO NEXT DELIMITER
     public void ReadUntilNonWhiteSpaceDelimiter()
     {
       while (!delimiters.Contains(_char) && _readPosition < _buffer.Length)
@@ -73,6 +74,7 @@ namespace Converter.Parsers
     // this will be only helper function of this kind because
     // dict is only structure that uses repeated delimiter for start
     // this may not work in the future if we do moving buffer but now its OK!
+    // TODO: this really should move at leats one char...
     public bool IsCurrentCharacterSameAsNext()
     {
       // if next char is in buffer and if _char is same as next char
@@ -108,7 +110,6 @@ namespace Converter.Parsers
       if (_char != '[')
       {
         result.Add(GetNextName<T>());
-        ReadChar(); // is this ok?
         return result;
       }
 
@@ -146,9 +147,41 @@ namespace Converter.Parsers
       return result;
     }
 
-    // FIX THIS
+    // skipp dict just for now
+    // what I don't need
+    // TODO: Think if i should be searching for endobj instead of >>
     public Dictionary<object, object> GetNextDict()
     {
+      bool endOfOutsideDict = false;
+      ReadUntilNonWhiteSpaceDelimiter();
+      if (_char == '<' && IsCurrentCharacterSameAsNext())
+        ReadChar();
+      ReadChar();
+
+      ReadUntilNonWhiteSpaceDelimiter();
+      int innerDictCount = 0;
+      
+      while (!endOfOutsideDict)
+      {
+        if (_char == 0x00)
+          throw new InvalidDataException("Unexpected EOS");
+        else if (_char == '<' && IsCurrentCharacterSameAsNext())
+        {
+          innerDictCount++;
+          ReadChar(); // read extra char to move off double deliter
+        } else if (_char == '>' && IsCurrentCharacterSameAsNext())
+        {
+          innerDictCount--;
+          ReadChar();
+          if (innerDictCount < 0)
+            break;
+        }
+
+        ReadChar();
+        ReadUntilNonWhiteSpaceDelimiter();
+      }
+
+      ReadChar();
       return new Dictionary<object, object>();
     }
 
@@ -459,6 +492,20 @@ namespace Converter.Parsers
       return isMatched;     
     }
 
+    // String literal
+    public string GetNextTextString()
+    {
+      ReadUntilNonWhiteSpaceDelimiter();
+      if (_char != '(')
+        throw new InvalidDataException("String literal error. Expected (");
+
+      string result = GetNextToken();
+
+      if (_char != ')')
+        throw new InvalidDataException("String literal error. Expected (");
+      ReadChar();
+      return result;
+    }
     public void SkipNextToken()
     {
       SkipWhiteSpaceAndDelimiters();

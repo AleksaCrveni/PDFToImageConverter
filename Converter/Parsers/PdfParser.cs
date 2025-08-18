@@ -3,7 +3,6 @@ using System.Globalization;
 using System.IO;
 using System.IO.Compression;
 using System.Text;
-
 namespace Converter.Parsers
 {
   // Note to myself - when dealing with variables that are indirect references add 'IR' on the end of the name
@@ -132,9 +131,9 @@ namespace Converter.Parsers
           case "Length":
             // TODO: Can this be long? test later with huge files
             int firstNumber = helper.GetNextInt32();
-            tokenString = helper.GetNextToken();
+            helper.SkipWhiteSpace();
 
-            if (tokenString[0] != '/')
+            if (char.IsDigit((char)helper._char))
             {
               // its IR value so read it all and temporary jump to read value
               long IRByteOffset = file.CrossReferenceEntries[firstNumber].TenDigitValue;
@@ -149,13 +148,12 @@ namespace Converter.Parsers
               irHelper.SkipNextToken(); // 'obj'
               firstNumber = irHelper.GetNextInt32();
 
-              helper.SkipNextToken(); // R
-              tokenString = helper.GetNextToken();
+              helper.SkipNextToken();
               file.Stream.Position = currPosition;
             }
             contentDict.Length = firstNumber;
             // continue because we alreayd loaded next string
-            continue;
+            break;
           case "Filter":
             // this will work even if there is one filter and its not date
             contentDict.Filters = helper.GetListOfNames<Filter>();
@@ -199,8 +197,9 @@ namespace Converter.Parsers
       Span<byte> encodedSpan = buffer.Slice(helper._position, (int)encodedStreamLen);
       var stream = new MemoryStream();
 
-      using (var compressStream = new MemoryStream(encodedSpan.ToArray()))
-      using (var decompressor = new DeflateStream(compressStream, CompressionMode.Decompress))
+      var arr = encodedSpan.ToArray();
+      using (var compressStream = new MemoryStream(arr))
+      using (var decompressor = new ZLibStream(compressStream, CompressionMode.Decompress))
         decompressor.CopyTo(stream);
 
       string contentDecoded = Encoding.Default.GetString(stream.ToArray());
@@ -231,18 +230,49 @@ namespace Converter.Parsers
       string tokenString = helper.GetNextToken();
       while (tokenString != "")
       {
-        object _ = tokenString switch
+        switch (tokenString)
         {
-          "ExtGState" => resourceDict.ExtGState = helper.GetNextDict(),
-          "ColorSpace" => resourceDict.ColorSpace = helper.GetNextDict(),
-          "Pattern" => resourceDict.Pattern = helper.GetNextDict(),
-          "Shading" => resourceDict.Shading = helper.GetNextDict(),
-          "XObject" => resourceDict.XObject = helper.GetNextDict(),
-          "Font" => resourceDict.Font = helper.GetNextDict(),
-          "ProcSet" => resourceDict.ProcSet = helper.GetNextArrayStrict(),
-          "Properties" => resourceDict.Properties = helper.GetNextDict(),
-          _ => ""
-        };
+          case "ExtGState":
+            resourceDict.ExtGState = helper.GetNextDict();
+            break;
+          case "ColorSpace":
+            resourceDict.ColorSpace = helper.GetNextDict();
+            break;
+          case "Pattern":
+            resourceDict.Pattern = helper.GetNextDict();
+            break;
+          case "Shading":
+            resourceDict.Shading = helper.GetNextDict();
+            break;
+          case "XObject":
+            resourceDict.XObject = helper.GetNextDict();
+            break;
+          case "Font":
+            // not specified in documentation, but i've seen files where Font is just IR and not dict of IRs
+            helper.SkipWhiteSpace();
+            if (helper._char == '<')
+            {
+
+              _ = helper.GetNextDict();
+              // PLACEHOLDER
+              resourceDict.Font = new Dictionary<string, (int, int)>();
+            }
+            else
+            {
+              (int a, int b) IR = helper.GetNextIndirectReference();
+              Dictionary<string, (int, int)> dict = new Dictionary<string, (int, int)>();
+              dict.Add("R1", IR);
+            }
+            break;
+          case "ProcSet":
+            resourceDict.ProcSet = helper.GetNextArrayStrict();
+            break;
+          case "Properties":
+            resourceDict.Properties = helper.GetNextDict();
+            break;
+          default:
+            break;
+        }
 
         helper.ReadUntilNonWhiteSpaceDelimiter();
         if (helper._char == '>' && helper.IsCurrentCharacterSameAsNext())
@@ -308,15 +338,23 @@ namespace Converter.Parsers
       string tokenString = helper.GetNextToken();
       while (tokenString != "")
       {
-        object _ = tokenString switch
+        switch (tokenString)
         {
-          // Have some generic enum parser
-          "Parent" => pageTree.ParentIR = helper.GetNextIndirectReference(),
-          "Count" => pageTree.Count = helper.GetNextInt32(),
-          "MediaBox" => pageTree.MediaBox = helper.GetNextRectangle(),
-          "Kids" => pageTree.KidsIRs = helper.GetNextIndirectReferenceList(),
-          _ => ""
-        };
+          case "Parent":
+            pageTree.ParentIR = helper.GetNextIndirectReference();
+            break;
+          case "Count":
+            pageTree.Count = helper.GetNextInt32();
+            break;
+          case "MediaBox":
+            pageTree.MediaBox = helper.GetNextRectangle();
+            break;
+          case "Kids":
+            pageTree.KidsIRs = helper.GetNextIndirectReferenceList();
+            break;
+          default:
+            break;
+        }
 
         helper.ReadUntilNonWhiteSpaceDelimiter();
         if (helper._char == '>' && helper.IsCurrentCharacterSameAsNext())
@@ -363,15 +401,23 @@ namespace Converter.Parsers
         PageTree pageTree = new PageTree();
         while (tokenString != "")
         {
-          object _ = tokenString switch
+          switch (tokenString)
           {
-            // Have some generic enum parser
-            "Parent" => pageTree.ParentIR = helper.GetNextIndirectReference(),
-            "Count" => pageTree.Count = helper.GetNextInt32(),
-            "MediaBox" => pageTree.MediaBox = helper.GetNextRectangle(),
-            "Kids" => pageTree.KidsIRs = helper.GetNextIndirectReferenceList(),
-            _ => ""
-          };
+            case "Parent":
+              pageTree.ParentIR = helper.GetNextIndirectReference();
+              break;
+            case "Count":
+              pageTree.Count = helper.GetNextInt32();
+              break;
+            case "MediaBox":
+              pageTree.MediaBox = helper.GetNextRectangle();
+              break;
+            case "Kids":
+              pageTree.KidsIRs = helper.GetNextIndirectReferenceList();
+              break;
+            default:
+              break;
+          }
 
           helper.ReadUntilNonWhiteSpaceDelimiter();
           if (helper._char == '>' && helper.IsCurrentCharacterSameAsNext())
@@ -389,40 +435,98 @@ namespace Converter.Parsers
         PageInfo pageInfo = new PageInfo();
         while (tokenString != "")
         {
-          object _ = tokenString switch
+          switch (tokenString)
           {
-            // Have some generic enum parser
-            "Parent" => pageInfo.ParentIR = helper.GetNextIndirectReference(),
-            "LastModified" => pageInfo.LastModified = DateTime.UtcNow, // TODO: Fix this when you know how date format looks like!
-            "Resources" => pageInfo.ResourcesIR = helper.GetNextIndirectReference(),
-            "MediaBox" => pageInfo.MediaBox = helper.GetNextRectangle(),
-            "CropBox" => pageInfo.CropBox = helper.GetNextRectangle(),
-            "BleedBox" => pageInfo.BleedBox = helper.GetNextRectangle(),
-            "TrimBox" => pageInfo.TrimBox = helper.GetNextRectangle(),
-            "ArtBox" => pageInfo.ArtBox = helper.GetNextRectangle(),
-            "BoxColorInfo" => pageInfo.BoxColorInfo = helper.GetNextDict(),
-            "Contents" => pageInfo.ContentsIR = helper.GetNextIndirectReference(),
-            "Rotate" => pageInfo.Rotate = helper.GetNextInt32(),
-            "Group" => pageInfo.Group = helper.GetNextDict(),
-            "Thumb" => pageInfo.Thumb = helper.GetNextStream(),
-            "B" => pageInfo.B = helper.GetNextIndirectReferenceList(),
-            "Dur" => pageInfo.Dur = helper.GetNextDouble(),
-            "Trans" => pageInfo.Trans = helper.GetNextDict(),
-            "Annots" => pageInfo.Annots = helper.GetNextArrayStrict(),
-            "AA" => pageInfo.AA = helper.GetNextDict(),
-            "Metadata" => pageInfo.Metadata = helper.GetNextStream(),
-            "PieceInfo" => pageInfo.PieceInfo = helper.GetNextDict(),
-            "StructParents" => pageInfo.StructParents = helper.GetNextInt32(),
-            "ID" => pageInfo.ID = helper.GetNextArrayStrict(),
-            "PZ" => pageInfo.PZ = helper.GetNextInt32(),
-            "SeparationInfo" => pageInfo.SeparationInfo = helper.GetNextDict(),
-            "Tabs" => pageInfo.Tabs = helper.GetNextName<Tabs>(),
-            "TemplateInstantiated" => pageInfo.TemplateInstantiated = helper.GetNextToken(),
-            "PresSteps" => pageInfo.PresSteps = helper.GetNextDict(),
-            "UserUnit" => pageInfo.UserUnit = helper.GetNextDouble(),
-            "VP" => pageInfo.VP = helper.GetNextDict(),
-            _ => ""
-          };
+            case "Parent":
+              pageInfo.ParentIR = helper.GetNextIndirectReference();
+              break;
+            case "LastModified" :
+              pageInfo.LastModified = DateTime.UtcNow; // TODO: Fix this hen you know how dat e asecformat looks like
+             break;
+            case "Resources" :
+              pageInfo.ResourcesIR = helper.GetNextIndirectReference();
+              break;
+            case "MediaBox" :
+              pageInfo.MediaBox = helper.GetNextRectangle();
+              break;
+            case "CropBox" :
+              pageInfo.CropBox = helper.GetNextRectangle();
+              break;
+            case "BleedBox" :
+              pageInfo.BleedBox = helper.GetNextRectangle();
+              break;
+            case "TrimBox" :
+              pageInfo.TrimBox = helper.GetNextRectangle();
+              break;
+            case "ArtBox" :
+              pageInfo.ArtBox = helper.GetNextRectangle();
+              break;
+            case "BoxColorInfo" :
+              pageInfo.BoxColorInfo = helper.GetNextDict();
+              break;
+            case "Contents" :
+              pageInfo.ContentsIR = helper.GetNextIndirectReference();
+              break;
+            case "Rotate" :
+              pageInfo.Rotate = helper.GetNextInt32();
+              break;
+            case "Group" :
+              pageInfo.Group = helper.GetNextDict();
+              break;
+            case "Thumb" :
+              pageInfo.Thumb = helper.GetNextStream();
+              break;
+            case "B" :
+              pageInfo.B = helper.GetNextIndirectReferenceList();
+              break;
+            case "Dur" :
+              pageInfo.Dur = helper.GetNextDouble();
+              break;
+            case "Trans" :
+              pageInfo.Trans = helper.GetNextDict();
+              break;
+            case "Annots" :
+              pageInfo.Annots = helper.GetNextArrayStrict();
+              break;
+            case "AA" :
+              pageInfo.AA = helper.GetNextDict();
+              break;
+            case "Metadata" :
+              pageInfo.Metadata = helper.GetNextStream();
+              break;
+            case "PieceInfo" :
+              pageInfo.PieceInfo = helper.GetNextDict();
+              break;
+            case "StructParents" :
+              pageInfo.StructParents = helper.GetNextInt32();
+              break;
+            case "ID" :
+              pageInfo.ID = helper.GetNextArrayStrict();
+              break;
+            case "PZ" :
+              pageInfo.PZ = helper.GetNextInt32();
+              break;
+            case "SeparationInfo" :
+              pageInfo.SeparationInfo = helper.GetNextDict();
+              break;
+            case "Tabs" :
+              pageInfo.Tabs = helper.GetNextName<Tabs>();
+              break;
+            case "TemplateInstantiated" :
+              pageInfo.TemplateInstantiated = helper.GetNextToken();
+              break;
+            case "PresSteps" :
+              pageInfo.PresSteps = helper.GetNextDict();
+              break;
+            case "UserUnit" :
+              pageInfo.UserUnit = helper.GetNextDouble();
+              break;
+            case "VP" :
+              pageInfo.VP = helper.GetNextDict();
+              break;
+            default:
+              break;
+          }
 
           helper.ReadUntilNonWhiteSpaceDelimiter();
           if (helper._char == '>' && helper.IsCurrentCharacterSameAsNext())
@@ -472,44 +576,98 @@ namespace Converter.Parsers
       }
       string tokenString = helper.GetNextToken();
       // Maybe move this to dictionary parsing
-      tokenString = helper.GetNextToken();
       while (tokenString != "")
       {
-        // TODO: Probably move this to normal switch or if statement because of string alloc in case key is not found
-        object _ = tokenString switch
+        switch (tokenString) 
         {
-          // Have some generic enum parser
-          "Version" => catalog.Version = ParsePdfVersionFromCatalog(ref helper),
-          "Extensions" => catalog.Extensions = helper.GetNextDict(),
-          "Pages" => catalog.PagesIR = helper.GetNextIndirectReference(),
-          "PageLabels" => catalog.PageLabels = helper.GetNextNumberTree(),
-          "Names" => catalog.Names = helper.GetNextDict(),
-          "Dests" => catalog.DestsIR = helper.GetNextIndirectReference(),
-          "ViewerPreferences" => catalog.ViewerPreferences = helper.GetNextDict(),
-          "PageLayout" => catalog.PageLayout = helper.GetNextName<PageLayout>(),
-          "PageMode" => catalog.PageMode = helper.GetNextName<PageMode>(),
-          "Outlines" => catalog.OutlinesIR = helper.GetNextIndirectReference(),
-          "Threads" => catalog.ThreadsIR = helper.GetNextIndirectReference(),
-          // not correct, leave for now
-          "OpenAction" => catalog.OpenAction = helper.GetNextToken(),
-          "AA" => catalog.AA = helper.GetNextDict(),
-          "URI" => catalog.URI = helper.GetNextDict(),
-          "AcroForm" => catalog.AcroForm = helper.GetNextDict(),
-          "MetaData" => catalog.MetadataIR = helper.GetNextIndirectReference(),
-          "StructTreeRoot" => catalog.StructTreeRoot = helper.GetNextDict(),
-          "MarkInfo" => catalog.MarkInfo = helper.GetNextDict(),
-          "Lang" => catalog.Lang = helper.GetNextToken(),
-          "SpiderInfo" => catalog.SpiderInfo = helper.GetNextDict(),
-          "OutputIntents" => catalog.OutputIntents = helper.GetNextArrayStrict(),
-          "PieceInfo" => catalog.PieceInfo = helper.GetNextDict(),
-          "OCProperties" => catalog.OCProperties = helper.GetNextDict(),
-          "Perms" => catalog.Perms = helper.GetNextDict(),
-          "Legal" => catalog.Legal = helper.GetNextDict(),
-          "Requirements" => catalog.Requirements = helper.GetNextArrayStrict(),
-          "Collection" => catalog.Collection = helper.GetNextDict(),
-          "NeedsRendering" => catalog.NeedsRendering = helper.GetNextToken() == "true",
-          _ => ""
-        };
+          case "Version":
+            catalog.Version = ParsePdfVersionFromCatalog(ref helper);
+            break;
+          case "Extensions":
+            catalog.Extensions = helper.GetNextDict();
+            break;
+          case "Pages":
+            catalog.PagesIR = helper.GetNextIndirectReference();
+            break;
+          case "PageLabels":
+            catalog.PageLabels = helper.GetNextNumberTree();
+            break;
+          case "Names":
+            catalog.Names = helper.GetNextDict();
+            break;
+          case "Dests":
+            catalog.DestsIR = helper.GetNextIndirectReference();
+            break;
+          case "ViewerPreferences":
+            catalog.ViewerPreferences = helper.GetNextDict();
+            break;
+          case "PageLayout":
+            catalog.PageLayout = helper.GetNextName<PageLayout>();
+            break;
+          case "PageMode":
+            catalog.PageMode = helper.GetNextName<PageMode>();
+            break;
+          case "Outlines":
+            catalog.OutlinesIR = helper.GetNextIndirectReference();
+            break;
+          case "Threads":
+            catalog.ThreadsIR = helper.GetNextIndirectReference();
+            break;
+          case "OpenAction":
+            // skip for now, this is needed only for renderer
+            catalog.OpenAction = new object();
+            break;
+          case "AA":
+            catalog.AA = helper.GetNextDict();
+            break;
+          case "URI":
+            catalog.URI = helper.GetNextDict();
+            break;
+          case "AcroForm":
+            catalog.AcroForm = helper.GetNextDict();
+            break;
+          case "MetaData":
+            catalog.MetadataIR = helper.GetNextIndirectReference();
+            break;
+          case "StructTreeRoot":
+            catalog.StructTreeRoot = helper.GetNextDict();
+            break;
+          case "MarkInfo":
+            catalog.MarkInfo = helper.GetNextDict();
+            break;
+          case "Lang":
+            catalog.Lang = helper.GetNextTextString();
+            break;
+          case "SpiderInfo":
+            catalog.SpiderInfo = helper.GetNextDict();
+            break;
+          case "OutputIntents":
+            catalog.OutputIntents = helper.GetNextArrayStrict();
+            break;
+          case "PieceInfo":
+            catalog.PieceInfo = helper.GetNextDict();
+            break;
+          case "OCProperties":
+            catalog.OCProperties = helper.GetNextDict();
+            break;
+          case "Perms":
+            catalog.Perms = helper.GetNextDict();
+            break;
+          case "Legal":
+            catalog.Legal = helper.GetNextDict();
+            break;
+          case "Requirements":
+            catalog.Requirements = helper.GetNextArrayStrict();
+            break;
+          case "Collection":
+            catalog.Collection = helper.GetNextDict();
+            break;
+          case "NeedsRendering":
+            catalog.NeedsRendering = helper.GetNextToken() == "true";
+            break;
+          default:
+            break;
+        }
 
         helper.ReadUntilNonWhiteSpaceDelimiter();
         if (helper._char == '>' && helper.IsCurrentCharacterSameAsNext())
@@ -589,19 +747,30 @@ namespace Converter.Parsers
           tokenString = helper.GetNextToken();
           while (tokenString != "")
           {
-            // TODO: Probably move this to normal switch or if statement because of string alloc in case key is not found
-            object _ = tokenString switch
+            switch (tokenString)
             {
-              "Size" => trailer.Size = helper.GetNextInt32(),
-              "Root" => trailer.RootIR = helper.GetNextIndirectReference(),
-              "Info" => trailer.InfoIR = helper.GetNextIndirectReference(),
-              "Encrypt" => trailer.EncryptIR = helper.GetNextIndirectReference(),
-              "Prev" => trailer.Prev = helper.GetNextInt32(),
-              "ID" => trailer.ID = helper.GetNextArrayKnownLengthStrict(2),
-              _ => ""
-            };
+              case "Size":
+                trailer.Size = helper.GetNextInt32();
+                break;
+              case "Root":
+                trailer.RootIR = helper.GetNextIndirectReference();
+                break;
+              case "Info":
+                trailer.InfoIR = helper.GetNextIndirectReference();
+                break;
+              case "Encrypt":
+                trailer.EncryptIR = helper.GetNextIndirectReference();
+                break;
+              case "Prev":
+                trailer.Prev = helper.GetNextInt32();
+                break;
+              case "ID":
+                trailer.ID = helper.GetNextArrayKnownLengthStrict(2);
+                break;
+              default:
+                break;
+            }
 
-            
             // end of dict
             helper.ReadUntilNonWhiteSpaceDelimiter();
             if (helper._char == '>' && helper.IsCurrentCharacterSameAsNext())

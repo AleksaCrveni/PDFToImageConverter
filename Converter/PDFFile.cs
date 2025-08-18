@@ -175,7 +175,7 @@ namespace Converter
     public Rect TrimBox;
     public Rect ArtBox;
     public Dictionary<object, object> BoxColorInfo;
-    public (int, int) ContentsIR; // I dontknow if this can be array of IR, docs aren't clear, search more samples
+    public (int, int) ContentsIR; // I don't know if this can be array of IR, docs aren't clear, search more samples
     public int Rotate;
     public Dictionary<object, object> Group; // 11.4.7
     public byte[] Thumb;
@@ -199,7 +199,7 @@ namespace Converter
     public ResourceDict ResourceDict;
     public ContentDict ContentDict;
   }
-  
+
   // Table 33
   public struct ResourceDict()
   {
@@ -208,7 +208,7 @@ namespace Converter
     public Dictionary<object, object> Pattern;
     public Dictionary<object, object> Shading;
     public Dictionary<object, object> XObject;
-    public Dictionary<object, object> Font;
+    public Dictionary<string, (int, int)> Font;
     public List<string> ProcSet;
     public Dictionary<object, object> Properties;
   }
