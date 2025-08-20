@@ -2,6 +2,7 @@
 using System.Globalization;
 using System.IO;
 using System.IO.Compression;
+using System.Runtime.InteropServices.Marshalling;
 using System.Text;
 namespace Converter.Parsers
 {
@@ -195,15 +196,90 @@ namespace Converter.Parsers
       // go to next line
       helper.SkipWhiteSpace();
       Span<byte> encodedSpan = buffer.Slice(helper._position, (int)encodedStreamLen);
-      var stream = new MemoryStream();
 
-      var arr = encodedSpan.ToArray();
-      using (var compressStream = new MemoryStream(arr))
-      using (var decompressor = new ZLibStream(compressStream, CompressionMode.Decompress))
-        decompressor.CopyTo(stream);
+      contentDict.DecodedStreamData = DecodeFilter(ref encodedSpan, contentDict.Filters);
+    }
 
-      string contentDecoded = Encoding.Default.GetString(stream.ToArray());
-      contentDict.DecodedStreamData = contentDecoded;
+    private string DecodeFilter(ref Span<byte> inputSpan, List<Filter> filters)
+    {
+      // first just do single filter
+      Filter f = filters[0];
+      if (f == Filter.Null)
+        return Encoding.Default.GetString(inputSpan);
+
+      byte[] decoded = new byte[1];
+      switch (f)
+      {
+        case Filter.Null:
+          decoded = Array.Empty<byte>();
+          break;
+        case Filter.ASCIIHexDecode:
+          decoded = Array.Empty<byte>();
+          break;
+        case Filter.ASCII85Decode:
+          decoded = Array.Empty<byte>();
+          break;
+        case Filter.LZWDecode:
+          decoded = Array.Empty<byte>();
+          break;
+        case Filter.FlateDecode:
+          // figure out if its gzip, base deflate or zlib decompression
+          Stream decompressor;
+
+          var arr = inputSpan.ToArray();
+          var compressStream = new MemoryStream(arr);
+          byte b0 = inputSpan[0];
+          byte b1 = inputSpan[1];
+          // account for big/lttiel end
+          // not sure if in deflate stream this can be first byte
+          if ((b0 & 15) == 8 && ((b0 >> 4) & 15)  == 7)
+          {
+            // ZLIB check (MSB is left)
+            // CM 0-3 bits need to be 8
+            // CMINFO 4-7 bits need to be 7
+            decompressor = new ZLibStream(compressStream, CompressionMode.Decompress);
+          }
+          else if (b0 == 31 && b1 == 139)
+          {
+            // GZIP check (MSB is right)
+            decompressor = new GZipStream(compressStream, CompressionMode.Decompress);
+          }
+          else
+            decompressor = new DeflateStream(compressStream, CompressionMode.Decompress);
+
+          MemoryStream stream = new MemoryStream();
+          decompressor.CopyTo(stream);
+          // dispose streams
+          compressStream.Dispose();
+          decompressor.Dispose();
+          // write custom stream because this will copy, so we copy from decompressor
+          // and then we have to copy again, i would preferably have one copy
+          decoded = stream.ToArray();
+          stream.Dispose();
+          break;
+        case Filter.RunLengthDecode:
+          decoded = Array.Empty<byte>();
+          break;
+        case Filter.CCITTFaxDecode:
+          decoded = Array.Empty<byte>();
+          break;
+        case Filter.JBIG2Decode:
+          decoded = Array.Empty<byte>();
+          break;
+        case Filter.DCTDecode:
+          decoded = Array.Empty<byte>();
+          break;
+        case Filter.JPXDecode:
+          decoded = Array.Empty<byte>();
+          break;
+        case Filter.Crypt:
+          decoded = Array.Empty<byte>();
+          break;
+        default:
+          break;
+      }
+
+      return Encoding.Default.GetString(decoded);
     }
     private void ParseResourceDictionary(PDFFile file, (int objIndex, int) objectPosition, ref ResourceDict resourceDict)
     {
