@@ -400,7 +400,7 @@ namespace Converter.Parsers
       while(_char != ']')
       {
         list.Add(GetNextIndirectReference());
-        ReadUntilNonWhiteSpaceDelimiter();
+        SkipWhiteSpace();
       }
       ReadChar();
       return list;
@@ -493,6 +493,7 @@ namespace Converter.Parsers
     }
 
     // String literal
+    // Fix in respect to Table 3 - Escape sequences in literal string
     public string GetNextTextString()
     {
       ReadUntilNonWhiteSpaceDelimiter();

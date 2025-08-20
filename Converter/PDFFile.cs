@@ -158,6 +158,7 @@ namespace Converter
   {
     public List<(int, int)> KidsIRs;
     public (int, int) ParentIR;
+    public (int, int) ResourcesIR;
     public int Count;
     public Rect MediaBox;
   }
@@ -217,10 +218,14 @@ namespace Converter
   // TODO: Expand this
   public struct ContentDict
   {
+    public ContentDict()
+    {
+
+    }
     // for some reason some pdf files have this as IR instead of direct value
     // so just in case i will support both for length
     public long Length;
-    public List<Filter> Filters;
+    public List<Filter> Filters = new List<Filter>() { Filter.Null };
     public string DecodedStreamData;
   }
 

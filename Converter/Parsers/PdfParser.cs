@@ -92,6 +92,8 @@ namespace Converter.Parsers
         ParsePageContents(file, file.PageInformation[i].ContentsIR, ref contentDict);
         pInfo.ContentDict = contentDict;
         file.PageInformation[i] = pInfo;
+        // don't do anything else for now, untill i learn about graphics and image formats
+        // i can parse data further but i hav eno clue what to do with it or what i really need.
       }
     }
 
@@ -427,6 +429,9 @@ namespace Converter.Parsers
             break;
           case "Kids":
             pageTree.KidsIRs = helper.GetNextIndirectReferenceList();
+            break;
+          case "Resources":
+            pageTree.ResourcesIR = helper.GetNextIndirectReference();
             break;
           default:
             break;
