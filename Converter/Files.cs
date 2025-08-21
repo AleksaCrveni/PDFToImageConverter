@@ -10,6 +10,9 @@ namespace Converter
     public static string Report { get; set; }
     public static string SmallTest { get; set; }
     public static string Sample { get; set; }
+    public static string HelloTiff { get; set; }
+    public static string BilevelTiff { get; set; }
+
     static Files()
     { 
       RootFolder = Path.Combine(Directory.GetParent(Directory.GetCurrentDirectory()).Parent.Parent.Parent.FullName, "Files");
@@ -18,6 +21,8 @@ namespace Converter
       Report = Path.Combine(RootFolder, "Report.pdf");
       SmallTest = Path.Combine(RootFolder, "SmallTest.txt");
       Sample = Path.Combine(RootFolder, "file-sample_150kB.pdf");
+      HelloTiff = Path.Combine(RootFolder, "HelloTiff.tif");
+      BilevelTiff = Path.Combine(RootFolder, "BilevelTiff.tif");
     }
   }
 }
