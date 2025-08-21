@@ -1,4 +1,5 @@
 ﻿using Converter;
+using Converter.FIleStructures;
 using Converter.Parsers;
 
 namespace Tester
@@ -15,7 +16,7 @@ namespace Tester
     public void BasicTrailerSucess()
     {
       PdfParser pdfParser = new PdfParser();
-      PDFFile pdfFile = pdfParser.Parse(Files.BaseDocFilePath);
+      PDFFile pdfFile = pdfParser.Parse(Files.Sample);
 
       Assert.IsTrue(pdfFile.PdfVersion == PDFVersion.V1_3);
       Assert.IsTrue(pdfFile.LastCrossReferenceOffset == 10777);
