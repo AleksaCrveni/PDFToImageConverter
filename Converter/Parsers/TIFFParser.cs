@@ -71,13 +71,15 @@ namespace Converter.Parsers
       int readBytes = file.Stream.Read(buffer);
       if (readBytes < sizeOfAllDirectoryEntries)
         throw new InvalidDataException("Invalid IFD NoDE.");
-
+      
       // -4 for next IFD position
       Tag tag = new Tag();
       ushort tagValue = 0;
       ushort type = 0;
       uint count = 0;
       uint valueOrOffset;
+      // usedd
+      Span<byte> rationalBuffer = stackalloc byte[8];
       // something  is wrong with my offsets or slices....... it gives wrong values, maybe something im offset by 1 or something?/
       for (int i = 0; i < buffer.Length - 4; i += 12)
       {
@@ -144,11 +146,26 @@ namespace Converter.Parsers
             tag.StripByteCounts = valueOrOffset;
             break;
           case 282:
-            // is this pointer?
-            tag.XResolution = valueOrOffset;
+            // this is pointer
+            rationalBuffer.Clear();
+            file.Stream.Position = valueOrOffset;
+            bytesRead = file.Stream.Read(rationalBuffer);
+            if (bytesRead != 8)
+              throw new InvalidDataException("Invalid rational. Unexpected EOS!");
+            uint numerator = BitConverter.ToUInt32(rationalBuffer.Slice(0, 4));
+            uint denominator = BitConverter.ToUInt32(rationalBuffer.Slice(4, 4));
+            tag.XResolution = (double)numerator / (double)denominator;
             break;
           case 283:
-            tag.YResolution = valueOrOffset;
+
+            rationalBuffer.Clear();
+            file.Stream.Position = valueOrOffset;
+            bytesRead = file.Stream.Read(rationalBuffer);
+            if (bytesRead != 8)
+              throw new InvalidDataException("Invalid rational. Unexpected EOS!");
+            numerator = BitConverter.ToUInt32(rationalBuffer.Slice(0, 4));
+            denominator = BitConverter.ToUInt32(rationalBuffer.Slice(4, 4));
+            tag.YResolution = (double)numerator / (double)denominator;
             break;
           case 284:
             if (valueOrOffset < 1 || valueOrOffset > 2)
