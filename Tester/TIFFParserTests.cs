@@ -15,7 +15,7 @@ namespace Tester
     public void ParseTest()
     {
       TIFFParser parser = new TIFFParser();
-      parser.Parse(Files.HelloTiff);
+      parser.Parse(Files.BilevelTiff);
     }
   }
 }

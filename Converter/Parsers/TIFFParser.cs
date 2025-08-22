@@ -69,18 +69,20 @@ namespace Converter.Parsers
 
       // -4 for next IFD position
       Tags tags = new Tags();
-      short tag = 0;
-      short type = 0;
-      int count = 0;
-      int valueOrOffset;
+      ushort tag = 0;
+      ushort type = 0;
+      uint count = 0;
+      uint valueOrOffset;
       // something  is wrong with my offsets or slices....... it gives wrong values, maybe something im offset by 1 or something?/
       for (int i = 0; i < buffer.Length - 4; i += 12)
       {
-        tag = BitConverter.ToInt16(buffer.Slice(i, 2));
-        type = BitConverter.ToInt16(buffer.Slice(i + 2, 2));
-        count = BitConverter.ToInt32(buffer.Slice(i + 4, 4));
-        valueOrOffset = BitConverter.ToInt32(buffer.Slice(i + 8, 4));
-
+        tag = BitConverter.ToUInt16(buffer.Slice(i, 2));
+        type = BitConverter.ToUInt16(buffer.Slice(i + 2, 2));
+        count = BitConverter.ToUInt32(buffer.Slice(i + 4, 4));
+        valueOrOffset = BitConverter.ToUInt32(buffer.Slice(i + 8, 4));
+        // make enums for tag values
+        // don't do casting because some values can have 0 and some can't and some are required and 
+        // we can't rely on defaulting, so just check and assign where you can't cast based on range
         switch (tag)
         {
           case 254:
@@ -93,17 +95,25 @@ namespace Converter.Parsers
             tags.ImageLength = valueOrOffset;
             break;
           case 258:
-            tags.BitsPerSample = (short)valueOrOffset;
+            tags.BitsPerSample = (ushort)valueOrOffset;
             break;
           case 259:
-            if (valueOrOffset != 1 && valueOrOffset != 2 && valueOrOffset != 32773)
-              throw new InvalidDataException("Invalid compression tag value!");
-            tags.Compression = (short)valueOrOffset;
+            Compression c = valueOrOffset switch
+            {
+              1 => Compression.NoCompression,
+              2 => Compression.CCITT,
+              32773 => Compression.PackBits,
+              _ => throw new InvalidDataException("Invalid compression tag value!")
+            };
+            tags.Compression = c;
             break;
           case 262:
-            if (valueOrOffset != 0 && valueOrOffset !=1)
-              throw new InvalidDataException("Invalid photometric interpretation tag value!");
-            tags.PhotometricInterpretation = (short)valueOrOffset;
+            PhotometricInterpretation p = valueOrOffset switch
+            {
+              (> 0) and (< 4) => (PhotometricInterpretation)valueOrOffset,
+              _ => throw new InvalidDataException("Invalid photometric interpretation tag value!")
+            };
+            tags.PhotometricInterpretation = p;
             break;
           case 273:
             tags.StripOffsets = valueOrOffset;
@@ -122,14 +132,21 @@ namespace Converter.Parsers
             tags.YResolution = valueOrOffset;
             break;
           case 296:
-            if (valueOrOffset < 1 || valueOrOffset > 3)
-              throw new InvalidDataException("Invalid Resolution Unit tag value!");
-            tags.ResolutionUnit = (short)valueOrOffset;
+            ResolutionUnit r = valueOrOffset switch
+            {
+              1 => ResolutionUnit.NoAbsoluteUnitOfMe,
+              2 => ResolutionUnit.Inch,
+              3 => ResolutionUnit.Centimeter,
+              _ => throw new InvalidDataException("Invalid Resolution Unit tag value!")
+            };
+            tags.ResolutionUnit = r;
             break;
           default:
-            throw new NotSupportedException($"Tag not supported add it. {tag}"); // this is just for development purposes
+             throw new NotSupportedException($"Tag not supported add it. {tag}"); // this is just for development purposes
         }
       }
+
+      // next IFD is last 4 bytes but read only 1 for now
     }
   }
 }
