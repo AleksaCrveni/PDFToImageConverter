@@ -145,7 +145,7 @@ namespace Converter.Parsers
              throw new NotSupportedException($"Tag not supported add it. {tag}"); // this is just for development purposes
         }
       }
-
+      file.Tags = tags;
       // next IFD is last 4 bytes but read only 1 for now
     }
   }
