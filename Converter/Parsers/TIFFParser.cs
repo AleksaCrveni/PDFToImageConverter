@@ -1,8 +1,12 @@
 ﻿using Converter.FIleStructures;
+using System.Buffers;
 using System.Buffers.Binary;
+using System.ComponentModel.DataAnnotations;
 using System.Data;
+using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
+using System.Runtime.InteropServices.Marshalling;
 
 namespace Converter.Parsers
 {
@@ -22,10 +26,73 @@ namespace Converter.Parsers
       file.Stream = stream;
       ParseHeader(file);
       ParseIFD(file);
+      ParseImageData(file);
     }
     
     public void ParseImageData(TIFFFile file)
     {
+      // First check max stripCount so we can allocate just once and not for each 'image'(IFD)
+      uint maxStripCount = 0;
+      foreach (TIFFData d in file.TIFFs)
+      {
+        uint stripCount = (d.Tag.ImageLength / d.Tag.RowsPerStrip);
+        if (d.Tag.ImageLength % d.Tag.RowsPerStrip > 0)
+          stripCount++;
+        if (stripCount > maxStripCount)
+          maxStripCount = stripCount;
+      }
+      // Mini Arena with double pointer testing
+      // * 4 because we are loading uint32 each strip
+      // * 2 because we want to load strip byte count into same arena
+      // usually do 8KB, but do 16 check beucase we will alloc 2 arrays
+      // ARENA can't work easily, as I cant read into span starting at half
+      Span<byte> stripOffsetsBuffer = maxStripCount * 4 <= KB * 4 ? stackalloc byte[(int)maxStripCount * 4] : new byte[maxStripCount * 4];
+      Span<byte> stripCountsBuffer = maxStripCount * 4 <= KB * 4 ? stackalloc byte[(int)maxStripCount * 4] : new byte[maxStripCount * 4];
+      Tag tag;
+      TIFFData data;
+      for (int z = 0; z < file.TIFFs.Count; z++)
+      {
+        data = file.TIFFs[z];
+        tag = data.Tag;
+        uint stripCount = (tag.ImageLength / tag.RowsPerStrip);
+        if (tag.ImageLength % tag.RowsPerStrip > 0)
+          stripCount++;
+
+        // Load strip offsets
+        file.Stream.Position = (long)tag.StripOffsetsPointer;
+        int readBytes = file.Stream.Read(stripOffsetsBuffer);
+        if (readBytes != stripOffsetsBuffer.Length)
+          throw new InvalidDataException("Invalid strip offsets actual value!");
+
+        // Load strip counts
+        file.Stream.Position = (long)tag.StripByteCountsPointer;
+        readBytes = file.Stream.Read(stripCountsBuffer);
+        if (readBytes != stripCountsBuffer.Length)
+          throw new InvalidDataException("Invalid strip counts actual value!");
+
+        // if its strip count is 1, stripcounts is not pointer but value ??
+        if (stripCount == 1)
+        {
+          uint byteCountVal = BitConverter.ToUInt32(stripCountsBuffer);
+          file.Stream.Position = (long)tag.StripOffsetsPointer;
+          //TODO: have some limit so we don't run out of memory
+          // usually file is very large just heap alloc
+          byte[] imageDataBuffer = new byte[(int)tag.StripByteCountsPointer];
+          readBytes = file.Stream.Read(imageDataBuffer);
+          if (readBytes != imageDataBuffer.Length)
+            throw new InvalidDataException("Invalid strip byte counts value! Unexpected EOS!");
+
+          // copy
+          data.FullImageData = imageDataBuffer;
+          continue;
+        }
+
+        // stripCount is lenght because we maybe have larger array but we want to read only what we know its ours
+        for (int i= 0; i < stripCount; i++)
+        {
+          
+        }
+      }
       
     }
 
@@ -71,8 +138,9 @@ namespace Converter.Parsers
       int readBytes = file.Stream.Read(buffer);
       if (readBytes < sizeOfAllDirectoryEntries)
         throw new InvalidDataException("Invalid IFD NoDE.");
-      
+
       // -4 for next IFD position
+      TIFFData tiffData = new TIFFData();
       Tag tag = new Tag();
       ushort tagValue = 0;
       ushort type = 0;
@@ -128,7 +196,8 @@ namespace Converter.Parsers
             tag.FillOrder = (ushort)valueOrOffset;
             break;
           case 273:
-            tag.StripOffsets = valueOrOffset;
+            // process later
+            tag.StripOffsetsPointer = valueOrOffset;
             break;
           case 274:
             if (valueOrOffset < 1 || valueOrOffset > 8)
@@ -143,7 +212,8 @@ namespace Converter.Parsers
             tag.RowsPerStrip = valueOrOffset;
             break;
           case 279:
-            tag.StripByteCounts = valueOrOffset;
+            // process later
+            tag.StripByteCountsPointer = valueOrOffset;
             break;
           case 282:
             // this is pointer
@@ -194,8 +264,10 @@ namespace Converter.Parsers
              throw new NotSupportedException($"Tag not supported add it. {tagValue}"); // this is just for development purposes
         }
       }
-      file.Tags.Add(tag);
+      tiffData.Tag = tag;
+      file.TIFFs.Add(tiffData);
       // next IFD is last 4 bytes but read only 1 for now
+      // its 0 if this is last IFD
     }
   }
 }

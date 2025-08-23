@@ -6,10 +6,15 @@
     public TIFFHeader Header = new TIFFHeader();
     public Stream Stream { get; set; }
     // this isn't global since there are more lists, but for now we just parse 1 so keep
-    public List<Tag> Tags { get; set; } = new List<Tag>();
+    public List<TIFFData> TIFFs { get; set; } = new List<TIFFData>();
     public int TotalPages = -1; // -1 in case its not available
   }
 
+  public struct TIFFData
+  {
+    public Tag Tag;
+    public byte[] FullImageData;
+  };
   public struct TIFFHeader
   {
     // if false its Big Endian
@@ -38,8 +43,8 @@
     public PhotometricInterpretation? PhotometricInterpretation;
     public Compression? Compression = FIleStructures.Compression.NoCompression;
     public ushort? BitsPerSample;
-    public uint? ImageLength;
-    public uint? ImageWidth;
+    public uint ImageLength; // required
+    public uint ImageWidth; // required
     public ResolutionUnit ResolutionUnit = ResolutionUnit.Inch;
     // in actual data this is represented as 2 uints, 1 for numerator and one for denominator
     // but we will process it directly in double
@@ -47,10 +52,10 @@
     // -||-
     public double? YResolution;
     // StripsPerImage = floor ((ImageLength + RowsPerStrip - 1) / RowsPerStrip - use for
-    public uint? RowsPerStrip;
-    public uint? StripOffsets;
+    public uint RowsPerStrip;
+    public uint? StripOffsetsPointer;
     // required
-    public uint? StripByteCounts;
+    public uint? StripByteCountsPointer;
     public uint NewSubfileType = 0;
     public ushort FillOrder = 1;
     public ushort Orientation = 1;
