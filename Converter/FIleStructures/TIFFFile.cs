@@ -86,4 +86,39 @@
     Centimeter = 3
   }
 
+  public enum TagType : ushort
+  {
+    NewSubfileType = 254,
+    ImageWidth = 256,
+    ImageLength = 257,
+    BitsPerSample = 258,
+    Compression = 259,
+    PhotometricInterpretation = 262,
+    FillOrder = 266,
+    StripOffsetsPointer = 273,
+    Orientation = 274,
+    SamplesPerPixel = 277,
+    RowsPerStrip = 278,
+    StripByteCountsPointer = 279,
+    XResolution = 283,
+    YResolution = 284,
+    ResolutionUnit = 296,
+    PageNumber = 297
+  }
+
+  public enum TagSize : ushort
+  {
+    BYTE = 1,
+    ASCII = 2,
+    SHORT = 3,
+    LONG = 4,
+    RATIONAL = 5,
+    SBYTE = 6,
+    UNDEFINED = 7,
+    SSHORT = 8, 
+    SLONG = 9,
+    SRATIONAL = 10, 
+    FLOAT = 11, 
+    DOUBLE = 12
+  }
 }

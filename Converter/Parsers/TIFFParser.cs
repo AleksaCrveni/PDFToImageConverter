@@ -154,10 +154,14 @@ namespace Converter.Parsers
         tagValue = BitConverter.ToUInt16(buffer.Slice(i, 2));
         type = BitConverter.ToUInt16(buffer.Slice(i + 2, 2));
         count = BitConverter.ToUInt32(buffer.Slice(i + 4, 4));
+
+        // can just read this it will work for both 
         valueOrOffset = BitConverter.ToUInt32(buffer.Slice(i + 8, 4));
+
         // make enums for tag values
         // don't do casting because some values can have 0 and some can't and some are required and 
         // we can't rely on defaulting, so just check and assign where you can't cast based on range
+        // IMPROVE THIS SO ACCOUNT FOR Type.......
         switch (tagValue)
         {
           case 254:
