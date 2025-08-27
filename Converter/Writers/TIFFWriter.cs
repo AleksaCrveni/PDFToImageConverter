@@ -98,12 +98,24 @@ namespace Converter.Writers
       if (compression != Compression.NoCompression)
         throw new NotImplementedException("This Compression not suppported yet!");
 
+      
       // divide by 8 because with no compression and bilevel values are either 0 or 1 and they are packed in 
       // bits
       ulong byteCount = ((uint)options.Width * (uint)options.Height) / 8;
-      // write these last
-      int remainder = Convert.ToInt32(byteCount % Convert.ToUInt32(writeBuffer.Length));
-      // write in 8k Strips
+
+      // write in ~8k Strips
+      // smallest stripsize that can be used where rowsPerStrip will be whole number
+
+      // 8192 / options.height
+      // get closest number to 8192 that is dividable by 8192 / options.height
+      stripSize = stripSize - (stripSize % options.Height);
+      uint stripCount = (uint)Math.Ceiling(byteCount / (decimal)stripSize);
+      if ((uint)byteCount % stripSize > 0)
+        stripCount++;
+
+      int rowsPerStrip = options.Height - 1 / (int)stripCount;
+      //uint stripCount = (uint)byteCount / (uint)stripSize;
+      int remainder = Convert.ToInt32((uint)byteCount % stripSize);
 
       int imageDataStartPointer = (int)fs.Position;
       for (ulong i = 0; i < byteCount; i += (ulong)stripSize)
@@ -118,21 +130,6 @@ namespace Converter.Writers
       Span<byte> remainderSizeBuffer = writeBuffer.Slice(0, remainder);
       Random.Shared.NextBytes(remainderSizeBuffer);
       fs.Write(remainderSizeBuffer);
-
-      uint stripCount = (uint)byteCount / (uint)stripSize;
-      if ((uint)byteCount% stripSize > 0)
-        stripCount++;
-
-      // stripCount = floor((ImageLength + RowsPerStrip - 1) / RowsPerStrip)
-      // uradi minus remainder i podeli ponovoi i probaj onda??
-
-      int rowsPerStrip = (int)Math.Ceiling((decimal)(options.Height - 1) / (int)stripCount);// no need to floor since its 2 ints and it will do it by itself
-
-      uint stripCountCheck = (uint)Math.Floor((options.Height + rowsPerStrip - 1) / (decimal)rowsPerStrip);
-      if (stripCountCheck != stripCount)
-        throw new Exception("SHIT");
-      // can all be single strip but its best to do 8K at the time
-      // -1 because of remainder
 
       int stripOffsetPointer = (int)fs.Position;
       pos = 0;
@@ -161,6 +158,8 @@ namespace Converter.Writers
       }
 
       //int lastStripByte = (int)(stripCount - 1) * 4;
+      if (remainder == 0)
+        remainder = stripSize;
       writeBuffer[pos++] = (byte)(remainder & 255);
       writeBuffer[pos++] = (byte)(remainder >> 8);
       writeBuffer[pos++] = (byte)(remainder >> 16);
@@ -275,8 +274,8 @@ namespace Converter.Writers
     public int Height = 0;
     public ushort MaxRandomWidth = 1920;
     public ushort MaxRandomHeight = 1080;
-    public ushort MinRandomWidth = 720;
-    public ushort MinRandomHeight = 480;
+    public ushort MinRandomWidth = 128;
+    public ushort MinRandomHeight = 128;
     public bool AllowStackAlloct = false;
   }
 }

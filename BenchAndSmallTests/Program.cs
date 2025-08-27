@@ -1,7 +1,5 @@
-﻿using BenchAndSmallTests;
-using BenchmarkDotNet.Running;
-using System.Threading.Tasks.Dataflow;
-
+﻿using Converter;
+using Converter.Writers;
 //int count1 = 0b_0000_0001;
 //int count2 = 0b_1110_0010;
 
@@ -57,4 +55,18 @@ using System.Threading.Tasks.Dataflow;
 //int i = 0;
 
 
-var runner = BenchmarkRunner.Run<MyBenches>();
+//byte[] arr = File.ReadAllBytes(Files.BilevelTiff);
+//byte b = arr[23880];
+//if (b == 1)
+//  arr[23880] = 0;
+//File.WriteAllBytes("inverted.tiff", arr);
+
+for (int i = 0; i < 10; i++)
+{
+  TIFFWriter.WriteRandomBilevelTiff($"Files/test{i}.tif", new TIFFWriterOptions()
+  {
+    AllowStackAlloct = true,
+  });
+}
+
+//var runner = BenchmarkRunner.Run<MyBenches>();
