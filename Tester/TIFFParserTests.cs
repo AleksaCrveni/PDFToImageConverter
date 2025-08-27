@@ -17,5 +17,12 @@ namespace Tester
       TIFFParser parser = new TIFFParser();
       parser.Parse(Files.BilevelTiff);
     }
+
+    [TestMethod]
+    public void ParseMyTiff()
+    {
+      TIFFParser parser = new TIFFParser();
+      parser.Parse(Files.CreateTestTiff);
+    }
   }
 }

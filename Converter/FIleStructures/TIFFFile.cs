@@ -100,8 +100,8 @@
     SamplesPerPixel = 277,
     RowsPerStrip = 278,
     StripByteCountsPointer = 279,
-    XResolution = 283,
-    YResolution = 284,
+    XResolution = 282,
+    YResolution = 283,
     ResolutionUnit = 296,
     PageNumber = 297
   }

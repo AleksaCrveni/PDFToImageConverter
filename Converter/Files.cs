@@ -1,6 +1,4 @@
-﻿using System.Diagnostics;
-
-namespace Converter
+﻿namespace Converter
 {
   public static class Files
   {
@@ -12,7 +10,7 @@ namespace Converter
     public static string Sample { get; set; }
     public static string HelloTiff { get; set; }
     public static string BilevelTiff { get; set; }
-
+    public static string CreateTestTiff { get; set; }
     static Files()
     { 
       RootFolder = Path.Combine(Directory.GetParent(Directory.GetCurrentDirectory()).Parent.Parent.Parent.FullName, "Files");
@@ -23,6 +21,7 @@ namespace Converter
       Sample = Path.Combine(RootFolder, "file-sample_150kB.pdf");
       HelloTiff = Path.Combine(RootFolder, "HelloTiff.tif");
       BilevelTiff = Path.Combine(RootFolder, "BilevelTiff.tif");
+      CreateTestTiff = Path.Combine(RootFolder, "testCreateTIFF.tif");
     }
   }
 }

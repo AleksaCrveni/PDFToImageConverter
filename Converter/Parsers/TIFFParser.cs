@@ -1,13 +1,4 @@
 ﻿using Converter.FIleStructures;
-using System.Buffers;
-using System.Buffers.Binary;
-using System.ComponentModel.DataAnnotations;
-using System.Data;
-using System.Diagnostics;
-using System.Runtime.CompilerServices;
-using System.Runtime.InteropServices;
-using System.Runtime.InteropServices.Marshalling;
-
 namespace Converter.Parsers
 {
   // NOTE: FOR NOW JUST SUPPORT LITTLE ENDIAN
@@ -54,9 +45,8 @@ namespace Converter.Parsers
       {
         data = file.TIFFs[z];
         tag = data.Tag;
-        uint stripCount = (tag.ImageLength / tag.RowsPerStrip);
-        if (tag.ImageLength % tag.RowsPerStrip > 0)
-          stripCount++;
+        uint stripCount = (uint)Math.Floor((tag.ImageLength + tag.RowsPerStrip -1) / (decimal)tag.RowsPerStrip);
+       
 
         // Load strip offsets
         file.Stream.Position = (long)tag.StripOffsetsPointer;
@@ -88,12 +78,21 @@ namespace Converter.Parsers
         }
 
         // stripCount is lenght because we maybe have larger array but we want to read only what we know its ours
-        for (int i= 0; i < stripCount; i++)
+        for (int i= 0; i < stripCount*4; i +=4)
         {
-          
+          uint offset = BitConverter.ToUInt32(stripOffsetsBuffer.Slice(i, 4));
+          uint byteCount = BitConverter.ToUInt32(stripCountsBuffer.Slice(i, 4));
+          if (offset + byteCount > file.Stream.Length)
+          {
+            throw new Exception("TIF-29");
+          }
         }
+
+        // JUST FOR DEBUG
+        Span<byte> imgRawArr = new byte[BitConverter.ToUInt32(stripCountsBuffer.Slice(stripCountsBuffer.Length - 4, 4)) + (((stripCountsBuffer.Length - 4) / 4) * 8192)];
+        file.Stream.Position = 8;
+        file.Stream.Read(imgRawArr);
       }
-      
     }
 
     public void ParseHeader(TIFFFile file)
@@ -189,7 +188,7 @@ namespace Converter.Parsers
           case 262:
             PhotometricInterpretation p = valueOrOffset switch
             {
-              (> 0) and (< 4) => (PhotometricInterpretation)valueOrOffset,
+              (>= 0) and (<= 4) => (PhotometricInterpretation)valueOrOffset,
               _ => throw new InvalidDataException("Invalid photometric interpretation tag value!")
             };
             tag.PhotometricInterpretation = p;

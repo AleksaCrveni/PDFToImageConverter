@@ -4,6 +4,7 @@ using System.Buffers;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.Linq;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading.Tasks;
 
@@ -50,7 +51,7 @@ namespace Converter.Writers
       if (options.Width == 0)
         options.Width = Random.Shared.Next(options.MinRandomWidth, options.MaxRandomWidth + 1);
       if (options.Height == 0)
-        options.Width = Random.Shared.Next(options.MinRandomHeight, options.MaxRandomHeight + 1);
+        options.Height = Random.Shared.Next(options.MinRandomHeight, options.MaxRandomHeight + 1);
 
       // use one buffer, always write in 8K intervals
       Span<byte> writeBuffer = options.AllowStackAlloct ? stackalloc byte[8192] : new byte[8192];
@@ -88,6 +89,10 @@ namespace Converter.Writers
     // TODO: fix all these castings and stuff about var sizes
     static void WriteRandomBilevelImageAndMetadata(ref FileStream fs, ref Span<byte> writeBuffer, ref TIFFWriterOptions options, Compression compression = Compression.NoCompression)
     {
+      // write 2 8B rationals
+      int pos = 0;
+      // XRes
+     
       int stripSize = 8192;
       // suppoirt later
       if (compression != Compression.NoCompression)
@@ -115,73 +120,81 @@ namespace Converter.Writers
       fs.Write(remainderSizeBuffer);
 
       uint stripCount = (uint)byteCount / (uint)stripSize;
-      if ((uint)stripCount % stripSize > 0)
+      if ((uint)byteCount% stripSize > 0)
         stripCount++;
 
       // stripCount = floor((ImageLength + RowsPerStrip - 1) / RowsPerStrip)
-      int rowsPerStrip = (options.Height - 1) / (int)stripCount;// no need to floor since its 2 ints and it will do it by itself
+      // uradi minus remainder i podeli ponovoi i probaj onda??
 
+      int rowsPerStrip = (int)Math.Ceiling((decimal)(options.Height - 1) / (int)stripCount);// no need to floor since its 2 ints and it will do it by itself
+
+      uint stripCountCheck = (uint)Math.Floor((options.Height + rowsPerStrip - 1) / (decimal)rowsPerStrip);
+      if (stripCountCheck != stripCount)
+        throw new Exception("SHIT");
       // can all be single strip but its best to do 8K at the time
       // -1 because of remainder
 
       int stripOffsetPointer = (int)fs.Position;
-      for (int i = 0; i < stripCount; i += 4)
+      pos = 0;
+      for (int i = 0; i < stripCount; i++)
       {
         // little endian only!
-        writeBuffer[i] = (byte)(imageDataStartPointer & 255);
-        writeBuffer[i + 1] = (byte)(imageDataStartPointer >> 8);
-        writeBuffer[i + 2] = (byte)(imageDataStartPointer >> 16);
-        writeBuffer[i + 3] = (byte)(imageDataStartPointer >> 24);
-        imageDataStartPointer += 4;
+        writeBuffer[pos++] = (byte)(imageDataStartPointer & 255);
+        writeBuffer[pos++] = (byte)(imageDataStartPointer >> 8);
+        writeBuffer[pos++] = (byte)(imageDataStartPointer >> 16);
+        writeBuffer[pos++] = (byte)(imageDataStartPointer >> 24);
+        imageDataStartPointer += stripSize;
       }
       // * 4 because each strip is 4 bytes
-      fs.Write(writeBuffer.Slice(0,(int)stripCount * 4));
+      fs.Write(writeBuffer.Slice(0,pos));
 
       int stripCountPointer = (int)fs.Position;
 
-      for (int i = 0; i < stripCount - 1; i += 4)
+      pos = 0;
+      for (int i = 0; i < stripCount - 1; i++)
       {
         // little endian only!
-        writeBuffer[i] = 8192 & 255;
-        writeBuffer[i + 1] = 8192 >> 8;
-        writeBuffer[i + 2] = 0;
-        writeBuffer[i + 3] = 0;
+        writeBuffer[pos++] = (byte)(stripSize & 255);
+        writeBuffer[pos++] = (byte)(stripSize >> 8);
+        writeBuffer[pos++] = 0;
+        writeBuffer[pos++] = 0;
       }
 
-      int lastStripByte = (int)(stripCount - 1) * 4;
-      writeBuffer[lastStripByte] = (byte)(remainder & 255);
-      writeBuffer[lastStripByte + 1] = (byte)(remainder >> 8);
-      writeBuffer[lastStripByte + 2] = (byte)(remainder >> 16);
-      writeBuffer[lastStripByte + 3] = (byte)(remainder >> 24);
+      //int lastStripByte = (int)(stripCount - 1) * 4;
+      writeBuffer[pos++] = (byte)(remainder & 255);
+      writeBuffer[pos++] = (byte)(remainder >> 8);
+      writeBuffer[pos++] = (byte)(remainder >> 16);
+      writeBuffer[pos++] = (byte)(remainder >> 24);
 
-      fs.Write(writeBuffer.Slice(0, (int)stripCount * 4));
+      fs.Write(writeBuffer.Slice(0, pos));
 
-      int pos = 0;
+      pos = 0;
       // write IFD 'header'
       writeBuffer[pos++] = 10;
       writeBuffer[pos++] = 0;
-      
-      WriteIFDEntry(ref writeBuffer, ref pos, TagType.ImageLength, TagSize.SHORT, 1,
-        (uint)options.Height);
-      WriteIFDEntry(ref writeBuffer, ref pos, TagType.ImageWidth, TagSize.SHORT, 1,
+
+      // apparently these tags should be written in sequence?????
+      WriteIFDEntryToBuffer(ref writeBuffer, ref pos, TagType.ImageWidth, TagSize.SHORT, 1,
         (uint)options.Width);
-      WriteIFDEntry(ref writeBuffer, ref pos, TagType.Compression, TagSize.SHORT, 1,
+      WriteIFDEntryToBuffer(ref writeBuffer, ref pos, TagType.ImageLength, TagSize.SHORT, 1,
+        (uint)options.Height);
+      WriteIFDEntryToBuffer(ref writeBuffer, ref pos, TagType.Compression, TagSize.SHORT, 1,
         (uint)Compression.NoCompression);
-      WriteIFDEntry(ref writeBuffer, ref pos, TagType.PhotometricInterpretation, TagSize.SHORT, 1,
+      WriteIFDEntryToBuffer(ref writeBuffer, ref pos, TagType.PhotometricInterpretation, TagSize.SHORT, 1,
         (uint)PhotometricInterpretation.WhiteIsZero);
-      WriteIFDEntry(ref writeBuffer, ref pos, TagType.StripOffsetsPointer, TagSize.LONG, 1,
+      WriteIFDEntryToBuffer(ref writeBuffer, ref pos, TagType.StripOffsetsPointer, TagSize.LONG, stripCount,
         (uint)stripOffsetPointer);
-      WriteIFDEntry(ref writeBuffer, ref pos, TagType.RowsPerStrip, TagSize.LONG, 1,
+      WriteIFDEntryToBuffer(ref writeBuffer, ref pos, TagType.RowsPerStrip, TagSize.LONG, 1,
         (uint)rowsPerStrip);
-      WriteIFDEntry(ref writeBuffer, ref pos, TagType.StripByteCountsPointer, TagSize.LONG, 1,
+      WriteIFDEntryToBuffer(ref writeBuffer, ref pos, TagType.StripByteCountsPointer, TagSize.LONG, stripCount,
         (uint)stripCountPointer);
-      WriteIFDEntry(ref writeBuffer, ref pos, TagType.ResolutionUnit, TagSize.SHORT, 1,
-        (uint)ResolutionUnit.Inch);
       // Have to write 2 more entiries so start offsets for rationals will be fs.Position + 2 (2 *12) + 4
-      WriteIFDEntry(ref writeBuffer, ref pos, TagType.XResolution, TagSize.RATIONAL, 2,
-        (uint)fs.Position + 2 + (10 *12) + 4);
-      WriteIFDEntry(ref writeBuffer, ref pos, TagType.YResolution, TagSize.RATIONAL, 2,
+      WriteIFDEntryToBuffer(ref writeBuffer, ref pos, TagType.XResolution, TagSize.RATIONAL, 1,
+        (uint)fs.Position + 2 + (10 * 12) + 4);
+      WriteIFDEntryToBuffer(ref writeBuffer, ref pos, TagType.YResolution, TagSize.RATIONAL, 1,
         (uint)fs.Position + 2 + (10 * 12) + 4 + 8);
+      WriteIFDEntryToBuffer(ref writeBuffer, ref pos, TagType.ResolutionUnit, TagSize.SHORT, 1,
+        (uint)ResolutionUnit.Inch);
 
       // write 4 bytes of 0s for next IFD address
       writeBuffer[pos++] = 0;
@@ -190,26 +203,25 @@ namespace Converter.Writers
       writeBuffer[pos++] = 0;
 
       // write IFD offset in header first 4-7 bytes
-      int currPos = (int)fs.Position;
+      int IFDStartPos = (int)fs.Position;
       fs.Position = 4;
       Span<byte> headerOverWrite = stackalloc byte[4];
-      headerOverWrite[0] = (byte)currPos;
-      headerOverWrite[1] = (byte)(currPos >> 8);
-      headerOverWrite[2] = (byte)(currPos >> 16);
-      headerOverWrite[3] = (byte)(currPos >> 24);
+      headerOverWrite[0] = (byte)IFDStartPos;
+      headerOverWrite[1] = (byte)(IFDStartPos >> 8);
+      headerOverWrite[2] = (byte)(IFDStartPos >> 16);
+      headerOverWrite[3] = (byte)(IFDStartPos >> 24);
       fs.Write(headerOverWrite);
 
-      fs.Position = currPos;
-      fs.Write(writeBuffer.Slice(0, pos - 1));
 
-      // write 2 8B rationals
+      fs.Seek(0, SeekOrigin.End);
+      fs.Write(writeBuffer.Slice(0, pos));
+
       pos = 0;
-      // XRes
       writeBuffer[pos++] = 72;
       writeBuffer[pos++] = 0;
       writeBuffer[pos++] = 0;
       writeBuffer[pos++] = 0;
-      writeBuffer[pos++] = 0;
+      writeBuffer[pos++] = 1;
       writeBuffer[pos++] = 0;
       writeBuffer[pos++] = 0;
       writeBuffer[pos++] = 0;
@@ -219,14 +231,17 @@ namespace Converter.Writers
       writeBuffer[pos++] = 0;
       writeBuffer[pos++] = 0;
       writeBuffer[pos++] = 0;
+      writeBuffer[pos++] = 1;
       writeBuffer[pos++] = 0;
       writeBuffer[pos++] = 0;
       writeBuffer[pos++] = 0;
-      writeBuffer[pos++] = 0;
+
       fs.Write(writeBuffer.Slice(0, 16));
+      fs.Flush();
+      fs.Dispose();
     }
 
-    public static void WriteIFDEntry(ref Span<byte> writeBuffer, ref int pos,TagType tag, TagSize t, uint count, uint valueOrOffset)
+    public static void WriteIFDEntryToBuffer(ref Span<byte> writeBuffer, ref int pos,TagType tag, TagSize t, uint count, uint valueOrOffset)
     {
       // 12 bytes
       // maybe i dont nbeed to mask but just cast and it cuts off
