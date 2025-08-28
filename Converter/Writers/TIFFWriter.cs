@@ -1,12 +1,4 @@
 ﻿using Converter.FIleStructures;
-using System;
-using System.Buffers;
-using System.Collections.Generic;
-using System.Diagnostics.CodeAnalysis;
-using System.Linq;
-using System.Runtime.InteropServices;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace Converter.Writers
 {
@@ -55,14 +47,15 @@ namespace Converter.Writers
 
       // use one buffer, always write in 8K intervals
       Span<byte> writeBuffer = options.AllowStackAlloct ? stackalloc byte[8192] : new byte[8192];
-      WriteHeader(ref fs, ref writeBuffer, options.BigEndian);
-      WriteRandomBilevelImageAndMetadata(ref fs, ref writeBuffer, ref options, Compression.NoCompression);
+      BufferWriter writer = new BufferWriter(ref writeBuffer, options.IsLittleEndian);
+      WriteHeader(ref fs, ref writeBuffer, options.IsLittleEndian);
+      WriteRandomBilevelImageAndMetadata(ref fs, ref writer, ref options, Compression.NoCompression);
     }
 
-    
-    static void WriteHeader(ref FileStream fs, ref Span<byte> writeBuffer, bool bigEndian = false)
+    // No need to use BufferWriter its ok
+    static void WriteHeader(ref FileStream fs, ref Span<byte> writeBuffer, bool isLittleEndian = true)
     {
-      if (bigEndian)
+      if (!isLittleEndian)
       {
         writeBuffer[0] = (byte)'M';
         writeBuffer[1] = (byte)'M';
@@ -82,31 +75,24 @@ namespace Converter.Writers
       writeBuffer[6] = 0;
       writeBuffer[7] = 0;
 
-      // maybe dont have to write insantly
+      // maybe dont have to write instantly
       fs.Write(writeBuffer.Slice(0, 8));
     }
 
     // TODO: fix all these castings and stuff about var sizes
-    static void WriteRandomBilevelImageAndMetadata(ref FileStream fs, ref Span<byte> writeBuffer, ref TIFFWriterOptions options, Compression compression = Compression.NoCompression)
+    static void WriteRandomBilevelImageAndMetadata(ref FileStream fs, ref BufferWriter writer, ref TIFFWriterOptions options, Compression compression = Compression.NoCompression)
     {
-      // write 2 8B rationals
       int pos = 0;
-      // XRes
-     
       int stripSize = 8192;
-      // suppoirt later
+      // support later
       if (compression != Compression.NoCompression)
         throw new NotImplementedException("This Compression not suppported yet!");
 
-      
-      // divide by 8 because with no compression and bilevel values are either 0 or 1 and they are packed in 
-      // bits
+      // divide by 8 because with no compression and bilevel values are either 0 or 1 and they are packed in bits
       ulong byteCount = ((uint)options.Width * (uint)options.Height) / 8;
 
       // write in ~8k Strips
       // smallest stripsize that can be used where rowsPerStrip will be whole number
-
-      // 8192 / options.height
       // get closest number to 8192 that is dividable by 8192 / options.height
       stripSize = stripSize - (stripSize % options.Height);
       uint stripCount = (uint)Math.Ceiling(byteCount / (decimal)stripSize);
@@ -114,20 +100,19 @@ namespace Converter.Writers
         stripCount++;
 
       int rowsPerStrip = options.Height - 1 / (int)stripCount;
-      //uint stripCount = (uint)byteCount / (uint)stripSize;
       int remainder = Convert.ToInt32((uint)byteCount % stripSize);
 
       int imageDataStartPointer = (int)fs.Position;
       for (ulong i = 0; i < byteCount; i += (ulong)stripSize)
       {
         // read random value into each buffer stuff and then write
-        Random.Shared.NextBytes(writeBuffer);
+        Random.Shared.NextBytes(writer._buffer);
         // do entire buffer because we know we are in range and no need to refresh
-        fs.Write(writeBuffer);
+        fs.Write(writer._buffer);
       }
 
       // write remainder
-      Span<byte> remainderSizeBuffer = writeBuffer.Slice(0, remainder);
+      Span<byte> remainderSizeBuffer = writer._buffer.Slice(0, remainder);
       Random.Shared.NextBytes(remainderSizeBuffer);
       fs.Write(remainderSizeBuffer);
 
@@ -136,140 +121,98 @@ namespace Converter.Writers
       for (int i = 0; i < stripCount; i++)
       {
         // little endian only!
-        writeBuffer[pos++] = (byte)(imageDataStartPointer & 255);
-        writeBuffer[pos++] = (byte)(imageDataStartPointer >> 8);
-        writeBuffer[pos++] = (byte)(imageDataStartPointer >> 16);
-        writeBuffer[pos++] = (byte)(imageDataStartPointer >> 24);
+        writer.WriteUnsigned32ToBuffer(ref pos, (uint)imageDataStartPointer);
         imageDataStartPointer += stripSize;
       }
-      // * 4 because each strip is 4 bytes
-      fs.Write(writeBuffer.Slice(0,pos));
+      fs.Write(writer._buffer.Slice(0,pos));
 
       int stripCountPointer = (int)fs.Position;
-
       pos = 0;
       for (int i = 0; i < stripCount - 1; i++)
       {
-        // little endian only!
-        writeBuffer[pos++] = (byte)(stripSize & 255);
-        writeBuffer[pos++] = (byte)(stripSize >> 8);
-        writeBuffer[pos++] = 0;
-        writeBuffer[pos++] = 0;
+        writer.WriteUnsigned32ToBuffer(ref pos, (uint)stripSize);
       }
 
-      //int lastStripByte = (int)(stripCount - 1) * 4;
       if (remainder == 0)
         remainder = stripSize;
-      writeBuffer[pos++] = (byte)(remainder & 255);
-      writeBuffer[pos++] = (byte)(remainder >> 8);
-      writeBuffer[pos++] = (byte)(remainder >> 16);
-      writeBuffer[pos++] = (byte)(remainder >> 24);
+      writer.WriteUnsigned32ToBuffer(ref pos, (uint)remainder);
 
-      fs.Write(writeBuffer.Slice(0, pos));
+      fs.Write(writer._buffer.Slice(0, pos));
 
       pos = 0;
-      // write IFD 'header'
-      writeBuffer[pos++] = 10;
-      writeBuffer[pos++] = 0;
-
-      // apparently these tags should be written in sequence?????
-      WriteIFDEntryToBuffer(ref writeBuffer, ref pos, TagType.ImageWidth, TagSize.SHORT, 1,
+      // write IFD 'header' lenght
+      writer.WriteUnsigned16ToBuffer(ref pos, 10);
+      // These tags should be in sequence according to JHOVE validator
+      // this means that they should be written from smallest to largest enum values
+      WriteIFDEntryToBuffer(ref writer, ref pos, TagType.ImageWidth, TagSize.SHORT, 1,
         (uint)options.Width);
-      WriteIFDEntryToBuffer(ref writeBuffer, ref pos, TagType.ImageLength, TagSize.SHORT, 1,
+      WriteIFDEntryToBuffer(ref writer, ref pos, TagType.ImageLength, TagSize.SHORT, 1,
         (uint)options.Height);
-      WriteIFDEntryToBuffer(ref writeBuffer, ref pos, TagType.Compression, TagSize.SHORT, 1,
+      WriteIFDEntryToBuffer(ref writer, ref pos, TagType.Compression, TagSize.SHORT, 1,
         (uint)Compression.NoCompression);
-      WriteIFDEntryToBuffer(ref writeBuffer, ref pos, TagType.PhotometricInterpretation, TagSize.SHORT, 1,
+      WriteIFDEntryToBuffer(ref writer, ref pos, TagType.PhotometricInterpretation, TagSize.SHORT, 1,
         (uint)PhotometricInterpretation.WhiteIsZero);
-      WriteIFDEntryToBuffer(ref writeBuffer, ref pos, TagType.StripOffsetsPointer, TagSize.LONG, stripCount,
+      WriteIFDEntryToBuffer(ref writer, ref pos, TagType.StripOffsetsPointer, TagSize.LONG, stripCount,
         (uint)stripOffsetPointer);
-      WriteIFDEntryToBuffer(ref writeBuffer, ref pos, TagType.RowsPerStrip, TagSize.LONG, 1,
+      WriteIFDEntryToBuffer(ref writer, ref pos, TagType.RowsPerStrip, TagSize.LONG, 1,
         (uint)rowsPerStrip);
-      WriteIFDEntryToBuffer(ref writeBuffer, ref pos, TagType.StripByteCountsPointer, TagSize.LONG, stripCount,
+      WriteIFDEntryToBuffer(ref writer, ref pos, TagType.StripByteCountsPointer, TagSize.LONG, stripCount,
         (uint)stripCountPointer);
       // Have to write 2 more entiries so start offsets for rationals will be fs.Position + 2 (2 *12) + 4
-      WriteIFDEntryToBuffer(ref writeBuffer, ref pos, TagType.XResolution, TagSize.RATIONAL, 1,
+      WriteIFDEntryToBuffer(ref writer, ref pos, TagType.XResolution, TagSize.RATIONAL, 1,
         (uint)fs.Position + 2 + (10 * 12) + 4);
-      WriteIFDEntryToBuffer(ref writeBuffer, ref pos, TagType.YResolution, TagSize.RATIONAL, 1,
+      WriteIFDEntryToBuffer(ref writer, ref pos, TagType.YResolution, TagSize.RATIONAL, 1,
         (uint)fs.Position + 2 + (10 * 12) + 4 + 8);
-      WriteIFDEntryToBuffer(ref writeBuffer, ref pos, TagType.ResolutionUnit, TagSize.SHORT, 1,
+      WriteIFDEntryToBuffer(ref writer, ref pos, TagType.ResolutionUnit, TagSize.SHORT, 1,
         (uint)ResolutionUnit.Inch);
 
       // write 4 bytes of 0s for next IFD address
-      writeBuffer[pos++] = 0;
-      writeBuffer[pos++] = 0;
-      writeBuffer[pos++] = 0;
-      writeBuffer[pos++] = 0;
+      writer.WriteUnsigned32ToBuffer(ref pos, 0);
+
+      // get IFD start pos before we write again
+      uint IFDStartPos = (uint)fs.Position;
+      fs.Write(writer._buffer.Slice(0, pos));
 
       // write IFD offset in header first 4-7 bytes
-      int IFDStartPos = (int)fs.Position;
       fs.Position = 4;
-      Span<byte> headerOverWrite = stackalloc byte[4];
-      headerOverWrite[0] = (byte)IFDStartPos;
-      headerOverWrite[1] = (byte)(IFDStartPos >> 8);
-      headerOverWrite[2] = (byte)(IFDStartPos >> 16);
-      headerOverWrite[3] = (byte)(IFDStartPos >> 24);
-      fs.Write(headerOverWrite);
+      pos = 0;
+      writer.WriteUnsigned32ToBuffer(ref pos, IFDStartPos);
+      fs.Write(writer._buffer.Slice(0, pos));
 
-
+      // go back to end
       fs.Seek(0, SeekOrigin.End);
-      fs.Write(writeBuffer.Slice(0, pos));
 
       pos = 0;
-      writeBuffer[pos++] = 72;
-      writeBuffer[pos++] = 0;
-      writeBuffer[pos++] = 0;
-      writeBuffer[pos++] = 0;
-      writeBuffer[pos++] = 1;
-      writeBuffer[pos++] = 0;
-      writeBuffer[pos++] = 0;
-      writeBuffer[pos++] = 0;
+      writer.WriteUnsigned32ToBuffer(ref pos, 72);
+      writer.WriteUnsigned32ToBuffer(ref pos, 1);
 
       // YRes
-      writeBuffer[pos++] = 72;
-      writeBuffer[pos++] = 0;
-      writeBuffer[pos++] = 0;
-      writeBuffer[pos++] = 0;
-      writeBuffer[pos++] = 1;
-      writeBuffer[pos++] = 0;
-      writeBuffer[pos++] = 0;
-      writeBuffer[pos++] = 0;
+      writer.WriteUnsigned32ToBuffer(ref pos, 72);
+      writer.WriteUnsigned32ToBuffer(ref pos, 1);
 
-      fs.Write(writeBuffer.Slice(0, 16));
+      fs.Write(writer._buffer.Slice(0, pos));
       fs.Flush();
       fs.Dispose();
     }
 
-    public static void WriteIFDEntryToBuffer(ref Span<byte> writeBuffer, ref int pos,TagType tag, TagSize t, uint count, uint valueOrOffset)
+    public static void WriteIFDEntryToBuffer(ref BufferWriter writer, ref int pos,TagType tag, TagSize t, uint count, uint valueOrOffset)
     {
       // 12 bytes
-      // maybe i dont nbeed to mask but just cast and it cuts off
-      // Tag
-      writeBuffer[pos++] = (byte)tag;
-      writeBuffer[pos++] = (byte)((uint)tag >> 8);
-
+      // tag
+      writer.WriteUnsigned16ToBuffer(ref pos, (ushort)tag);
       // Type
-      writeBuffer[pos++] = (byte)t;
-      writeBuffer[pos++] = (byte)((uint)t >> 8);
-
+      writer.WriteUnsigned16ToBuffer(ref pos, (ushort)t);
       // Count
-      writeBuffer[pos++] = (byte)count;
-      writeBuffer[pos++] = (byte)(count >> 8);
-      writeBuffer[pos++] = (byte)(count >> 16);
-      writeBuffer[pos++] = (byte)(count >> 24);
-
+      writer.WriteUnsigned32ToBuffer(ref pos, count);
       // value
-      writeBuffer[pos++] = (byte)valueOrOffset;
-      writeBuffer[pos++] = (byte)(valueOrOffset >> 8);
-      writeBuffer[pos++] = (byte)(valueOrOffset >> 16);
-      writeBuffer[pos++] = (byte)(valueOrOffset >> 24);
+      writer.WriteUnsigned32ToBuffer(ref pos, valueOrOffset);
     }
   }
 
   
   public struct TIFFWriterOptions()
   {
-    public bool BigEndian = false;
+    public bool IsLittleEndian = true;
     public int Width = 0;
     public int Height = 0;
     public ushort MaxRandomWidth = 1920;
