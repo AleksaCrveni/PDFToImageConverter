@@ -9,33 +9,6 @@ namespace Converter.Writers
     /// </summary>
     /// <param name="path">Filepath including filename</param>
     /// <param name="options">Options for image generation</param>
-    /// <list type="bullet">
-    /// <item>
-    /// - BigEndian wether file is in big endian or little endian
-    ///   -> default false
-    ///   </item>
-    /// </list>
-    /// - BigEndian wether file is in big endian or little endian
-    ///   -> default false
-    /// - Width is width of the picture
-    ///   -> default 0
-    ///   -> if its 0 random value is generated based on MaxRandomWidth and MinRandomWidth value
-    /// - Heigh is height of the picture
-    ///   -> default 0
-    ///   -> if its 0 random value is generated base d on MaxRandomHeight and MinRandomHeight value
-    /// - MaxRandomWidth is maximum value width can get if its randomly generated
-    ///   -> default is 1920
-    ///   -> used when generated random value when width is 0
-    ///   -> this value should NOT be 0 and must be bigger than MaxRandomWidth
-    /// - MinRandomWidth is minimum value width can get if its randomly generated
-    ///   -> default is 720
-    ///   -> used when generated random value when width is 0
-    ///   -> this value should NOT be 0 and must be smaller than MinRandomWidth
-    /// - MaxRandomWidth is maximum value width can get if its randomly generated
-    ///   -> default is 1920
-    ///   -> used when generated random value when width is 0
-    ///   -> this value should NOT be 0
-    /// </param>
     public static void WriteRandomBilevelTiff(string path, TIFFWriterOptions options)
     {
       FileStream fs = File.Create(path);
@@ -209,16 +182,48 @@ namespace Converter.Writers
     }
   }
 
-  
+  /// <summary> Options for TIFF Writer
+  /// </summary>
   public struct TIFFWriterOptions()
   {
+    /// <summary>
+    /// Declares wether TIFF Image should be written as BigEndian(MM) or LittleEndian(II)
+    /// </summary>
     public bool IsLittleEndian = true;
+
+    /// <summary>
+    /// Width of the image. If it's 0, random value is generated based on MinRandomWidth and MinRandomWidth value. Default is 0.
+    /// </summary>
     public int Width = 0;
+
+    /// <summary>
+    /// Height of the image. If it's 0, random value is generated based on MinRandomHeight and MinRandomHeight value. Default is 0.
+    /// </summary>
     public int Height = 0;
+
+    /// <summary>
+    /// Maximum width that can be rolled in case Width isn't specified, should be larger than MinRandomWidth and non zero. Default is 1920.
+    /// </summary>
     public ushort MaxRandomWidth = 1920;
+
+    /// <summary>
+    /// Maximum width that can be rolled in case Width isn't specified, should be larger than MinRandomHeight and non zero. Default is 1080.
+    /// </summary>
     public ushort MaxRandomHeight = 1080;
+
+    /// <summary>
+    /// Minimum width that can be rolled in case Width isn't specified, should be smaller than MaxRandomWidth and non zero. Default is 128.
+    /// </summary>
     public ushort MinRandomWidth = 128;
+
+    /// <summary>
+    /// Minimum height that can be rolled in case Width isn't specified, should be smaller than MaxRandomHeight and non zero. Default is 128.
+    /// </summary>
     public ushort MinRandomHeight = 128;
+
+    /// <summary>
+    /// Allow writer buffer to be allocated on the stack. Buffer size is 8192 bytes. If false, buffer will be allocated on heap. Default is false.
+    /// </summary>
     public bool AllowStackAlloct = false;
   }
 }
