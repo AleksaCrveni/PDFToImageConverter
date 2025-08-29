@@ -109,14 +109,17 @@ namespace Converter.Writers
       fs.Write(writer._buffer.Slice(0, pos));
 
       pos = 0;
+      int tagCount = 11;
       // write IFD 'header' lenght
-      writer.WriteUnsigned16ToBuffer(ref pos, 10);
+      writer.WriteUnsigned16ToBuffer(ref pos, (ushort)tagCount);
       // These tags should be in sequence according to JHOVE validator
       // this means that they should be written from smallest to largest enum values
       WriteIFDEntryToBuffer(ref writer, ref pos, TagType.ImageWidth, TagSize.SHORT, 1,
         (uint)options.Width);
       WriteIFDEntryToBuffer(ref writer, ref pos, TagType.ImageLength, TagSize.SHORT, 1,
         (uint)options.Height);
+      WriteIFDEntryToBuffer(ref writer, ref pos, TagType.BitsPerSample, TagSize.SHORT, 1,
+        1);
       WriteIFDEntryToBuffer(ref writer, ref pos, TagType.Compression, TagSize.SHORT, 1,
         (uint)Compression.NoCompression);
       WriteIFDEntryToBuffer(ref writer, ref pos, TagType.PhotometricInterpretation, TagSize.SHORT, 1,
@@ -129,9 +132,9 @@ namespace Converter.Writers
         (uint)stripCountPointer);
       // Have to write 2 more entiries so start offsets for rationals will be fs.Position + 2 (2 *12) + 4
       WriteIFDEntryToBuffer(ref writer, ref pos, TagType.XResolution, TagSize.RATIONAL, 1,
-        (uint)fs.Position + 2 + (10 * 12) + 4);
+        (uint)(fs.Position + 2 + (tagCount * 12) + 4));
       WriteIFDEntryToBuffer(ref writer, ref pos, TagType.YResolution, TagSize.RATIONAL, 1,
-        (uint)fs.Position + 2 + (10 * 12) + 4 + 8);
+        (uint)(fs.Position + 2 + (tagCount * 12) + 4 + 8));
       WriteIFDEntryToBuffer(ref writer, ref pos, TagType.ResolutionUnit, TagSize.SHORT, 1,
         (uint)ResolutionUnit.Inch);
 
