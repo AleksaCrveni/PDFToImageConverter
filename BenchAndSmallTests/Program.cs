@@ -63,7 +63,15 @@ using Converter.Writers;
 
 for (int i = 0; i < 10; i++)
 {
-  TIFFWriter.WriteRandomBilevelTiff($"Files/test{i}.tif", new TIFFWriterOptions()
+  TIFFWriter.WriteRandomBilevelTIFF($"Files/Bilevel/test{i}.tif", new TIFFWriterOptions()
+  {
+    AllowStackAlloct = true,
+  });
+}
+
+for (int i = 0; i < 10; i++)
+{
+  TIFFWriter.WriteRandomGrayscaleTIFF($"Files/Grayscale/test{i}.tif", new TIFFWriterOptions()
   {
     AllowStackAlloct = true,
   });
