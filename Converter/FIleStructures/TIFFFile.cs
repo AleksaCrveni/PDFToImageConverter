@@ -103,7 +103,8 @@
     XResolution = 282,
     YResolution = 283,
     ResolutionUnit = 296,
-    PageNumber = 297
+    PageNumber = 297,
+    ColorMap = 320
   }
 
   public enum TagSize : ushort
