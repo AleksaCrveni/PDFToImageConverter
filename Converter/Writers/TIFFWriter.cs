@@ -4,6 +4,7 @@ namespace Converter.Writers
 {
   public static class TIFFWriter
   {
+    private static int DEFAULT_STRIP_SIZE = 8192;
     /// <summary>
     /// Writes random bilevel tiff file with random width or heigh depending on option values passed
     /// </summary>
@@ -56,7 +57,7 @@ namespace Converter.Writers
     static void WriteRandomBilevelImageAndMetadata(ref FileStream fs, ref BufferWriter writer, ref TIFFWriterOptions options, Compression compression = Compression.NoCompression)
     {
       int pos = 0;
-      int stripSize = 8192;
+      
       // support later
       if (compression != Compression.NoCompression)
         throw new NotImplementedException("This Compression not suppported yet!");
@@ -67,14 +68,9 @@ namespace Converter.Writers
       // write in ~8k Strips
       // smallest stripsize that can be used where rowsPerStrip will be whole number
       // get closest number to 8192 that is dividable by 8192 / options.height
-      stripSize = stripSize - (stripSize % options.Height);
-      uint stripCount = (uint)Math.Ceiling(byteCount / (decimal)stripSize);
-      if ((uint)byteCount % stripSize > 0)
-        stripCount++;
+      int stripSize = DEFAULT_STRIP_SIZE;
 
-      int rowsPerStrip = options.Height - 1 / (int)stripCount;
-      int remainder = Convert.ToInt32((uint)byteCount % stripSize);
-
+      CalculateStripAndRowInfo(byteCount, options.Height, ref stripSize, out uint stripCount, out int rowsPerStrip, out int remainder);
       int imageDataStartPointer = (int)fs.Position;
       for (ulong i = 0; i < byteCount; i += (ulong)stripSize)
       {
@@ -168,7 +164,7 @@ namespace Converter.Writers
       fs.Dispose();
     }
 
-    public static void WriteIFDEntryToBuffer(ref BufferWriter writer, ref int pos,TagType tag, TagSize t, uint count, uint valueOrOffset)
+    static void WriteIFDEntryToBuffer(ref BufferWriter writer, ref int pos,TagType tag, TagSize t, uint count, uint valueOrOffset)
     {
       // 12 bytes
       // tag
@@ -179,6 +175,17 @@ namespace Converter.Writers
       writer.WriteUnsigned32ToBuffer(ref pos, count);
       // value
       writer.WriteUnsigned32ToBuffer(ref pos, valueOrOffset);
+    }
+
+    static void CalculateStripAndRowInfo(ulong byteCount, int height, ref int stripSize, out uint stripCount, out int rowsPerStrip, out int remainder)
+    {
+      stripSize = stripSize - (stripSize % height);
+      stripCount = (uint)Math.Ceiling(byteCount / (decimal)stripSize);
+      if ((uint)byteCount % stripSize > 0)
+        stripCount++;
+
+      rowsPerStrip = height - 1 / (int)stripCount;
+      remainder = Convert.ToInt32((uint)byteCount % stripSize);
     }
   }
 
