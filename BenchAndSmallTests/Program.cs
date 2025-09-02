@@ -67,22 +67,20 @@ for (int i = 0; i < 10; i++)
   {
     AllowStackAlloct = true,
   });
-}
-
-for (int i = 0; i < 10; i++)
-{
   TIFFWriter.WriteRandomGrayscaleTIFF($"Files/Grayscale/test{i}.tif", new TIFFWriterOptions()
   {
     AllowStackAlloct = true,
   });
-}
-
-for (int i = 0; i < 10; i++)
-{
   TIFFWriter.WriteRandomPaletteTiff($"Files/Palette/test{i}.tif", new TIFFWriterOptions()
   {
     AllowStackAlloct = true,
   });
+  TIFFWriter.WriteRandomRGBFullColorTiff($"Files/RGBFullColor/test{i}.tif", new TIFFWriterOptions()
+  {
+    AllowStackAlloct = true,
+  });
 }
+
+  
 
 //var runner = BenchmarkRunner.Run<MyBenches>();

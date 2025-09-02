@@ -264,7 +264,8 @@ namespace Converter.Parsers
             tag.PageNumber = pageNumber;
             break;
           default:
-             throw new NotSupportedException($"Tag not supported add it. {tagValue}"); // this is just for development purposes
+            //throw new NotSupportedException($"Tag not supported add it. {tagValue}"); // this is just for development purposes
+            break;
         }
       }
       tiffData.Tag = tag;
