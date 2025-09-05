@@ -28,6 +28,10 @@ namespace Converter.Parsers
     {
       _buffer = (ReadOnlySpan<byte>)buffer;
     }
+    public SpanParseHelper(ref ReadOnlySpan<byte> buffer)
+    {
+      _buffer = buffer;
+    }
     // it should stop at next special char, but it should exclude them!
     // if special char is first token its ok!
     // this is mostly used to get 'keys' in dictionaries
@@ -226,6 +230,27 @@ namespace Converter.Parsers
       return result;
     }
 
+    public uint GetNextUnsignedInt32()
+    {
+      SkipWhiteSpaceAndDelimiters();
+      int starter = _position;
+      // don't have to check if _char is 0 if we reach end of the buffer becaseu its cheked in IsCurrentCharPdfWhiteSpace
+      while (IsCurrentByteDigit())
+      {
+        ReadChar();
+      }
+
+      // TODO: maybe dont need new span just read from buffer directly
+      ReadOnlySpan<byte> numberInBytes = _buffer.Slice(starter, _position - starter);
+      uint result = 0;
+      for (int i = 0; i < numberInBytes.Length; i++)
+      {
+        // these should be no negative ints so this is okay i believe?
+        result = result * 10 + (uint)CharUnicodeInfo.GetDecimalDigitValue((char)numberInBytes[i]);
+      }
+      return result;
+    }
+
     // do 64 for just in case, not sure if its specified max precision
     public double GetNextDouble()
     {
@@ -329,7 +354,7 @@ namespace Converter.Parsers
     }
      
     // byte string is starting with < and ending with >
-    public string ReadByteString()
+    public string GetNextByteString()
     {
       SkipWhiteSpaceAndDelimiters();
       if (_char != '<')

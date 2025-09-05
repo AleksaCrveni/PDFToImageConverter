@@ -226,14 +226,14 @@ namespace Converter.FIleStructures
     public int LastChar;
     // can be indirect val
     public int[] Widths;
-    // can be indirect val
+    // is IR
     public FontDescriptor FontDescriptor;
     // can be name of dict, but just do enum for now
-    public Encoding Encoding;
+    public EncodingInfo Encoding;
     public byte[] ToUnicode;
   }
   
-  public enum Encoding
+  public enum EncodingInfo
   {
     Custom,
     MacRomanEncoding,
@@ -275,17 +275,17 @@ namespace Converter.FIleStructures
   
   // Table 123
   [Flags]
-  public enum FontFlags
+  public enum FontFlags : UInt16
   {
     FixedPitch = 1,
     Serif = 2,
-    Symbolic = 3,
-    Script = 4,
-    Nonsymbolic = 6,
-    Italic = 7,
-    AllCap = 17,
-    SmallCap = 18,
-    ForceBold = 19
+    Symbolic = 4,
+    Script = 8,
+    Nonsymbolic = 16,
+    Italic = 32,
+    AllCap = 64,
+    SmallCap = 128,
+    ForceBold = 256
   }
 
   public enum FontStretch
