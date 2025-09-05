@@ -209,9 +209,97 @@ namespace Converter.FIleStructures
     public Dictionary<object, object> Pattern;
     public Dictionary<object, object> Shading;
     public Dictionary<object, object> XObject;
-    public Dictionary<string, (int, int)> Font;
+    public FontInfo Font;
     public List<string> ProcSet;
     public Dictionary<object, object> Properties;
+  }
+
+  // Table 111
+  public struct FontInfo()
+  {
+    public FontType SubType;
+    public string Name;
+    // postscript name of the font, can be parsed later if needed
+    // this is actually enum??
+    public string BaseFont;
+    public int FirstChar;
+    public int LastChar;
+    // can be indirect val
+    public int[] Widths;
+    // can be indirect val
+    public FontDescriptor FontDescriptor;
+    // can be name of dict, but just do enum for now
+    public Encoding Encoding;
+    public byte[] ToUnicode;
+  }
+  
+  public enum Encoding
+  {
+    Custom,
+    MacRomanEncoding,
+    MacExpertEncoding,
+    WinAnsiEncoding,
+  }
+
+    // Table 122
+  public struct FontDescriptor
+  {
+    // should be same as FontInfo.BaseFont
+    public string FontName;
+    // Byte string
+    // Used for type 3 fonts in tagged documnts
+    public string FontFamily;
+    // Used for type 3 fonts in tagged documnts
+    public FontStretch FontStretch;
+    // valid values are 100,200,300,400,500,600,700,800,900
+    public int FontWeight;
+    public FontFlags Flags;
+    public Rect FontBBox;
+    public int ItalicAngle;
+    public int Ascent;
+    public int Descent;
+    public int Leading;
+    public int CapHeight;
+    public int XHeight;
+    public int StemV;
+    public int StemH;
+    public int AvgWidth;
+    public int MaxWidth;
+    public int MissingWidth;
+    public byte[] FontFile;
+    public byte[] FontFile2;
+    public byte[] FontFile3;
+    // byte string
+    public string CharSet;
+  }
+  
+  // Table 123
+  [Flags]
+  public enum FontFlags
+  {
+    FixedPitch = 1,
+    Serif = 2,
+    Symbolic = 3,
+    Script = 4,
+    Nonsymbolic = 6,
+    Italic = 7,
+    AllCap = 17,
+    SmallCap = 18,
+    ForceBold = 19
+  }
+
+  public enum FontStretch
+  {
+    Null = 0,
+    UltraCondensed,
+    ExtraCondensed,
+    Condensed,
+    SemiCondensed,
+    Normal,
+    SemiExpanded,
+    Expanded,
+    ExtraExpanded,
+    UltraExpanded
   }
 
   // 7.4.1 & Table 5
@@ -243,6 +331,22 @@ namespace Converter.FIleStructures
     JPXDecode,
     Crypt
   }
+
+  public enum FontType
+  {
+    Null = 0,
+    Type0,
+    Type1,
+    MMType1,
+    Type3,
+    TrueType,
+    CIDFontType0,
+    CIDFontType2,
+    OpenType,
+  }
+
+  public enum BaseFont
+  { }
 
 
   // 7.9.5

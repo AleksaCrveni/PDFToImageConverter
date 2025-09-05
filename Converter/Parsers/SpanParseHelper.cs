@@ -15,7 +15,7 @@ namespace Converter.Parsers
 {
   public ref struct SpanParseHelper
   {
-    private ReadOnlySpan<byte> _buffer;
+    public ReadOnlySpan<byte> _buffer;
     public int _position = 0; // current posion
     private int _readPosition = 0; // next position
     public byte _char; // current char
