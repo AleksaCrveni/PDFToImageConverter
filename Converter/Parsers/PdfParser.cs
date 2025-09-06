@@ -328,19 +328,35 @@ namespace Converter.Parsers
           case "Font":
             // not specified in documentation, but i've seen files where Font is just IR and not dict of IRs
             helper.SkipWhiteSpace();
-            if (helper._char == '<')
+            FontInfo fontInfo = new FontInfo();
+            int bytesRead = 0;
+            if (helper._char == '<' && helper.IsCurrentCharacterSameAsNext())
             {
-
-              _ = helper.GetNextDict();
-              // PLACEHOLDER
-              resourceDict.Font = new Dictionary<string, (int, int)>();
+              helper.ReadChar();
+              // use this because we dont know when dict ends so we can just skip those and not read again on main buffer
+              bytesRead = ParseFontDictionary(file, helper._buffer.Slice(helper._position), true, ref fontInfo);
             }
             else
             {
-              (int a, int b) IR = helper.GetNextIndirectReference();
-              Dictionary<string, (int, int)> dict = new Dictionary<string, (int, int)>();
-              dict.Add("R1", IR);
+              (int objectIndex, int b) IR = helper.GetNextIndirectReference();
+              objectByteOffset = file.CrossReferenceEntries[objectIndex].TenDigitValue;
+              objectLength = GetDistanceToNextObject(objectIndex, objectByteOffset, file);
+
+              // use array pool
+              Span<byte> irBuffer = new byte[objectLength];
+
+              long prevPos = file.Stream.Position;
+              
+              readBytes = file.Stream.Read(irBuffer);
+              // do i need this...?
+              if (irBuffer.Length != readBytes)
+                throw new InvalidDataException("Invalid data");
+              bytesRead = ParseFontDictionary(file, irBuffer, false, ref fontInfo);
+              file.Stream.Position = prevPos;
             }
+
+            helper._position += bytesRead;
+            resourceDict.Font = fontInfo;
             break;
           case "ProcSet":
             resourceDict.ProcSet = helper.GetNextArrayStrict();
@@ -360,6 +376,249 @@ namespace Converter.Parsers
 
       if (tokenString == "")
         throw new InvalidDataException("Invalid dictionary");
+    }
+
+    /// <summary>
+    /// Parse FontDictioanry data for ResourceDict
+    /// </summary>
+    /// <param name="file"></param>
+    /// <param name="buffer">Buffer where entire data is contained, unless some data is referenced in IR</param>
+    /// <param name="dictOpen">True if we read into dict already because we aren't sure if its IR or dict in first place</param>
+    /// <param name="fontInfo"></param>
+    /// <returns>Number of bytes moved inside small buffer</returns>
+    private int ParseFontDictionary(PDFFile file, ReadOnlySpan<byte> buffer, bool dictOpen, ref FontInfo fontInfo)
+    {
+      SpanParseHelper helper = new SpanParseHelper(ref buffer);
+      bool dictStartFound = dictOpen;
+      while (!dictStartFound)
+      {
+        helper.ReadUntilNonWhiteSpaceDelimiter();
+        if (helper._char == '<')
+          dictStartFound = helper.IsCurrentCharacterSameAsNext();
+      }
+
+      string tokenString = helper.GetNextToken();
+      while (tokenString != "")
+      {
+        switch (tokenString)
+        {
+          case "SubType":
+            fontInfo.SubType = helper.GetNextName<FontType>();
+            break;
+          case "Name":
+            fontInfo.Name = helper.GetNextToken();
+            break;
+          case "BaseFont":
+            fontInfo.BaseFont = helper.GetNextToken();
+            break;
+          case "FirstChar":
+            fontInfo.FirstChar= helper.GetNextInt32();
+            break;
+          case "LastChar":
+            fontInfo.LastChar = helper.GetNextInt32();
+            break;
+          case "Widths":
+            helper.SkipWhiteSpace();
+            // can be direct array or IR
+            int[] widthsArr = new int[fontInfo.LastChar - fontInfo.FirstChar + 1];
+            if (helper._char == '[')
+            {
+              helper.ReadChar();
+              for (int i = 0; i < widthsArr.Length; i++)
+              {
+                widthsArr[i] = helper.GetNextInt32();
+              }
+            } else if (char.IsDigit((char)helper._char))
+            {
+              int objectIndex = helper._char;
+              long objectByteOffset = file.CrossReferenceEntries[objectIndex].TenDigitValue;
+              long objectLength = GetDistanceToNextObject(objectIndex, objectByteOffset, file);
+              Span<byte> irBuffer = new byte[objectLength];
+
+              long currPos = file.Stream.Position;
+              file.Stream.Position = objectByteOffset;
+              int bytesRead = file.Stream.Read(irBuffer);
+              if (bytesRead != objectLength)
+                throw new InvalidDataException("Invalid array for Widths field!");
+              file.Stream.Position = currPos;
+              SpanParseHelper irHelper = new SpanParseHelper(ref irBuffer);
+
+              irHelper.SkipNextToken(); // object id
+              irHelper.SkipNextToken(); // seocnd number
+              irHelper.SkipNextToken(); // 'obj'
+              irHelper.ReadUntilNonWhiteSpaceDelimiter();
+              while (helper._char != '[')
+              {
+                irHelper.ReadChar();
+                irHelper.ReadUntilNonWhiteSpaceDelimiter();
+              }
+
+              for (int i = 0; i < widthsArr.Length; i++)
+              {
+                widthsArr[i] = irHelper.GetNextInt32();
+              }
+
+              irHelper.ReadUntilNonWhiteSpaceDelimiter();
+              if (helper._char != ']')
+                throw new InvalidDataException("Invalid end of widths array!");
+            }
+            else
+            {
+              throw new InvalidDataException("Invalid Widths value in Font Dictionary!");
+            }
+
+            fontInfo.Widths = widthsArr;
+            break;
+          case "FontDescriptor":
+            (int objectIndex, int _) ir = helper.GetNextIndirectReference();
+            FontDescriptor fontDescriptor = new FontDescriptor();
+            // prob should rename
+            ParseFontDescriptor(file, ir, ref fontDescriptor);
+            fontInfo.FontDescriptor = fontDescriptor;
+            break;
+          case "Encoding":
+            //TODO: Fix later to support dictionaries as welll
+            fontInfo.Encoding = helper.GetNextName<EncodingInf>();
+            break;
+          case "ToUnicode":
+            //TODO: fix, this is actually IR to stream
+            fontInfo.ToUnicode = helper.GetNextStream();
+            break;
+          default:
+            break;
+        }
+
+        helper.ReadUntilNonWhiteSpaceDelimiter();
+        if (helper._char == '>' && helper.IsCurrentCharacterSameAsNext())
+          break;
+        tokenString = helper.GetNextToken();
+      }
+
+      if (tokenString == "")
+        throw new InvalidDataException("Invalid dictionary");
+
+      return helper._position;
+    }
+
+    private void ParseFontDescriptor(PDFFile file, (int objectIndex, int _) objectPosition, ref FontDescriptor fontDescriptor)
+    {
+      int objectIndex = objectPosition.objectIndex;
+      long objectByteOffset = file.CrossReferenceEntries[objectIndex].TenDigitValue;
+      long objectLength = GetDistanceToNextObject(objectIndex, objectByteOffset, file);
+      Span<byte> buffer = new byte[objectLength];
+      SpanParseHelper helper = new SpanParseHelper(ref buffer);
+      int readBytes = file.Stream.Read(buffer);
+      if (readBytes != objectLength)
+        throw new InvalidDataException("Invalid font descriptor dictionary.");
+
+      bool dictStartFound = false;
+      while (!dictStartFound)
+      {
+        helper.ReadUntilNonWhiteSpaceDelimiter();
+        if (helper._char == '<')
+          dictStartFound = helper.IsCurrentCharacterSameAsNext();
+      }
+
+      string tokenString = helper.GetNextToken();
+      while (tokenString != "")
+      {
+        switch (tokenString)
+        {
+          case "FontName":
+            fontDescriptor.FontName = helper.GetNextToken();
+            break;
+          case "FontFamily":
+            fontDescriptor.FontFamily = helper.GetNextByteString();
+            break;
+          case "FontStretch":
+            fontDescriptor.FontStretch = helper.GetNextName<FontStretch>();
+            break;
+          case "FontWeight":
+            int fw = helper.GetNextInt32();
+            if (fw != 100 && fw != 200 && fw != 300 && fw != 400 && fw != 500 &&
+                fw != 600 && fw != 700 && fw != 800 && fw != 900)
+              throw new InvalidDataException("Invalid font weight in font descriptor!");
+            fontDescriptor.FontWeight = fw;
+            break;
+          case "Flags":
+            uint i = helper.GetNextUnsignedInt32();
+            FontFlags flags = new FontFlags();
+            if ((i & 1) == 1)
+              flags |= FontFlags.FixedPitch;
+            if ((i & 2) == 2)
+              flags |= FontFlags.Serif;
+            if ((i & 4) == 4)
+              flags |= FontFlags.Symbolic;
+            if ((i & 8) == 8)
+              flags |= FontFlags.Script;
+            if ((i & 32) == 32)
+              flags |= FontFlags.Nonsymbolic;
+            if ((i & 64) == 64)
+              flags |= FontFlags.Italic;
+            if ((i & 65536) == 65536) // 17th bit (indexed from 1)
+              flags |= FontFlags.AllCap;
+            if ((i & 131072) == 131072) // 18th bit (indexed from 1)
+              flags |= FontFlags.SmallCap;
+            if ((i & 262144) == 262144) // 19th bit (indexed from 1)
+              flags |= FontFlags.ForceBold;
+            fontDescriptor.Flags = flags;
+            break;
+          case "FontBBox":
+            fontDescriptor.FontBBox = helper.GetNextRectangle();
+            break;
+          case "ItalicAngle":
+            fontDescriptor.ItalicAngle = helper.GetNextInt32();
+            break;
+          case "Ascent":
+            fontDescriptor.Ascent = helper.GetNextInt32();
+            break;
+          case "Descent":
+            fontDescriptor.Descent = helper.GetNextInt32();
+            break;
+          case "Leading":
+            fontDescriptor.Leading = helper.GetNextInt32();
+            break;
+          case "CapHeight":
+            fontDescriptor.CapHeight = helper.GetNextInt32();
+            break;
+          case "StemV":
+            fontDescriptor.StemV = helper.GetNextInt32();
+            break;
+          case "StemH":
+            fontDescriptor.StemH = helper.GetNextInt32();
+            break;
+          case "AvgWidth":
+            fontDescriptor.AvgWidth = helper.GetNextInt32();
+            break;
+          case "MaxWidth":
+            fontDescriptor.MaxWidth = helper.GetNextInt32();
+            break;
+          case "MissingWidth":
+            fontDescriptor.MissingWidth = helper.GetNextInt32();
+            break;
+          case "FontFile":
+            fontDescriptor.FontFile = helper.GetNextStream();
+            break;
+          case "FontFile2":
+            fontDescriptor.FontFile2 = helper.GetNextStream();
+            break;
+          case "FontFile3":
+            fontDescriptor.FontFile3 = helper.GetNextStream();
+            break;
+          case "CharSet":
+            fontDescriptor.CharSet = helper.GetNextToken();
+            break;
+          default:
+            break;
+
+
+        }
+        helper.ReadUntilNonWhiteSpaceDelimiter();
+        if (helper._char == '>' && helper.IsCurrentCharacterSameAsNext())
+          break;
+        tokenString = helper.GetNextToken();
+      }
+
     }
 
     private void ParsePageContents(PDFFile file, (int objIndex, int) objectPosition)

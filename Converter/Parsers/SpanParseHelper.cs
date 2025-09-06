@@ -208,7 +208,7 @@ namespace Converter.Parsers
       ReadChar();
       return res;
     }
-
+    // TODO: Fix so this works for negatives
     public int GetNextInt32()
     {
       SkipWhiteSpaceAndDelimiters();

@@ -229,11 +229,11 @@ namespace Converter.FIleStructures
     // is IR
     public FontDescriptor FontDescriptor;
     // can be name of dict, but just do enum for now
-    public EncodingInfo Encoding;
+    public EncodingInf Encoding;
     public byte[] ToUnicode;
   }
   
-  public enum EncodingInfo
+  public enum EncodingInf
   {
     Custom,
     MacRomanEncoding,
