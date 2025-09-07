@@ -209,7 +209,8 @@ namespace Converter.FIleStructures
     public Dictionary<object, object> Pattern;
     public Dictionary<object, object> Shading;
     public Dictionary<object, object> XObject;
-    public FontInfo Font;
+    // key is arbitary so it has to be a string and its used to reference this fonts
+    public Dictionary<string, FontInfo> Font;
     public List<string> ProcSet;
     public Dictionary<object, object> Properties;
   }

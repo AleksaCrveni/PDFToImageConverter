@@ -42,7 +42,7 @@ namespace Converter.Parsers
       SkipWhiteSpaceAndDelimiters();
       int starter = _position;
       // don't have to check if _char is 0 if we reach end of the buffer becaseu its cheked in IsCurrentCharPdfWhiteSpace
-      while (!IsCurrentCharPdfWhiteSpace() && !delimiters.Contains(_char))
+      while (!IsCurrentCharPdfWhiteSpace() && !delimiters.Contains(_char) && _readPosition < _buffer.Length)
       {
         ReadChar();
       }

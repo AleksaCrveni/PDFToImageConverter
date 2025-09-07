@@ -3,6 +3,7 @@ using Converter.FIleStructures;
 using System.Globalization;
 using System.IO.Compression;
 using System.Runtime.InteropServices;
+using System.Runtime.Versioning;
 using System.Text;
 namespace Converter.Parsers
 {
@@ -164,7 +165,7 @@ namespace Converter.Parsers
           default:
             break;
         }
-
+        helper.ReadUntilNonWhiteSpaceDelimiter();
         if (helper._char == '>' && helper.IsCurrentCharacterSameAsNext())
           break;
         tokenString = helper.GetNextToken();
@@ -330,33 +331,34 @@ namespace Converter.Parsers
             helper.SkipWhiteSpace();
             FontInfo fontInfo = new FontInfo();
             int bytesRead = 0;
+            Dictionary<string, FontInfo> fontData;
             if (helper._char == '<' && helper.IsCurrentCharacterSameAsNext())
             {
               helper.ReadChar();
               // use this because we dont know when dict ends so we can just skip those and not read again on main buffer
-              bytesRead = ParseFontDictionary(file, helper._buffer.Slice(helper._position), true, ref fontInfo);
+              fontData = ParseFontIRDictionary(file, helper._buffer.Slice(helper._position), true);
             }
             else
             {
               (int objectIndex, int b) IR = helper.GetNextIndirectReference();
-              objectByteOffset = file.CrossReferenceEntries[objectIndex].TenDigitValue;
-              objectLength = GetDistanceToNextObject(objectIndex, objectByteOffset, file);
+              objectByteOffset = file.CrossReferenceEntries[IR.objectIndex].TenDigitValue;
+              objectLength = GetDistanceToNextObject(IR.objectIndex, objectByteOffset, file);
 
               // use array pool
               Span<byte> irBuffer = new byte[objectLength];
 
               long prevPos = file.Stream.Position;
-              
+              file.Stream.Position = objectByteOffset;
               readBytes = file.Stream.Read(irBuffer);
               // do i need this...?
               if (irBuffer.Length != readBytes)
                 throw new InvalidDataException("Invalid data");
-              bytesRead = ParseFontDictionary(file, irBuffer, false, ref fontInfo);
+              fontData = ParseFontIRDictionary(file, irBuffer, false);
               file.Stream.Position = prevPos;
             }
 
-            helper._position += bytesRead;
-            resourceDict.Font = fontInfo;
+
+            resourceDict.Font = fontData;
             break;
           case "ProcSet":
             resourceDict.ProcSet = helper.GetNextArrayStrict();
@@ -378,18 +380,66 @@ namespace Converter.Parsers
         throw new InvalidDataException("Invalid dictionary");
     }
 
+    // TODO: fix this as well, after you add array pooling of some kind
+    private Dictionary<string, FontInfo> ParseFontIRDictionary(PDFFile file, ReadOnlySpan<byte> buffer, bool dictOpen)
+    {
+      SpanParseHelper helper = new SpanParseHelper(ref buffer);
+
+      bool dictStartFound = dictOpen;
+      while (!dictStartFound)
+      {
+        helper.ReadUntilNonWhiteSpaceDelimiter();
+        if (helper._char == '<')
+          dictStartFound = helper.IsCurrentCharacterSameAsNext();
+      }
+
+      string key;
+      FontInfo fontInfo;
+      long objectByteOffset = 0;
+      long objectLength = 0;
+
+      // make this larger in size so it can be reused, otherwise make new one
+      // or maybe new one could be come main buffer since its bigger..??
+      // can also calcualte lenght or largest dict and then alloc but its a bit more complicated
+      // but i think these should always be under 8k
+      Span<byte> mainBuffer = new byte[KB * 8];
+      long origPos = file.Stream.Position;
+      Dictionary<string, FontInfo> fontData = new();
+      while (helper._char != '>' && !helper.IsCurrentCharacterSameAsNext())
+      {
+        key = helper.GetNextToken();
+        if (key == "")
+          break;
+        fontInfo = new FontInfo();
+        (int objectIndex, int _) IR = helper.GetNextIndirectReference();
+        objectByteOffset = file.CrossReferenceEntries[IR.objectIndex].TenDigitValue;
+        objectLength = GetDistanceToNextObject(IR.objectIndex, objectByteOffset, file);
+        Span<byte> irBuffer = objectLength <= mainBuffer.Length ? mainBuffer.Slice(0, (int)objectLength) : new byte[objectLength];
+        file.Stream.Position = objectByteOffset;
+        int bytesRead = file.Stream.Read(irBuffer);
+        if (bytesRead != irBuffer.Length)
+          throw new InvalidDataException("Invalid font dict lenght!");
+        ParseFontDictionary(file, irBuffer, ref fontInfo);
+        fontData.Add(key, fontInfo);
+        helper.ReadUntilNonWhiteSpaceDelimiter();
+      }
+      file.Stream.Position = origPos;
+      return fontData;
+    }
+
+
     /// <summary>
-    /// Parse FontDictioanry data for ResourceDict
+    /// Parse FontDictioanry data for ResourceDict that is referenced in from ParseFontIRDictionary
     /// </summary>
     /// <param name="file"></param>
     /// <param name="buffer">Buffer where entire data is contained, unless some data is referenced in IR</param>
     /// <param name="dictOpen">True if we read into dict already because we aren't sure if its IR or dict in first place</param>
     /// <param name="fontInfo"></param>
     /// <returns>Number of bytes moved inside small buffer</returns>
-    private int ParseFontDictionary(PDFFile file, ReadOnlySpan<byte> buffer, bool dictOpen, ref FontInfo fontInfo)
+    private void ParseFontDictionary(PDFFile file, ReadOnlySpan<byte> buffer, ref FontInfo fontInfo)
     {
       SpanParseHelper helper = new SpanParseHelper(ref buffer);
-      bool dictStartFound = dictOpen;
+      bool dictStartFound = false;
       while (!dictStartFound)
       {
         helper.ReadUntilNonWhiteSpaceDelimiter();
@@ -402,7 +452,7 @@ namespace Converter.Parsers
       {
         switch (tokenString)
         {
-          case "SubType":
+          case "Subtype":
             fontInfo.SubType = helper.GetNextName<FontType>();
             break;
           case "Name":
@@ -428,6 +478,10 @@ namespace Converter.Parsers
               {
                 widthsArr[i] = helper.GetNextInt32();
               }
+              helper.ReadUntilNonWhiteSpaceDelimiter();
+              if (helper._char != ']')
+                throw new InvalidDataException("Invalid end of widths array!");
+              helper.ReadChar();
             } else if (char.IsDigit((char)helper._char))
             {
               int objectIndex = helper._char;
@@ -482,7 +536,9 @@ namespace Converter.Parsers
             break;
           case "ToUnicode":
             //TODO: fix, this is actually IR to stream
-            fontInfo.ToUnicode = helper.GetNextStream();
+            //placeholder
+            (var _, var r) = helper.GetNextIndirectReference();
+            fontInfo.ToUnicode = new byte[1];
             break;
           default:
             break;
@@ -496,8 +552,6 @@ namespace Converter.Parsers
 
       if (tokenString == "")
         throw new InvalidDataException("Invalid dictionary");
-
-      return helper._position;
     }
 
     private void ParseFontDescriptor(PDFFile file, (int objectIndex, int _) objectPosition, ref FontDescriptor fontDescriptor)
@@ -597,13 +651,19 @@ namespace Converter.Parsers
             fontDescriptor.MissingWidth = helper.GetNextInt32();
             break;
           case "FontFile":
-            fontDescriptor.FontFile = helper.GetNextStream();
+            //placeholder
+            (var _ , var r) = helper.GetNextIndirectReference();
+            fontDescriptor.FontFile = new byte[1];
             break;
           case "FontFile2":
-            fontDescriptor.FontFile2 = helper.GetNextStream();
+            //placeholder
+            (var _, var r1) = helper.GetNextIndirectReference();
+            fontDescriptor.FontFile2 = new byte[1];
             break;
           case "FontFile3":
-            fontDescriptor.FontFile3 = helper.GetNextStream();
+            //placeholder
+            (var _, var r3) = helper.GetNextIndirectReference();
+            fontDescriptor.FontFile3 = new byte[1];
             break;
           case "CharSet":
             fontDescriptor.CharSet = helper.GetNextToken();
@@ -618,11 +678,6 @@ namespace Converter.Parsers
           break;
         tokenString = helper.GetNextToken();
       }
-
-    }
-
-    private void ParsePageContents(PDFFile file, (int objIndex, int) objectPosition)
-    {
 
     }
     private void ParseRootPageTree(PDFFile file)
