@@ -5,6 +5,7 @@ using System.Data;
 using System.Diagnostics;
 using System.Drawing;
 using System.Globalization;
+using System.Numerics;
 using System.Runtime.InteropServices;
 using System.Runtime.Intrinsics.Arm;
 using System.Security.Cryptography;
@@ -258,6 +259,13 @@ namespace Converter.Parsers
       int starter = _position;
       // don't have to check if _char is 0 if we reach end of the buffer becaseu its cheked in IsCurrentCharPdfWhiteSpace;
       // long is ok, there won't be as big numbers in pdf files
+      bool isNegative = false;
+      if (_char == '-')
+      {
+        isNegative = true;
+        ReadChar();
+      }
+        
       long result = 0;
       int baseIndex = 0;
       // significant
@@ -274,8 +282,17 @@ namespace Converter.Parsers
       }
       // == 1 means for some reason last char was 
       if (baseIndex == 0 || _position - baseIndex - starter == 1)
+      {
+        if (isNegative)
+          result *= -1;
         return result;
-      return result / (Math.Pow(10, (_position - baseIndex - starter - 1)));
+      }
+        
+      double res = result / (Math.Pow(10, (_position - baseIndex - starter - 1)));
+
+      if (isNegative)
+        res *= -1;
+      return res;
     }
     // Non completely loose, only disregard last provided byte decided byte
     public int GetNextInt32WithExpectedNonDigitEnd(byte nonDigit)
@@ -383,26 +400,15 @@ namespace Converter.Parsers
     }
     public Rect GetNextRectangle()
     {
-      // .... reference aloc
       Rect rect = new Rect();
       ReadUntilNonWhiteSpaceDelimiter();
       if (_char != '[')
         throw new InvalidDataException("Invalid Rectangle data. Expected [");
-      // reach char because if there is no space between [ and next number skipspace wont move char
-      // and if we move and next char is also whitespace it will be moved regardless
+
       double a = GetNextDouble();
-      if (a < 0)
-        throw new InvalidDataException("Invalid Rectangle data. Expected number");
       double b = GetNextDouble();
-      if (b < 0)
-        throw new InvalidDataException("Invalid Rectangle data. Expected number");
       double c = GetNextDouble();
-      if (c < 0)
-        throw new InvalidDataException("Invalid Rectangle data. Expected number");
-      // used this function because string number is sending with ], there is space in between from what i've seen
       double d = GetNextDouble();
-      if (d < 0)
-        throw new InvalidDataException("Invalid Rectangle data. Expected number");
 
       ReadUntilNonWhiteSpaceDelimiter();
       if (_char != ']')
