@@ -198,7 +198,7 @@ namespace Converter.FIleStructures
     public Dictionary<object, object> VP;
     // This is actual data from ResourcesIR dictionary
     public ResourceDict ResourceDict;
-    public ContentDict ContentDict;
+    public CommonStreamDict ContentDict;
   }
 
   // Table 33
@@ -267,13 +267,38 @@ namespace Converter.FIleStructures
     public int AvgWidth;
     public int MaxWidth;
     public int MissingWidth;
-    public byte[] FontFile;
-    public byte[] FontFile2;
-    public byte[] FontFile3;
+    public FontFileInfo FontFile;
     // byte string
     public string CharSet;
   }
-  
+
+  // Table5  + Table 127
+  // Length + Filter  + Table 127
+  public class FontFileInfo : CommonStreamDict, ICommonStreamDictExt
+  {
+    public int Length1;
+    public int Length2;
+    public int Length3;
+    public string Subtype;
+    public byte[] Metadata;
+  }
+
+  // make function to parse common stream dict and then have action as paratmere
+
+  public class FontFileMetadata : CommonStreamDict, ICommonStreamDictExt
+  {
+    
+
+  }
+
+  // Table 122
+  public enum FontFileType
+  {
+    FontFile,
+    FontFil2,
+    FontFile3
+  }
+
   // Table 123
   [Flags]
   public enum FontFlags : UInt16
@@ -303,11 +328,14 @@ namespace Converter.FIleStructures
     UltraExpanded
   }
 
+  public interface ICommonStreamDictExt {}
+  public interface ICommonStreamDict { }
+
   // 7.4.1 & Table 5
   // TODO: Expand this
-  public struct ContentDict
+  public class CommonStreamDict : ICommonStreamDict
   {
-    public ContentDict()
+    public CommonStreamDict()
     {
 
     }
@@ -394,6 +422,12 @@ namespace Converter.FIleStructures
     public double llY;
     public double urX;
     public double urY;
+  }
+
+
+  public enum PDFObjects
+  {
+    STREAM
   }
 
 }
