@@ -89,7 +89,7 @@ namespace Converter.Parsers
         pInfo.ResourceDict = resourceDict;
 
         // Process Contents
-        ContentDict contentDict = new ContentDict();
+        CommonStreamDict contentDict = new CommonStreamDict();
         ParsePageContents(file, file.PageInformation[i].ContentsIR, ref contentDict);
         pInfo.ContentDict = contentDict;
         file.PageInformation[i] = pInfo;
@@ -98,12 +98,28 @@ namespace Converter.Parsers
       }
     }
 
-    // TODO: swap everythin to switch case from switch expression
     // TODO: for later, see we can decode withoutloading it all
-    private void ParsePageContents(PDFFile file, (int objIndex, int) objectPosition, ref ContentDict contentDict)
+    private void ParsePageContents(PDFFile file, (int objIndex, int) objectPosition, ref CommonStreamDict contentDict)
     {
-      // Parse stream Dict
-      int objectIndex = objectPosition.objIndex;
+      ParseStreamDictAndData(file, objectPosition, contentDict, ParseFontFileStream);
+    }
+
+    // has to be byte[] because we can't pass ref struct in generic action arguments
+    private void ParseFontFileStream(PDFFile file, ref SpanParseHelper helper, string tokenString)
+    {
+
+    }
+    
+    delegate void DELEGATE_ParseExtentionDictIncludingCommonDict(PDFFile file, ref SpanParseHelper helper, string tokenString);
+
+    // used for common dict parsing
+    private void ParseExtentionDictPlaceholder(PDFFile file, ref SpanParseHelper helper, string tokenString) { }
+    private void ParseStreamDictAndData(PDFFile file, (int objectIndex, int) objectPosition, CommonStreamDict streamDict, DELEGATE_ParseExtentionDictIncludingCommonDict func)
+    {
+      // need to have this check because we need to differentiate this from CommonStreamDict
+      // so we don't have infinite recusion
+      bool hasExtensions = streamDict is ICommonStreamDictExt;
+      int objectIndex = objectPosition.objectIndex;
       long objectByteOffset = file.CrossReferenceEntries[objectIndex].TenDigitValue;
       // allocate bigger so we can reuse it for content stream later
       // but maybe allocate smaller just to get lenght and then see if it can fit everything in stack
@@ -155,12 +171,12 @@ namespace Converter.Parsers
               helper.SkipNextToken();
               file.Stream.Position = currPosition;
             }
-            contentDict.Length = firstNumber;
+            streamDict.Length = firstNumber;
             // continue because we alreayd loaded next string
             break;
           case "Filter":
             // this will work even if there is one filter and its not date
-            contentDict.Filters = helper.GetListOfNames<Filter>();
+            streamDict.Filters = helper.GetListOfNames<Filter>();
             break;
           default:
             break;
@@ -179,7 +195,7 @@ namespace Converter.Parsers
         throw new InvalidDataException("Expected stream!");
 
       // Parse stream
-      long encodedStreamLen = contentDict.Length;
+      long encodedStreamLen = streamDict.Length;
       // do some checking to know entire stream is already loaded in buffer
       if (encodedStreamLen + helper._position > buffer.Length)
       {
@@ -199,10 +215,8 @@ namespace Converter.Parsers
       // go to next line
       helper.SkipWhiteSpace();
       Span<byte> encodedSpan = buffer.Slice(helper._position, (int)encodedStreamLen);
-
-      contentDict.DecodedStreamData = DecodeFilter(ref encodedSpan, contentDict.Filters);
+      streamDict.DecodedStreamData = DecodeFilter(ref encodedSpan, streamDict.Filters);
     }
-
     private string DecodeFilter(ref Span<byte> inputSpan, List<Filter> filters)
     {
       // first just do single filter
@@ -652,18 +666,18 @@ namespace Converter.Parsers
             break;
           case "FontFile":
             //placeholder
-            (var _ , var r) = helper.GetNextIndirectReference();
-            fontDescriptor.FontFile = new byte[1];
+            (int objectIndex, int _) fontFileIR = helper.GetNextIndirectReference();
+            //fontDescriptor.FontFile = ParseFontFile(file, fontFileIR, tokenString[tokenString.Length]);
             break;
           case "FontFile2":
             //placeholder
-            (var _, var r1) = helper.GetNextIndirectReference();
-            fontDescriptor.FontFile2 = new byte[1];
+            (int objectIndex, int _) fontFile2IR = helper.GetNextIndirectReference();
+            //fontDescriptor.FontFile = ParseFontFile(file, fontFile2IR, tokenString[tokenString.Length]);
             break;
           case "FontFile3":
             //placeholder
-            (var _, var r3) = helper.GetNextIndirectReference();
-            fontDescriptor.FontFile3 = new byte[1];
+            (int objectIndex, int _) fontFile3IR = helper.GetNextIndirectReference();
+            //fontDescriptor.FontFile = ParseFontFile(file, fontFile3IR, tokenString[tokenString.Length]);
             break;
           case "CharSet":
             fontDescriptor.CharSet = helper.GetNextToken();
@@ -679,6 +693,10 @@ namespace Converter.Parsers
         tokenString = helper.GetNextToken();
       }
 
+    }
+    private byte[] ParseFontFile(PDFFile file, (int objectIndex, int _) objectPosition, char type)
+    {
+      return new byte[1];
     }
     private void ParseRootPageTree(PDFFile file)
     {
