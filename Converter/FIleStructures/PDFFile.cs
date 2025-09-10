@@ -274,18 +274,23 @@ namespace Converter.FIleStructures
 
   // Table5  + Table 127
   // Length + Filter  + Table 127
-  public class FontFileInfo : CommonStreamDict, ICommonStreamDictExt
+  public struct FontFileInfo
   {
+    public CommonStreamDict CommonStreamInfo;
+    public FontFileInfo()
+    {
+
+    }
     public int Length1;
     public int Length2;
     public int Length3;
-    public string Subtype;
+    public FontFileSubtype Subtype;
     public byte[] Metadata;
   }
 
   // make function to parse common stream dict and then have action as paratmere
 
-  public class FontFileMetadata : CommonStreamDict, ICommonStreamDictExt
+  public struct FontFileMetadata
   {
     
 
@@ -328,12 +333,9 @@ namespace Converter.FIleStructures
     UltraExpanded
   }
 
-  public interface ICommonStreamDictExt {}
-  public interface ICommonStreamDict { }
-
   // 7.4.1 & Table 5
   // TODO: Expand this
-  public class CommonStreamDict : ICommonStreamDict
+  public struct CommonStreamDict 
   {
     public CommonStreamDict()
     {
@@ -345,6 +347,7 @@ namespace Converter.FIleStructures
     public List<Filter> Filters = new List<Filter>() { Filter.Null };
     public string DecodedStreamData;
   }
+
 
   public enum Filter
   {
@@ -390,7 +393,7 @@ namespace Converter.FIleStructures
       urY = d;
     }
 
-    public static bool operator == (Rect a, Rect b)
+    public static bool operator ==(Rect a, Rect b)
     {
       if (a.urX != b.urX)
         return false;
@@ -403,7 +406,7 @@ namespace Converter.FIleStructures
 
       return true;
     }
-    public static bool operator != (Rect a, Rect b)
+    public static bool operator !=(Rect a, Rect b)
     {
       if (a.urX == b.urX)
         return false;
@@ -424,10 +427,13 @@ namespace Converter.FIleStructures
     public double urY;
   }
 
-
-  public enum PDFObjects
-  {
-    STREAM
+  public enum FontFileSubtype
+  { 
+    Null = 0,
+    Type1C,
+    CIDFontType0C,
+    OpenType
   }
+
 
 }

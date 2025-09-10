@@ -5,6 +5,7 @@ using System.IO.Compression;
 using System.Runtime.InteropServices;
 using System.Runtime.Versioning;
 using System.Text;
+using System.Threading.Tasks;
 namespace Converter.Parsers
 {
   // Note to myself - when dealing with variables that are indirect references add 'IR' on the end of the name
@@ -99,26 +100,8 @@ namespace Converter.Parsers
     }
 
     // TODO: for later, see we can decode withoutloading it all
-    private void ParsePageContents(PDFFile file, (int objIndex, int) objectPosition, ref CommonStreamDict contentDict)
+    private void ParsePageContents(PDFFile file, (int objectIndex, int) objectPosition, ref CommonStreamDict contentDict)
     {
-      ParseStreamDictAndData(file, objectPosition, contentDict, ParseFontFileStream);
-    }
-
-    // has to be byte[] because we can't pass ref struct in generic action arguments
-    private void ParseFontFileStream(PDFFile file, ref SpanParseHelper helper, string tokenString)
-    {
-
-    }
-    
-    delegate void DELEGATE_ParseExtentionDictIncludingCommonDict(PDFFile file, ref SpanParseHelper helper, string tokenString);
-
-    // used for common dict parsing
-    private void ParseExtentionDictPlaceholder(PDFFile file, ref SpanParseHelper helper, string tokenString) { }
-    private void ParseStreamDictAndData(PDFFile file, (int objectIndex, int) objectPosition, CommonStreamDict streamDict, DELEGATE_ParseExtentionDictIncludingCommonDict func)
-    {
-      // need to have this check because we need to differentiate this from CommonStreamDict
-      // so we don't have infinite recusion
-      bool hasExtensions = streamDict is ICommonStreamDictExt;
       int objectIndex = objectPosition.objectIndex;
       long objectByteOffset = file.CrossReferenceEntries[objectIndex].TenDigitValue;
       // allocate bigger so we can reuse it for content stream later
@@ -145,42 +128,7 @@ namespace Converter.Parsers
       string tokenString = helper.GetNextToken();
       while (tokenString != "")
       {
-        switch (tokenString)
-        {
-          // docs say that this is direct value, but i've seen it being IR in some files so account for that?
-          case "Length":
-            // TODO: Can this be long? test later with huge files
-            int firstNumber = helper.GetNextInt32();
-            helper.SkipWhiteSpace();
-
-            if (char.IsDigit((char)helper._char))
-            {
-              // its IR value so read it all and temporary jump to read value
-              long IRByteOffset = file.CrossReferenceEntries[firstNumber].TenDigitValue;
-              long currPosition = file.Stream.Position;
-              file.Stream.Position = IRByteOffset;
-
-              Span<byte> irBuffer = stackalloc byte[KB / 4]; // 256
-              SpanParseHelper irHelper = new SpanParseHelper(ref irBuffer);
-              file.Stream.Read(irBuffer);
-              irHelper.SkipNextToken(); // object id
-              irHelper.SkipNextToken(); // seocnd number
-              irHelper.SkipNextToken(); // 'obj'
-              firstNumber = irHelper.GetNextInt32();
-
-              helper.SkipNextToken();
-              file.Stream.Position = currPosition;
-            }
-            streamDict.Length = firstNumber;
-            // continue because we alreayd loaded next string
-            break;
-          case "Filter":
-            // this will work even if there is one filter and its not date
-            streamDict.Filters = helper.GetListOfNames<Filter>();
-            break;
-          default:
-            break;
-        }
+        ParseCommonStreamDictAsExtension(file, ref helper, tokenString, ref contentDict);
         helper.ReadUntilNonWhiteSpaceDelimiter();
         if (helper._char == '>' && helper.IsCurrentCharacterSameAsNext())
           break;
@@ -195,7 +143,7 @@ namespace Converter.Parsers
         throw new InvalidDataException("Expected stream!");
 
       // Parse stream
-      long encodedStreamLen = streamDict.Length;
+      long encodedStreamLen = contentDict.Length;
       // do some checking to know entire stream is already loaded in buffer
       if (encodedStreamLen + helper._position > buffer.Length)
       {
@@ -215,7 +163,134 @@ namespace Converter.Parsers
       // go to next line
       helper.SkipWhiteSpace();
       Span<byte> encodedSpan = buffer.Slice(helper._position, (int)encodedStreamLen);
-      streamDict.DecodedStreamData = DecodeFilter(ref encodedSpan, streamDict.Filters);
+      contentDict.DecodedStreamData = DecodeFilter(ref encodedSpan, contentDict.Filters);
+    }
+
+    private void ParseFontFileDictAndStream(PDFFile file, (int objectIndex, int) objectPosition, ref FontFileInfo fontFileInfo, ref CommonStreamDict commonStreamDict)
+    {
+      int objectIndex = objectPosition.objectIndex;
+      long objectByteOffset = file.CrossReferenceEntries[objectIndex].TenDigitValue;
+      // allocate bigger so we can reuse it for content stream later
+      // but maybe allocate smaller just to get lenght and then see if it can fit everything in stack
+      // you can do some entire obj size - length to get stream dictionary size, but I am not sure if this would work\
+      // if streams are interrupted
+      // for now just expect that stream dict at least will fit in 8kb, later chang if needed when testing with big files
+      Span<byte> buffer = stackalloc byte[KB * 8];
+      SpanParseHelper helper = new SpanParseHelper(ref buffer);
+      file.Stream.Position = objectByteOffset;
+      int readBytes = file.Stream.Read(buffer);
+      if (readBytes == 0)
+        throw new InvalidDataException("Unexpected EOS!");
+
+      bool startDictFound = false;
+      while (!startDictFound)
+      {
+        helper.ReadUntilNonWhiteSpaceDelimiter();
+        if (helper._char == '<')
+          startDictFound = helper.IsCurrentCharacterSameAsNext();
+      }
+
+      
+      string tokenString = helper.GetNextToken();
+      // TODO: do better validation here
+      while (tokenString != "")
+      {
+        switch (tokenString)
+        {
+          case "Length1":
+            fontFileInfo.Length1 = helper.GetNextInt32();
+            break;
+          case "Length2":
+            fontFileInfo.Length2 = helper.GetNextInt32();
+            break;
+          case "Length3":
+            fontFileInfo.Length3 = helper.GetNextInt32();
+            break;
+          case "Subtype":
+            fontFileInfo.Subtype = helper.GetNextName<FontFileSubtype>();
+            break;
+          case "Metadata":
+            // IR, has XMP syntax, 
+            break;
+          default:
+            ParseCommonStreamDictAsExtension(file, ref helper, tokenString, ref commonStreamDict);
+            break;
+        }
+        helper.ReadUntilNonWhiteSpaceDelimiter();
+        if (helper._char == '>' && helper.IsCurrentCharacterSameAsNext())
+          break;
+        tokenString = helper.GetNextToken();
+      }
+
+      if (tokenString == "")
+        throw new InvalidDataException("Invalid dictionary");
+
+      tokenString = helper.GetNextToken();
+      if (tokenString != "stream")
+        throw new InvalidDataException("Expected stream!");
+
+      // Parse stream
+      // do some checking to know entire stream is already loaded in buffer
+      long encodedStreamLen = commonStreamDict.Length;
+      if (encodedStreamLen + helper._position > buffer.Length)
+      {
+        // full stream isn't loaded in the buffer so we have to load it
+        if (encodedStreamLen > buffer.Length)
+        {
+          // heap alloc if we can't reuse existing buffer
+          buffer = new byte[encodedStreamLen];
+        }
+        // set position after stream dict
+        file.Stream.Position = objectByteOffset + helper._position;
+        readBytes = file.Stream.Read(buffer);
+        if (readBytes == 0)
+          throw new InvalidDataException("Unexpected EOS!");
+        helper._position = 0;
+      }
+      // go to next line
+      helper.SkipWhiteSpace();
+      Span<byte> encodedSpan = buffer.Slice(helper._position, (int)encodedStreamLen);
+      commonStreamDict.DecodedStreamData = DecodeFilter(ref encodedSpan, commonStreamDict.Filters);
+      fontFileInfo.CommonStreamInfo = commonStreamDict;
+    }
+
+    private void ParseCommonStreamDictAsExtension(PDFFile file, ref SpanParseHelper helper, string tokenString, ref CommonStreamDict dict)
+    {
+      switch (tokenString)
+      {
+        // docs say that this is direct value, but i've seen it being IR in some files so account for that?
+        case "Length":
+          // TODO: Can this be long? test later with huge files
+          int firstNumber = helper.GetNextInt32();
+          helper.SkipWhiteSpace();
+          if (char.IsDigit((char)helper._char))
+          {
+            // its IR value so read it all and temporary jump to read value
+            long IRByteOffset = file.CrossReferenceEntries[firstNumber].TenDigitValue;
+            long currPosition = file.Stream.Position;
+            file.Stream.Position = IRByteOffset;
+
+            Span<byte> irBuffer = stackalloc byte[KB / 4]; // 256
+            SpanParseHelper irHelper = new SpanParseHelper(ref irBuffer);
+            file.Stream.Read(irBuffer);
+            irHelper.SkipNextToken(); // object id
+            irHelper.SkipNextToken(); // seocnd number
+            irHelper.SkipNextToken(); // 'obj'
+            firstNumber = irHelper.GetNextInt32();
+
+            helper.SkipNextToken();
+            file.Stream.Position = currPosition;
+          }
+          dict.Length = firstNumber;
+          // continue because we alreayd loaded next string
+          break;
+        case "Filter":
+          // this will work even if there is one filter and its not date
+          dict.Filters = helper.GetListOfNames<Filter>();
+          break;
+        default:
+          break;
+      }
     }
     private string DecodeFilter(ref Span<byte> inputSpan, List<Filter> filters)
     {
@@ -443,7 +518,8 @@ namespace Converter.Parsers
 
 
     /// <summary>
-    /// Parse FontDictioanry data for ResourceDict that is referenced in from ParseFontIRDictionary
+    /// Parse FontDictioanry data for ResourceDict that is referenced in from ParseFontIRDictionary.
+    /// This is different thatn FileFont!!
     /// </summary>
     /// <param name="file"></param>
     /// <param name="buffer">Buffer where entire data is contained, unless some data is referenced in IR</param>
@@ -665,39 +741,28 @@ namespace Converter.Parsers
             fontDescriptor.MissingWidth = helper.GetNextInt32();
             break;
           case "FontFile":
-            //placeholder
-            (int objectIndex, int _) fontFileIR = helper.GetNextIndirectReference();
-            //fontDescriptor.FontFile = ParseFontFile(file, fontFileIR, tokenString[tokenString.Length]);
-            break;
           case "FontFile2":
-            //placeholder
-            (int objectIndex, int _) fontFile2IR = helper.GetNextIndirectReference();
-            //fontDescriptor.FontFile = ParseFontFile(file, fontFile2IR, tokenString[tokenString.Length]);
-            break;
           case "FontFile3":
-            //placeholder
-            (int objectIndex, int _) fontFile3IR = helper.GetNextIndirectReference();
-            //fontDescriptor.FontFile = ParseFontFile(file, fontFile3IR, tokenString[tokenString.Length]);
+            (int objectIndex, int _) fontFileIR = helper.GetNextIndirectReference();
+            FontFileInfo fontFileInfo = new FontFileInfo();
+            CommonStreamDict commonStreamDict = new CommonStreamDict();
+            ParseFontFileDictAndStream(file, fontFileIR, ref fontFileInfo, ref commonStreamDict);
+            fontFileInfo.CommonStreamInfo = commonStreamDict;
+            fontDescriptor.FontFile = fontFileInfo;
             break;
           case "CharSet":
             fontDescriptor.CharSet = helper.GetNextToken();
             break;
           default:
             break;
-
-
         }
         helper.ReadUntilNonWhiteSpaceDelimiter();
         if (helper._char == '>' && helper.IsCurrentCharacterSameAsNext())
           break;
         tokenString = helper.GetNextToken();
       }
+    }
 
-    }
-    private byte[] ParseFontFile(PDFFile file, (int objectIndex, int _) objectPosition, char type)
-    {
-      return new byte[1];
-    }
     private void ParseRootPageTree(PDFFile file)
     {
       int objectIndex = file.Catalog.PagesIR.Item1;
@@ -718,6 +783,7 @@ namespace Converter.Parsers
         throw new InvalidDataException("Invalid data");
       FillRootPageTreeFrom(file, ref helper, ref rootPageTree);
     }
+
     private void FillRootPageTreeFrom(PDFFile file, ref SpanParseHelper helper, ref PageTree root)
     {
       //
