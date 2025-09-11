@@ -1,5 +1,4 @@
 ﻿using Converter.FIleStructures;
-using System.Runtime.CompilerServices;
 
 namespace Converter.Writers
 {

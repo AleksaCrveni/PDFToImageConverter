@@ -1,10 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-
-namespace Converter.Writers
+﻿namespace Converter.Writers
 {
   /// <summary>
   /// Helper struct to write to buffer with specified options that are passed in constructor

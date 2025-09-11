@@ -2,10 +2,7 @@
 using Converter.FIleStructures;
 using System.Globalization;
 using System.IO.Compression;
-using System.Runtime.InteropServices;
-using System.Runtime.Versioning;
 using System.Text;
-using System.Threading.Tasks;
 namespace Converter.Parsers
 {
   // Note to myself - when dealing with variables that are indirect references add 'IR' on the end of the name

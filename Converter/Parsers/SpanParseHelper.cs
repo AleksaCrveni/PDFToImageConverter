@@ -1,16 +1,6 @@
 ﻿using Converter.FIleStructures;
-using System;
-using System.ComponentModel.DataAnnotations;
-using System.Data;
-using System.Diagnostics;
-using System.Drawing;
 using System.Globalization;
-using System.Numerics;
-using System.Runtime.InteropServices;
-using System.Runtime.Intrinsics.Arm;
-using System.Security.Cryptography;
 using System.Text;
-using System.Xml.Serialization;
 
 namespace Converter.Parsers
 {

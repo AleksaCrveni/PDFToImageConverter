@@ -1,13 +1,4 @@
-﻿using Converter.Parsers;
-using System.ComponentModel;
-using System.Diagnostics.CodeAnalysis;
-using System.Drawing;
-using System.Dynamic;
-using System.Reflection.Metadata.Ecma335;
-using System.Runtime.Intrinsics.X86;
-using System.Runtime.Serialization;
-using System.Text;
-namespace Converter.FIleStructures
+﻿namespace Converter.FIleStructures
 {
   public class PDFFile
   {
