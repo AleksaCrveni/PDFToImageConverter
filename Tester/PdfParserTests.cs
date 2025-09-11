@@ -115,7 +115,7 @@ namespace Tester
       Rect tt2FontBBox = new Rect();
       tt2FontBBox.FillRect(-394, -411, 1309, 1192);
 
-      Assert.IsTrue(tt2FD.FontName == "QVIYZW+AvenirNext-Regular");
+      Assert.IsTrue(tt2FD.FontName == tt2FI.BaseFont);
       Assert.IsTrue((tt2FD.Flags & FontFlags.Nonsymbolic) == FontFlags.Nonsymbolic);
       Assert.IsTrue(tt2FD.FontBBox == tt2FontBBox);
       Assert.IsTrue(tt2FD.ItalicAngle == 0);
@@ -138,7 +138,50 @@ namespace Tester
       Assert.IsTrue(tt2FontFileInfo.Length2 == 0);
       Assert.IsTrue(tt2FontFileInfo.Length3 == 0);
 
+      FontInfo tt1FI = resourceDict.Font["TT1"];
 
+      Assert.IsTrue(tt1FI.SubType == FontType.TrueType);
+      Assert.IsTrue(tt1FI.BaseFont == "IJPPFY+AvenirNext-Medium");
+      Assert.IsTrue(tt1FI.Encoding == EncodingInf.MacRomanEncoding);
+      Assert.IsTrue(tt1FI.FirstChar == 32);
+      Assert.IsTrue(tt1FI.LastChar == 118);
+      int[] tt1FIWidths = new int[118 - 32 + 1]
+      {
+        250,0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 761, 0, 568, 0, 0, 0, 0, 0, 0, 0, 772, 0, 595, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 542, 0, 0, 0, 0,0, 0, 0, 0, 0, 527, 0, 0, 0, 610, 0, 0, 0, 444, 0, 582, 504
+      };
+      for (int i = 0; i < tt1FI.Widths.Length; i++)
+      {
+        if (tt1FI.Widths[i] != tt1FIWidths[i])
+          throw new InvalidDataException("Invalid width array!");
+      }
+
+      FontDescriptor tt1FD = tt1FI.FontDescriptor;
+
+      Rect tt1FontBBox = new Rect();
+      tt2FontBBox.FillRect(-440, -436, 1369, 1199);
+
+      Assert.IsTrue(tt1FD.FontName == tt1FI.BaseFont);
+      Assert.IsTrue((tt1FD.Flags & FontFlags.Nonsymbolic) == FontFlags.Nonsymbolic);
+      Assert.IsTrue(tt1FD.FontBBox == tt2FontBBox);
+      Assert.IsTrue(tt1FD.ItalicAngle == 0);
+      Assert.IsTrue(tt1FD.Ascent == 1000);
+      Assert.IsTrue(tt1FD.Descent == -366);
+      Assert.IsTrue(tt1FD.CapHeight == 708);
+      Assert.IsTrue(tt1FD.StemV == 99);
+      Assert.IsTrue(tt1FD.XHeight == 474);
+      Assert.IsTrue(tt1FD.StemH == 88);
+      Assert.IsTrue(tt1FD.MaxWidth == 1603);
+      Assert.IsTrue(tt1FD.AvgWidth == 459);
+
+      FontFileInfo tt1FontFileInfo = tt1FI.FontDescriptor.FontFile;
+      Assert.IsTrue(tt1FontFileInfo.CommonStreamInfo.Length == 2368);
+      Assert.IsTrue(tt1FontFileInfo.CommonStreamInfo.Filters[0] == Filter.FlateDecode);
+
+      // no idea how to test actual value of decoded thing because its just random bytes and can't be easily
+      // copy pasted somewhere
+      Assert.IsTrue(tt1FontFileInfo.Length1 == 3796);
+      Assert.IsTrue(tt1FontFileInfo.Length2 == 0);
+      Assert.IsTrue(tt1FontFileInfo.Length3 == 0);
     }
 
     [TestMethod]
