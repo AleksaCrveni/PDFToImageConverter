@@ -2,6 +2,7 @@
 using Converter.FIleStructures;
 using System.Globalization;
 using System.IO.Compression;
+using System.Runtime.CompilerServices;
 using System.Text;
 namespace Converter.Parsers
 {
@@ -724,6 +725,9 @@ namespace Converter.Parsers
             break;
           case "StemV":
             fontDescriptor.StemV = helper.GetNextInt32();
+            break;
+          case "XHeight":
+            fontDescriptor.XHeight = helper.GetNextInt32();
             break;
           case "StemH":
             fontDescriptor.StemH = helper.GetNextInt32();
