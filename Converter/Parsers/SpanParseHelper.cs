@@ -199,12 +199,20 @@ namespace Converter.Parsers
       ReadChar();
       return res;
     }
-    // TODO: Fix so this works for negatives
+
     public int GetNextInt32()
     {
       SkipWhiteSpaceAndDelimiters();
+      bool isNegative = false;
+      if (_char == '-')
+      {
+        isNegative = true;
+        ReadChar();
+      }
+
       int starter = _position;
       // don't have to check if _char is 0 if we reach end of the buffer becaseu its cheked in IsCurrentCharPdfWhiteSpace
+
       while (IsCurrentByteDigit())
       {
         ReadChar();
@@ -218,6 +226,9 @@ namespace Converter.Parsers
         // these should be no negative ints so this is okay i believe?
         result = result * 10 + (int)CharUnicodeInfo.GetDecimalDigitValue((char)numberInBytes[i]);
       }
+
+      if (isNegative)
+        result *= -1;
       return result;
     }
 
@@ -255,7 +266,7 @@ namespace Converter.Parsers
         isNegative = true;
         ReadChar();
       }
-        
+
       long result = 0;
       int baseIndex = 0;
       // significant
@@ -277,39 +288,12 @@ namespace Converter.Parsers
           result *= -1;
         return result;
       }
-        
+
       double res = result / (Math.Pow(10, (_position - baseIndex - starter - 1)));
 
       if (isNegative)
         res *= -1;
       return res;
-    }
-    // Non completely loose, only disregard last provided byte decided byte
-    public int GetNextInt32WithExpectedNonDigitEnd(byte nonDigit)
-    {
-      SkipWhiteSpaceAndDelimiters();
-      int starter = _position;
-      // don't have to check if _char is 0 if we reach end of the buffer becaseu its cheked in IsCurrentCharPdfWhiteSpace
-      while (!IsCurrentCharPdfWhiteSpace())
-      {
-        if (IsCurrentByteDigit())
-          ReadChar();
-        else
-          break;
-      }
-
-      // TODO: maybe dont need new span just read from buffer directly
-      int len = _position - starter;
-      if (_char == nonDigit)
-        ReadChar();
-      ReadOnlySpan<byte> numberInBytes = _buffer.Slice(starter, len);
-      int result = 0;
-      for (int i = 0; i < numberInBytes.Length; i++)
-      {
-        // these should be no negative ints so this is okay i believe?
-        result = result * 10 + (int)CharUnicodeInfo.GetDecimalDigitValue((char)numberInBytes[i]);
-      }
-      return result;
     }
 
     public List<string> GetNextArrayStrict()
