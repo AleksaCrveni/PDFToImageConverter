@@ -1,6 +1,5 @@
 ﻿using Converter.FIleStructures;
 using Converter.Parsers;
-using System.Diagnostics;
 
 namespace Tester
 {
