@@ -44,6 +44,7 @@ namespace Converter.Fonts
     public void ParseFontDirectory()
     {
       FontDirectory fd = new FontDirectory();
+      TableOffsets tOff = new TableOffsets();
       uint scalarType = ReadUInt32();
       fd.ScalarType = scalarType switch
       {
@@ -89,63 +90,63 @@ namespace Converter.Fonts
         {
           // cmap
           case 1885433187:
-            ttf.cmap = _buffer.Slice((int)offset, (int)length);
+            tOff.cmap = _buffer.Slice((int)offset, (int)length);
             break;
           // glyf
           case 1719233639:
-            ttf.glyf = _buffer.Slice((int)offset, (int)length);
+            tOff.glyf = _buffer.Slice((int)offset, (int)length);
             break;
           // head
           case 1684104552:
-            ttf.head = _buffer.Slice((int)offset, (int)length);
+            tOff.head = _buffer.Slice((int)offset, (int)length);
             break;
           // hhea
           case 1634035816:
-            ttf.hhea = _buffer.Slice((int)offset, (int)length);
+            tOff.hhea = _buffer.Slice((int)offset, (int)length);
             break;
           // hmtx
           case 2020896104:
-            ttf.hmtx = _buffer.Slice((int)offset, (int)length);
+            tOff.hmtx = _buffer.Slice((int)offset, (int)length);
             break;
           // loca
           case 1633906540:
-            ttf.loca = _buffer.Slice((int)offset, (int)length);
+            tOff.loca = _buffer.Slice((int)offset, (int)length);
             break;
           // maxp
           case 1886937453:
-            ttf.maxp = _buffer.Slice((int)offset, (int)length);
+            tOff.maxp = _buffer.Slice((int)offset, (int)length);
             break;
           // name
           case 1701667182:
-            ttf.name = _buffer.Slice((int)offset, (int)length);
+            tOff.name = _buffer.Slice((int)offset, (int)length);
             break;
           // post
           case 1953722224:
-            ttf.post = _buffer.Slice((int)offset, (int)length);
+            tOff.post = _buffer.Slice((int)offset, (int)length);
             break;
           // cvt 
           case 544503395:
-            ttf.cvt = _buffer.Slice((int)offset, (int)length);
+            tOff.cvt = _buffer.Slice((int)offset, (int)length);
             break;
           // fpgm 
           case 1835495526:
-            ttf.fpgm = _buffer.Slice((int)offset, (int)length);
+            tOff.fpgm = _buffer.Slice((int)offset, (int)length);
             break;
           // hdmx 
           case 2020435048:
-            ttf.hdmx = _buffer.Slice((int)offset, (int)length);
+            tOff.hdmx = _buffer.Slice((int)offset, (int)length);
             break;
           // kern 
           case 1852990827:
-            ttf.kern = _buffer.Slice((int)offset, (int)length);
+            tOff.kern = _buffer.Slice((int)offset, (int)length);
             break;
           // OS/2 
           case 841962319:
-            ttf.OS_2 = _buffer.Slice((int)offset, (int)length);
+            tOff.OS_2 = _buffer.Slice((int)offset, (int)length);
             break;
           // prep 
           case 1885696624:
-            ttf.prep = _buffer.Slice((int)offset, (int)length);
+            tOff.prep = _buffer.Slice((int)offset, (int)length);
             break;
           default:
             // during development only!
@@ -155,6 +156,9 @@ namespace Converter.Fonts
             break;
         }
       }
+
+      ttf.FontDirectory = fd;
+      ttf.Offsets = tOff;
     }
 
     private uint ReadUInt32()

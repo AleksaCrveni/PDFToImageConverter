@@ -8,6 +8,13 @@
     public TrueTypeFont() { }
 
     public FontDirectory FontDirectory;
+    public TableOffsets Offsets;
+  }
+
+  public ref struct TableOffsets
+  {
+
+    public TableOffsets() { }
     public ReadOnlySpan<byte> cmap = new ReadOnlySpan<byte>(); // R
     public ReadOnlySpan<byte> glyf = new ReadOnlySpan<byte>(); // R
     public ReadOnlySpan<byte> head = new ReadOnlySpan<byte>(); // R
@@ -18,13 +25,15 @@
     public ReadOnlySpan<byte> name = new ReadOnlySpan<byte>(); // R
     public ReadOnlySpan<byte> post = new ReadOnlySpan<byte>(); // R
 
-    public ReadOnlySpan<byte> cvt  = new ReadOnlySpan<byte>(); // SD
+    public ReadOnlySpan<byte> cvt = new ReadOnlySpan<byte>(); // SD
     public ReadOnlySpan<byte> fpgm = new ReadOnlySpan<byte>(); // SD
     public ReadOnlySpan<byte> hdmx = new ReadOnlySpan<byte>(); // SD
     public ReadOnlySpan<byte> kern = new ReadOnlySpan<byte>(); // SD
     public ReadOnlySpan<byte> OS_2 = new ReadOnlySpan<byte>(); // SD
     public ReadOnlySpan<byte> prep = new ReadOnlySpan<byte>(); // SD
+
   }
+
 
   public struct FontDirectory
   {
