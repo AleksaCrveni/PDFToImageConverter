@@ -65,7 +65,8 @@ namespace Converter.Fonts
       uint offset = 0;
       uint length;
       uint pad = 0;
-      // TODO: Optimize to do binary search
+      ReadOnlySpan<byte> tableBuffer;
+      // TODO: Optimize to do binary search?
       for (int i = 0; i < fd.NumTables; i++)
       {
         tag = ReadUInt32();
@@ -86,67 +87,72 @@ namespace Converter.Fonts
         {
           // do something special
         }
+        tableBuffer = _buffer.Slice((int)offset, (int)length);
+
+        if (checkSum != CalculateCheckSum(ref tableBuffer, length))
+          throw new InvalidDataException("Check sum failed!");
+
         switch (tag)
         {
           // cmap
           case 1885433187:
-            tOff.cmap = _buffer.Slice((int)offset, (int)length);
+            tOff.cmap = tableBuffer;
             break;
           // glyf
           case 1719233639:
-            tOff.glyf = _buffer.Slice((int)offset, (int)length);
+            tOff.glyf = tableBuffer;
             break;
           // head
           case 1684104552:
-            tOff.head = _buffer.Slice((int)offset, (int)length);
+            tOff.head = tableBuffer;
             break;
           // hhea
           case 1634035816:
-            tOff.hhea = _buffer.Slice((int)offset, (int)length);
+            tOff.hhea = tableBuffer;
             break;
           // hmtx
           case 2020896104:
-            tOff.hmtx = _buffer.Slice((int)offset, (int)length);
+            tOff.hmtx = tableBuffer;
             break;
           // loca
           case 1633906540:
-            tOff.loca = _buffer.Slice((int)offset, (int)length);
+            tOff.loca = tableBuffer;
             break;
           // maxp
           case 1886937453:
-            tOff.maxp = _buffer.Slice((int)offset, (int)length);
+            tOff.maxp = tableBuffer;
             break;
           // name
           case 1701667182:
-            tOff.name = _buffer.Slice((int)offset, (int)length);
+            tOff.name = tableBuffer;
             break;
           // post
           case 1953722224:
-            tOff.post = _buffer.Slice((int)offset, (int)length);
+            tOff.post = tableBuffer;
             break;
           // cvt 
           case 544503395:
-            tOff.cvt = _buffer.Slice((int)offset, (int)length);
+            tOff.cvt = tableBuffer;
             break;
           // fpgm 
           case 1835495526:
-            tOff.fpgm = _buffer.Slice((int)offset, (int)length);
+            tOff.fpgm = tableBuffer;
             break;
           // hdmx 
           case 2020435048:
-            tOff.hdmx = _buffer.Slice((int)offset, (int)length);
+            tOff.hdmx = tableBuffer;
             break;
           // kern 
           case 1852990827:
-            tOff.kern = _buffer.Slice((int)offset, (int)length);
+            tOff.kern = tableBuffer;
             break;
           // OS/2 
           case 841962319:
-            tOff.OS_2 = _buffer.Slice((int)offset, (int)length);
+            tOff.OS_2 = tableBuffer;
             break;
           // prep 
           case 1885696624:
-            tOff.prep = _buffer.Slice((int)offset, (int)length);
+            tOff.prep = tableBuffer;
             break;
           default:
             // during development only!
@@ -154,7 +160,7 @@ namespace Converter.Fonts
             throw new Exception("Tag not implemented yet!");
 #endif
             break;
-        }
+          }
       }
 
       ttf.FontDirectory = fd;
@@ -191,6 +197,19 @@ namespace Converter.Fonts
     private byte ReadByte()
     {
       return _buffer[pos++];
+    }
+
+    private uint CalculateCheckSum(ref ReadOnlySpan<byte> tableBuffer, uint numOfBytesInTable)
+    {
+      uint sum = 0;
+      uint nLongs = (numOfBytesInTable + 3) / 4;
+      int i = 0;
+      while (nLongs-- > 0)
+      {
+        sum += BitConverter.ToUInt32(tableBuffer.Slice(i, 4));
+        i += 4;
+      }
+      return sum;
     }
   }
 }
