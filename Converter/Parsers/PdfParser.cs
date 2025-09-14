@@ -1,5 +1,7 @@
 ﻿
+using Converter.FileStructures;
 using Converter.FIleStructures;
+using Converter.Fonts;
 using System.Globalization;
 using System.IO.Compression;
 using System.Runtime.CompilerServices;
@@ -161,7 +163,8 @@ namespace Converter.Parsers
       // go to next line
       helper.SkipWhiteSpace();
       Span<byte> encodedSpan = buffer.Slice(helper._position, (int)encodedStreamLen);
-      contentDict.DecodedStreamData = DecodeFilter(ref encodedSpan, contentDict.Filters);
+      ReadOnlySpan<byte> decodedSpan = DecodeFilter(ref encodedSpan, contentDict.Filters);
+      contentDict.DecodedStreamData = Encoding.Default.GetString(decodedSpan);
     }
 
     private void ParseFontFileDictAndStream(PDFFile file, (int objectIndex, int) objectPosition, ref FontFileInfo fontFileInfo, ref CommonStreamDict commonStreamDict)
@@ -248,8 +251,13 @@ namespace Converter.Parsers
       // go to next line
       helper.SkipWhiteSpace();
       Span<byte> encodedSpan = buffer.Slice(helper._position, (int)encodedStreamLen);
-      commonStreamDict.DecodedStreamData = DecodeFilter(ref encodedSpan, commonStreamDict.Filters);
+      ReadOnlySpan<byte> decodedSpan = DecodeFilter(ref encodedSpan, commonStreamDict.Filters);
+      commonStreamDict.DecodedStreamData = Encoding.Default.GetString(decodedSpan);
       fontFileInfo.CommonStreamInfo = commonStreamDict;
+
+      TrueTypeFont ttf = new TrueTypeFont();
+      TTFParser ttfParser = new TTFParser();
+      ttfParser.Init(ref decodedSpan, ref ttf);
     }
 
     private void ParseCommonStreamDictAsExtension(PDFFile file, ref SpanParseHelper helper, string tokenString, ref CommonStreamDict dict)
@@ -290,14 +298,14 @@ namespace Converter.Parsers
           break;
       }
     }
-    private string DecodeFilter(ref Span<byte> inputSpan, List<Filter> filters)
+    private byte[] DecodeFilter(ref Span<byte> inputSpan, List<Filter> filters)
     {
       // first just do single filter
       Filter f = filters[0];
       if (f == Filter.Null)
-        return Encoding.Default.GetString(inputSpan);
+        return new byte[1];
 
-      byte[] decoded = new byte[1];
+      byte[] decoded;
       switch (f)
       {
         case Filter.Null:
@@ -366,10 +374,11 @@ namespace Converter.Parsers
           decoded = Array.Empty<byte>();
           break;
         default:
+          decoded = new byte[1];
           break;
       }
 
-      return Encoding.Default.GetString(decoded);
+      return decoded;
     }
     private void ParseResourceDictionary(PDFFile file, (int objIndex, int) objectPosition, ref ResourceDict resourceDict)
     {

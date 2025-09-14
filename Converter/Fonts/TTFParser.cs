@@ -6,36 +6,37 @@ namespace Converter.Fonts
 {
   public ref struct TTFParser
   {
-    public ReadOnlySpan<byte> _buffer;
-    private TrueTypeFont ttf;
+    private ReadOnlySpan<byte> _buffer;
+    private TrueTypeFont _ttf;
     private int pos;
     // size of byte in bits, for some reason some archs have non 8 bit byte size
     private int byteSize;
     // use endOfArr internally to know if you reached end of array or not
     private uint endOfArr;
     private uint beginOfSfnt;
-    public void Init(ref TrueTypeFont _ttf, ReadOnlySpan<byte> buffer)
+    public void Init(ref ReadOnlySpan<byte> buffer, ref TrueTypeFont ttf)
     {
       _buffer = buffer;
-      InternalInit(ref _ttf);
-     
+      _ttf = ttf;
+      InitInternal();
     }
 
-    public void Init(ref TrueTypeFont _ttf, Span<byte> buffer)
+
+    public void Init(ref Span<byte> buffer, ref TrueTypeFont ttf)
     {
-      _buffer = buffer;
-      InternalInit(ref _ttf);
+      _buffer = (ReadOnlySpan<byte>)buffer;
+      _ttf = ttf;
+      InitInternal();
     }
-    private void InternalInit(ref TrueTypeFont _ttf)
+
+    public void InitInternal()
     {
-      ttf = _ttf;
       pos = 0;
       byteSize = 8;
       endOfArr = 0;
       beginOfSfnt = 8;
     }
-    
-    
+
     public void Parse()
     {
       ParseFontDirectory();
@@ -163,8 +164,8 @@ namespace Converter.Fonts
           }
       }
 
-      ttf.FontDirectory = fd;
-      ttf.Offsets = tOff;
+      _ttf.FontDirectory = fd;
+      _ttf.Offsets = tOff;
     }
 
     private uint ReadUInt32()
