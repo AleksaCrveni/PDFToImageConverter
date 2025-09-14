@@ -1,4 +1,5 @@
-﻿using System.Runtime.CompilerServices;
+﻿using System.Buffers.Binary;
+using System.Runtime.CompilerServices;
 using System.Text;
 
 Stream _stdIn = Console.OpenStandardInput();
@@ -18,8 +19,10 @@ StringBuilder sb = new StringBuilder(0);
 Span<byte> fourByteSpan = new byte[4];
 // create span out of character
 int mode = 0;
-// create unsigned int32 out of 4 byte string
-mode = 1;
+// create unsigned int32 out of 4 byte string LITTLE ENDIAN
+//mode = 1;
+// create unsigned int32 out of 4 byte string BIG ENDIAN
+mode = 2;
 while (!end)
 {
   _stdIn.Read(_buffer, offset, size);
@@ -32,14 +35,15 @@ while (!end)
   end = mode switch
   {
     0 => CreateSpan(ref input),
-    1 => CreateUInt32From4ByteString(input.AsSpan().Slice(0, 4)),
+    1 => CreateUInt32From4ByteStringLittleEndian(input.AsSpan().Slice(0, 4)),
+    2 => CreateUInt32From4ByteStringBigEndian(input.AsSpan().Slice(0, 4)),
     _ => throw new Exception("Invalid mode!")
   };
   
   
 }
 
-bool CreateUInt32From4ByteString(ReadOnlySpan<char> input)
+bool CreateUInt32From4ByteStringLittleEndian(ReadOnlySpan<char> input)
 {
   sb.Clear();
   Span<byte> bInput = new byte[4];
@@ -51,7 +55,21 @@ bool CreateUInt32From4ByteString(ReadOnlySpan<char> input)
   uint res = BitConverter.ToUInt32(bInput);
   Console.WriteLine($"Unsigned int value is {res}");
   return false;
+}
+
+bool CreateUInt32From4ByteStringBigEndian(ReadOnlySpan<char> input)
+{
+  sb.Clear();
+  Span<byte> bInput = new byte[4];
+  for (int i = 0; i < bInput.Length; i++)
+  {
+    bInput[i] = (byte)input[i];
   }
+
+  uint res = BinaryPrimitives.ReadUInt32BigEndian(bInput);
+  Console.WriteLine($"Unsigned int value is {res}");
+  return false;
+}
 
 bool CreateSpan(ref string input)
 {

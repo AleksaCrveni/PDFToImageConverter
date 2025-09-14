@@ -25,7 +25,7 @@
     public ReadOnlySpan<byte> name = new ReadOnlySpan<byte>(); // R
     public ReadOnlySpan<byte> post = new ReadOnlySpan<byte>(); // R
 
-    public ReadOnlySpan<byte> cvt = new ReadOnlySpan<byte>(); // SD
+    public ReadOnlySpan<byte> cvt  = new ReadOnlySpan<byte>(); // SD
     public ReadOnlySpan<byte> fpgm = new ReadOnlySpan<byte>(); // SD
     public ReadOnlySpan<byte> hdmx = new ReadOnlySpan<byte>(); // SD
     public ReadOnlySpan<byte> kern = new ReadOnlySpan<byte>(); // SD

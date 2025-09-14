@@ -258,6 +258,7 @@ namespace Converter.Parsers
       TrueTypeFont ttf = new TrueTypeFont();
       TTFParser ttfParser = new TTFParser();
       ttfParser.Init(ref decodedSpan, ref ttf);
+      ttfParser.Parse();
     }
 
     private void ParseCommonStreamDictAsExtension(PDFFile file, ref SpanParseHelper helper, string tokenString, ref CommonStreamDict dict)

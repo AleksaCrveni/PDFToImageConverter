@@ -1,9 +1,13 @@
 ﻿using Converter.FileStructures;
+using System.Buffers.Binary;
 using System.Reflection.Metadata.Ecma335;
 
 
 namespace Converter.Fonts
 {
+  /// <summary>
+  /// TrueTypeFont is big endian
+  /// </summary>
   public ref struct TTFParser
   {
     private ReadOnlySpan<byte> _buffer;
@@ -34,7 +38,7 @@ namespace Converter.Fonts
       pos = 0;
       byteSize = 8;
       endOfArr = 0;
-      beginOfSfnt = 8;
+      beginOfSfnt = 0;
     }
 
     public void Parse()
@@ -46,9 +50,11 @@ namespace Converter.Fonts
     {
       FontDirectory fd = new FontDirectory();
       TableOffsets tOff = new TableOffsets();
+      
       uint scalarType = ReadUInt32();
       fd.ScalarType = scalarType switch
       {
+        // true
         0x00010000 => ScalarType.True,
         0x74727565 => ScalarType.True,
         0x4F54544F => ScalarType.Otto,
@@ -84,75 +90,75 @@ namespace Converter.Fonts
         // did this so I don't allocate string when comparing 
 
         // SPECIAL CASE FOR HEAD
-        if (tag == 1684104552)
+        if (tag == 1751474532)
         {
           // do something special
         }
         tableBuffer = _buffer.Slice((int)offset, (int)length);
 
-        if (checkSum != CalculateCheckSum(ref tableBuffer, length))
+        if (checkSum != 0 && checkSum != CalculateCheckSum(ref tableBuffer, length))
           throw new InvalidDataException("Check sum failed!");
 
         switch (tag)
         {
           // cmap
-          case 1885433187:
+          case 1668112752:
             tOff.cmap = tableBuffer;
             break;
           // glyf
-          case 1719233639:
+          case 1735162214:
             tOff.glyf = tableBuffer;
             break;
           // head
-          case 1684104552:
+          case 1751474532:
             tOff.head = tableBuffer;
             break;
           // hhea
-          case 1634035816:
+          case 1751672161:
             tOff.hhea = tableBuffer;
             break;
           // hmtx
-          case 2020896104:
+          case 1752003704:
             tOff.hmtx = tableBuffer;
             break;
           // loca
-          case 1633906540:
+          case 1819239265:
             tOff.loca = tableBuffer;
             break;
           // maxp
-          case 1886937453:
+          case 1835104368:
             tOff.maxp = tableBuffer;
             break;
           // name
-          case 1701667182:
+          case 1851878757:
             tOff.name = tableBuffer;
             break;
           // post
-          case 1953722224:
+          case 1886352244:
             tOff.post = tableBuffer;
             break;
           // cvt 
-          case 544503395:
+          case 1668707360:
             tOff.cvt = tableBuffer;
             break;
           // fpgm 
-          case 1835495526:
+          case 1718642541:
             tOff.fpgm = tableBuffer;
             break;
           // hdmx 
-          case 2020435048:
+          case 1751412088:
             tOff.hdmx = tableBuffer;
             break;
           // kern 
-          case 1852990827:
+          case 1801810542:
             tOff.kern = tableBuffer;
             break;
           // OS/2 
-          case 841962319:
+          case 1330851634:
             tOff.OS_2 = tableBuffer;
             break;
           // prep 
-          case 1885696624:
+          case 1886545264:
             tOff.prep = tableBuffer;
             break;
           default:
@@ -164,33 +170,49 @@ namespace Converter.Fonts
           }
       }
 
+      // TODO: cmpa is needed only for non CIDFont dicts
+      if (
+        tOff.head.Length == 0 ||
+        tOff.hhea.Length == 0 ||
+        tOff.loca.Length == 0 ||
+        tOff.maxp.Length == 0 ||
+        tOff.cvt.Length  == 0 ||
+        tOff.prep.Length == 0 ||
+        tOff.glyf.Length == 0 ||
+        tOff.hmtx.Length == 0 ||
+        tOff.fpgm.Length == 0 ||
+        tOff.cmap.Length == 0   )
+      {
+        throw new InvalidDataException("Missing one of the required tables!");
+      }
+
       _ttf.FontDirectory = fd;
       _ttf.Offsets = tOff;
     }
 
     private uint ReadUInt32()
     {
-      uint res = BitConverter.ToUInt32(_buffer.Slice(pos, 4));
+      uint res = BinaryPrimitives.ReadUInt32BigEndian(_buffer.Slice(pos, 4));
       pos += 4;
       return res;
     }
     private int ReadSignedInt32()
     {
-      int res = BitConverter.ToInt32(_buffer.Slice(pos, 4));
+      int res = BinaryPrimitives.ReadInt32BigEndian(_buffer.Slice(pos, 4));
       pos += 4;
       return res;
     }
 
     private ushort ReadUInt16()
     {
-      ushort res = BitConverter.ToUInt16(_buffer.Slice(pos, 2));
+      ushort res = BinaryPrimitives.ReadUInt16BigEndian(_buffer.Slice(pos, 2));
       pos += 2;
       return res;
     }
 
     private short ReadSignedInt16()
     {
-      short res = BitConverter.ToInt16(_buffer.Slice(pos, 2));
+      short res = BinaryPrimitives.ReadInt16BigEndian(_buffer.Slice(pos, 2));
       pos += 2;
       return res;
     }
@@ -207,7 +229,7 @@ namespace Converter.Fonts
       int i = 0;
       while (nLongs-- > 0)
       {
-        sum += BitConverter.ToUInt32(tableBuffer.Slice(i, 4));
+        sum += BinaryPrimitives.ReadUInt32BigEndian(tableBuffer.Slice(i, 4));
         i += 4;
       }
       return sum;
