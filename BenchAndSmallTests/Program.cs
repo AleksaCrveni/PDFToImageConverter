@@ -1,4 +1,7 @@
-﻿using Converter;
+﻿using BenchAndSmallTests;
+using BenchmarkDotNet.Running;
+using Converter;
+using Converter.FIleStructures;
 using Converter.Writers;
 //int count1 = 0b_0000_0001;
 //int count2 = 0b_1110_0010;
@@ -61,26 +64,23 @@ using Converter.Writers;
 //  arr[23880] = 0;
 //File.WriteAllBytes("inverted.tiff", arr);
 
-for (int i = 0; i < 10; i++)
-{
-  TIFFWriter.WriteRandomBilevelTIFF($"Files/Bilevel/test{i}.tif", new TIFFWriterOptions()
-  {
-    AllowStackAlloct = true,
-  });
-  TIFFWriter.WriteRandomGrayscaleTIFF($"Files/Grayscale/test{i}.tif", new TIFFWriterOptions()
-  {
-    AllowStackAlloct = true,
-  });
-  TIFFWriter.WriteRandomPaletteTiff($"Files/Palette/test{i}.tif", new TIFFWriterOptions()
-  {
-    AllowStackAlloct = true,
-  });
-  TIFFWriter.WriteRandomRGBFullColorTiff($"Files/RGBFullColor/test{i}.tif", new TIFFWriterOptions()
-  {
-    AllowStackAlloct = true,
-  });
-}
-
-  
-
-//var runner = BenchmarkRunner.Run<MyBenches>();
+//for (int i = 0; i < 10; i++)
+//{
+//  TIFFWriter.WriteRandomBilevelTIFF($"Files/Bilevel/test{i}.tif", new TIFFWriterOptions()
+//  {
+//    AllowStackAlloct = true,
+//  });
+//  TIFFWriter.WriteRandomGrayscaleTIFF($"Files/Grayscale/test{i}.tif", new TIFFWriterOptions()
+//  {
+//    AllowStackAlloct = true,
+//  });
+//  TIFFWriter.WriteRandomPaletteTiff($"Files/Palette/test{i}.tif", new TIFFWriterOptions()
+//  {
+//    AllowStackAlloct = true,
+//  });
+//  TIFFWriter.WriteRandomRGBFullColorTiff($"Files/RGBFullColor/test{i}.tif", new TIFFWriterOptions()
+//  {
+//    AllowStackAlloct = true,
+//  });
+//}
+var runner = BenchmarkRunner.Run<MyBenches>();
