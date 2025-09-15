@@ -1,7 +1,7 @@
 ﻿namespace Converter.FileStructures
 {
   /// <summary>
-  /// R -> required, O -> optional, SD -> needed for some OSes
+  /// R -> required, O -> optional, SD -> needed for some OSes, Offsets -> OF
   /// </summary>
   public ref struct TrueTypeFont
   {
@@ -9,6 +9,10 @@
 
     public FontDirectory FontDirectory;
     public TableOffsets Offsets;
+    public ushort NumOfGlyphs;
+    public int Svg;
+    public uint IndexMapOffset;
+    public ushort IndexToLocFormat;
   }
 
   public ref struct TableOffsets
@@ -31,7 +35,6 @@
     public ReadOnlySpan<byte> kern = new ReadOnlySpan<byte>(); // SD
     public ReadOnlySpan<byte> OS_2 = new ReadOnlySpan<byte>(); // SD
     public ReadOnlySpan<byte> prep = new ReadOnlySpan<byte>(); // SD
-
   }
 
 
@@ -55,5 +58,22 @@
     Typ1, // recognized as referring to the old style of PostScript font housed in a sfnt wrapper
     Otto, // indicates an OpenType font with PostScript outlines (that is, a 'CFF ' table instead of a 'glyf' table)
   }
+
+  public enum PlatformID : ushort
+  {
+    Unicode = 0,
+    Macintosh = 1,
+    DO_NOT_USE = 2,
+    Microsoft = 3
+  }
+
+  public enum MSPlatformSpecificID : ushort
+  {
+    MS_Symbol = 0,
+    MS_UnicodeBMP = 1,
+    MS_ShiftJIS = 2,
+    MS_UnicodeFULL = 10
+  }
+
 
 }
