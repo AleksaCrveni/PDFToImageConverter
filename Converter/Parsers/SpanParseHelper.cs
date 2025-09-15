@@ -1,4 +1,5 @@
 ﻿using Converter.FIleStructures;
+using Converter.Parsers.PDF;
 using System.Globalization;
 using System.Text;
 
@@ -553,7 +554,7 @@ namespace Converter.Parsers
     public bool IsCurrentCharPdfWhiteSpace()
     {
       // NUL || HORIZONTAL TAB (HT) || LINE FEED (LF) || FORM FEED (FF) || CARRIAGE RETURN (CR) || SPACE (SP)
-      if (_char == 0x00 || _char == 0x09 || _char == 0x0a || _char == 0x0c || _char == 0x0d || _char == 0x20)
+      if (_char == PDFConstants.NULL || _char == PDFConstants.HT || _char == PDFConstants.LF || _char == PDFConstants.FF || _char == PDFConstants.CR || _char == PDFConstants.SP)
         return true;
       return false;
     }
