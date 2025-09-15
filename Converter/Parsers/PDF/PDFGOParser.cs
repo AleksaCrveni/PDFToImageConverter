@@ -25,6 +25,8 @@ namespace Converter.Parsers.PDF
     public void ParseAll()
     {
       string val = ReadNextString();
+      // TODO: instead of string, we can return hexadecimals or numbers
+      // since they are all less than 4char strings
       switch (val)
       {
         case "w":
