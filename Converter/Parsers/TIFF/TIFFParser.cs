@@ -1,5 +1,5 @@
 ﻿using Converter.FIleStructures;
-namespace Converter.Parsers
+namespace Converter.Parsers.FileParsers
 {
   // NOTE: FOR NOW JUST SUPPORT LITTLE ENDIAN
   public class TIFFParser
@@ -26,7 +26,7 @@ namespace Converter.Parsers
       uint maxStripCount = 0;
       foreach (TIFFData d in file.TIFFs)
       {
-        uint stripCount = (d.Tag.ImageLength / d.Tag.RowsPerStrip);
+        uint stripCount = d.Tag.ImageLength / d.Tag.RowsPerStrip;
         if (d.Tag.ImageLength % d.Tag.RowsPerStrip > 0)
           stripCount++;
         if (stripCount > maxStripCount)
@@ -89,7 +89,7 @@ namespace Converter.Parsers
         }
 
         // JUST FOR DEBUG
-        Span<byte> imgRawArr = new byte[BitConverter.ToUInt32(stripCountsBuffer.Slice(stripCountsBuffer.Length - 4, 4)) + (((stripCountsBuffer.Length - 4) / 4) * 8192)];
+        Span<byte> imgRawArr = new byte[BitConverter.ToUInt32(stripCountsBuffer.Slice(stripCountsBuffer.Length - 4, 4)) + (stripCountsBuffer.Length - 4) / 4 * 8192];
         file.Stream.Position = 8;
         file.Stream.Read(imgRawArr);
       }
@@ -188,7 +188,7 @@ namespace Converter.Parsers
           case 262:
             PhotometricInterpretation p = valueOrOffset switch
             {
-              (>= 0) and (<= 4) => (PhotometricInterpretation)valueOrOffset,
+              >= 0 and <= 4 => (PhotometricInterpretation)valueOrOffset,
               _ => throw new InvalidDataException("Invalid photometric interpretation tag value!")
             };
             tag.PhotometricInterpretation = p;
@@ -227,7 +227,7 @@ namespace Converter.Parsers
               throw new InvalidDataException("Invalid rational. Unexpected EOS!");
             uint numerator = BitConverter.ToUInt32(rationalBuffer.Slice(0, 4));
             uint denominator = BitConverter.ToUInt32(rationalBuffer.Slice(4, 4));
-            tag.XResolution = (double)numerator / (double)denominator;
+            tag.XResolution = numerator / (double)denominator;
             break;
           case 283:
 
@@ -238,7 +238,7 @@ namespace Converter.Parsers
               throw new InvalidDataException("Invalid rational. Unexpected EOS!");
             numerator = BitConverter.ToUInt32(rationalBuffer.Slice(0, 4));
             denominator = BitConverter.ToUInt32(rationalBuffer.Slice(4, 4));
-            tag.YResolution = (double)numerator / (double)denominator;
+            tag.YResolution = numerator / (double)denominator;
             break;
           case 284:
             if (valueOrOffset < 1 || valueOrOffset > 2)
@@ -258,7 +258,7 @@ namespace Converter.Parsers
           case 297:
             // first short in long is pagenubmer, second part is total pages
             ushort pageNumber = (ushort)(valueOrOffset >> 16);
-            ushort totalPages = (ushort)(valueOrOffset); // can just cutoff
+            ushort totalPages = (ushort)valueOrOffset; // can just cutoff
             if (totalPages != 0)
               file.TotalPages = totalPages;
             tag.PageNumber = pageNumber;

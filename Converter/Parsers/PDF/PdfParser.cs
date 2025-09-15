@@ -1,12 +1,11 @@
-﻿
-using Converter.FileStructures;
+﻿using Converter.FileStructures;
 using Converter.FIleStructures;
-using Converter.Fonts;
+using Converter.Parsers.Fonts;
 using System.Globalization;
 using System.IO.Compression;
 using System.Runtime.CompilerServices;
 using System.Text;
-namespace Converter.Parsers
+namespace Converter.Parsers.PDF
 {
   // Note to myself - when dealing with variables that are indirect references add 'IR' on the end of the name
   // TODO: Am I stupid or i can just compare characters directly instead of bytes........................
@@ -331,7 +330,7 @@ namespace Converter.Parsers
           byte b1 = inputSpan[1];
           // account for big/lttiel end
           // not sure if in deflate stream this can be first byte
-          if ((b0 & 15) == 8 && ((b0 >> 4) & 15)  == 7)
+          if ((b0 & 15) == 8 && (b0 >> 4 & 15)  == 7)
           {
             // ZLIB check (MSB is left)
             // CM 0-3 bits need to be 8
@@ -1174,7 +1173,7 @@ namespace Converter.Parsers
     {
       // TODO: I guess byteoffset should be long
       // i really feel i should be loading in more bytes in chunk
-      file.Stream.Position = (long)file.LastCrossReferenceOffset;
+      file.Stream.Position = file.LastCrossReferenceOffset;
 
       // make sure talbe is starting with xref keyword
       Span<byte> xrefBufferChar = stackalloc byte[4] { (byte)'x', (byte)'r', (byte)'e', (byte)'f' };
@@ -1193,12 +1192,12 @@ namespace Converter.Parsers
 
       // TODO: Think if you want list or array and fix this later
       CRefEntry[] entryArr = new CRefEntry[sectionLen];
-      Array.Fill<CRefEntry>(entryArr, new CRefEntry());
+      Array.Fill(entryArr, new CRefEntry());
       List<CRefEntry> cRefEntries = entryArr.ToList();
       Span<byte> cRefEntryBuffer = stackalloc byte[20];
       readBytes = 0;
       CRefEntry entry;
-      for (int i = (int)startObj; i < endObj; i++)
+      for (int i = startObj; i < endObj; i++)
       {
         readBytes = file.Stream.Read(cRefEntryBuffer);
         if (readBytes != cRefEntryBuffer.Length)
@@ -1292,42 +1291,42 @@ namespace Converter.Parsers
       if (bytesRead != buffer.Length)
         throw new InvalidDataException("Invalid data");
       // checking for %PDF-X.X in bytes
-      if (buffer[0] != (byte)0x25)
+      if (buffer[0] != 0x25)
         throw new InvalidDataException("Invalid data");
-      if (buffer[1] != (byte)0x50)
+      if (buffer[1] != 0x50)
         throw new InvalidDataException("Invalid data");
-      if (buffer[2] != (byte)0x44)
+      if (buffer[2] != 0x44)
         throw new InvalidDataException("Invalid data");
-      if (buffer[3] != (byte)0x46)
+      if (buffer[3] != 0x46)
         throw new InvalidDataException("Invalid data");
-      if (buffer[4] != (byte)0x2d)
+      if (buffer[4] != 0x2d)
         throw new InvalidDataException("Invalid data");
       // checking version
       byte majorVersion = buffer[5];
-      if (majorVersion != (byte)0x31 && majorVersion != (byte)0x32)
+      if (majorVersion != 0x31 && majorVersion != 0x32)
         throw new InvalidDataException("Invalid data");
-      if (buffer[6] != (byte)0x2e)
+      if (buffer[6] != 0x2e)
         throw new InvalidDataException("Invalid data");
       byte minorVersion = buffer[7];
-      if (majorVersion == (byte)0x31)
+      if (majorVersion == 0x31)
       {
         switch (minorVersion)
         {
-          case (byte)0x30:
+          case 0x30:
             return PDFVersion.V1_0;
-          case (byte)0x31:
+          case 0x31:
             return PDFVersion.V1_1;
-          case (byte)0x32:
+          case 0x32:
             return PDFVersion.V1_2;
-          case (byte)0x33:
+          case 0x33:
             return PDFVersion.V1_3;
-          case (byte)0x34:
+          case 0x34:
             return PDFVersion.V1_4;
-          case (byte)0x35:
+          case 0x35:
             return PDFVersion.V1_5;
-          case (byte)0x36:
+          case 0x36:
             return PDFVersion.V1_6;
-          case (byte)0x37:
+          case 0x37:
             return PDFVersion.V1_7;
           default:
             throw new InvalidDataException("Invalid data");
@@ -1337,7 +1336,7 @@ namespace Converter.Parsers
       {
         switch (minorVersion)
         {
-          case (byte)0x30:
+          case 0x30:
             return PDFVersion.V2_0;
           default:
             throw new InvalidDataException("Invalid data");
@@ -1353,30 +1352,30 @@ namespace Converter.Parsers
       if (buffer.Length != 4)
         throw new InvalidDataException("Invalid data!");
       byte majorVersion = buffer[1];
-      if (majorVersion != (byte)0x31 && majorVersion != (byte)0x32)
+      if (majorVersion != 0x31 && majorVersion != 0x32)
         throw new InvalidDataException("Invalid data");
-      if (buffer[2] != (byte)0x2e)
+      if (buffer[2] != 0x2e)
         throw new InvalidDataException("Invalid data");
       byte minorVersion = buffer[3];
-      if (majorVersion == (byte)0x31)
+      if (majorVersion == 0x31)
       {
         switch (minorVersion)
         {
-          case (byte)0x30:
+          case 0x30:
             return PDFVersion.V1_0;
-          case (byte)0x31:
+          case 0x31:
             return PDFVersion.V1_1;
-          case (byte)0x32:
+          case 0x32:
             return PDFVersion.V1_2;
-          case (byte)0x33:
+          case 0x33:
             return PDFVersion.V1_3;
-          case (byte)0x34:
+          case 0x34:
             return PDFVersion.V1_4;
-          case (byte)0x35:
+          case 0x35:
             return PDFVersion.V1_5;
-          case (byte)0x36:
+          case 0x36:
             return PDFVersion.V1_6;
-          case (byte)0x37:
+          case 0x37:
             return PDFVersion.V1_7;
           default:
             throw new InvalidDataException("Invalid data");
@@ -1386,7 +1385,7 @@ namespace Converter.Parsers
       {
         switch (minorVersion)
         {
-          case (byte)0x30:
+          case 0x30:
             return PDFVersion.V2_0;
             break;
           default:
@@ -1452,7 +1451,7 @@ namespace Converter.Parsers
       {
         if (!char.IsDigit((char)buffer[index]))
           throw new InvalidDataException("Invalid data");
-        value = value * 10 + (long)CharUnicodeInfo.GetDecimalDigitValue((char)buffer[index]);
+        value = value * 10 + CharUnicodeInfo.GetDecimalDigitValue((char)buffer[index]);
       }
       file.LastCrossReferenceOffset =  value;
     }
@@ -1470,7 +1469,7 @@ namespace Converter.Parsers
     }
 
     // do these better, seems odd?
-    private UInt16 ConvertBytesToUnsignedInt16(Span<byte> buffer)
+    private ushort ConvertBytesToUnsignedInt16(Span<byte> buffer)
     {
       uint res = 0;
       for (int i = 0; i < buffer.Length; i++)
@@ -1479,10 +1478,10 @@ namespace Converter.Parsers
         res = res * 10 + (uint)CharUnicodeInfo.GetDecimalDigitValue((char)buffer[i]);
       }
       // this should wrap, idk if i should throw exception
-      return (UInt16)res;
+      return (ushort)res;
     }
 
-    private UInt64 ConvertBytesToUnsignedInt64(Span<byte> buffer)
+    private ulong ConvertBytesToUnsignedInt64(Span<byte> buffer)
     {
       uint res = 0;
       for (int i = 0; i < buffer.Length; i++)
@@ -1491,7 +1490,7 @@ namespace Converter.Parsers
         res = res * 10 + (uint)CharUnicodeInfo.GetDecimalDigitValue((char)buffer[i]);
       }
       // this should wrap, idk if i should throw exception
-      return (UInt64)res;
+      return res;
     }
     // I think if i count object number it would be a bit faster but this is fine too
    

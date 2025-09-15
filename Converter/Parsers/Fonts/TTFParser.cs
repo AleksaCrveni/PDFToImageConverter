@@ -3,7 +3,7 @@ using System.Buffers.Binary;
 using System.Reflection.Metadata.Ecma335;
 
 
-namespace Converter.Fonts
+namespace Converter.Parsers.Fonts
 {
   /// <summary>
   /// TrueTypeFont is big endian
@@ -211,7 +211,7 @@ namespace Converter.Fonts
         // not sure if this check is even require need to be done here, stb_truetype only does this 
         switch (platformID)
         {
-          case (ushort)Converter.FileStructures.PlatformID.Microsoft:
+          case (ushort)FileStructures.PlatformID.Microsoft:
             switch (platformSpecificID)
             {
               case (ushort)MSPlatformSpecificID.MS_UnicodeBMP:
@@ -221,10 +221,10 @@ namespace Converter.Fonts
               
             }
             break;
-          case (ushort)Converter.FileStructures.PlatformID.Unicode:
+          case (ushort)FileStructures.PlatformID.Unicode:
             _ttf.IndexMapOffset = offset;
             break;
-          case (ushort)Converter.FileStructures.PlatformID.Macintosh:
+          case (ushort)FileStructures.PlatformID.Macintosh:
             _ttf.IndexMapOffset = offset;
             break;
         }
@@ -237,6 +237,12 @@ namespace Converter.Fonts
 
       _ttf.FontDirectory = fd;
       _ttf.Offsets = tOff;
+    }
+
+    public float ScaleForPixelHeight(float lineHeight)
+    {
+      int fHeight = ReadSignedInt16(ref _ttf.Offsets.hhea, 4) - ReadSignedInt16(ref _ttf.Offsets.hhea, 6);
+      return lineHeight / fHeight;
     }
 
     private uint ReadUInt32(ref ReadOnlySpan<byte> buffer, int pos)

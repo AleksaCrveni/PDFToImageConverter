@@ -130,15 +130,15 @@ namespace Converter.Parsers
       if (len > 256)
         throw new InvalidDataException("Name too long!");
       if (len == 0)
-          return default(T);
+          return default;
 
       // this needs to be done because Enum.TryParse accepts only <char>
       Span<char> spanOfChars = stackalloc char[len];
       for (int i = 0; i < spanOfChars.Length; i++)
         spanOfChars[i] = (char)_buffer[start + i]; // no need to make another slice, just use main buffer and offset
 
-      if (!Enum.TryParse<T>((ReadOnlySpan<char>)spanOfChars, out T result))
-        return default(T);
+      if (!Enum.TryParse((ReadOnlySpan<char>)spanOfChars, out T result))
+        return default;
 
       return result;
     }
@@ -224,7 +224,7 @@ namespace Converter.Parsers
       for (int i = 0; i < numberInBytes.Length; i++)
       {
         // these should be no negative ints so this is okay i believe?
-        result = result * 10 + (int)CharUnicodeInfo.GetDecimalDigitValue((char)numberInBytes[i]);
+        result = result * 10 + CharUnicodeInfo.GetDecimalDigitValue((char)numberInBytes[i]);
       }
 
       if (isNegative)
@@ -289,7 +289,7 @@ namespace Converter.Parsers
         return result;
       }
 
-      double res = result / (Math.Pow(10, (_position - baseIndex - starter - 1)));
+      double res = result / Math.Pow(10, _position - baseIndex - starter - 1);
 
       if (isNegative)
         res *= -1;
@@ -462,7 +462,7 @@ namespace Converter.Parsers
     public bool GoToNextStringMatch(string valToMatch)
     {
       // use span not to allocate another string when getting new string
-      int strSize = valToMatch.Length * sizeof(Char);
+      int strSize = valToMatch.Length * sizeof(char);
       if (strSize > MAX_STRING_SPAN_ALLOC_SIZE)
         throw new InvalidDataException("String to match too big!");
 
@@ -543,7 +543,7 @@ namespace Converter.Parsers
 
     public void SkipWhiteSpaceAndDelimiters()
     {
-      while (IsCurrentCharPdfWhiteSpace() || delimiters.Contains<byte>(_char))
+      while (IsCurrentCharPdfWhiteSpace() || delimiters.Contains(_char))
         ReadChar();
     }
 
@@ -553,7 +553,7 @@ namespace Converter.Parsers
     public bool IsCurrentCharPdfWhiteSpace()
     {
       // NUL || HORIZONTAL TAB (HT) || LINE FEED (LF) || FORM FEED (FF) || CARRIAGE RETURN (CR) || SPACE (SP)
-      if (_char == (byte)0x00 || _char == (byte)0x09 || _char == (byte)0x0a || _char == (byte)0x0c || _char == (byte)0x0d || _char == (byte)0x20)
+      if (_char == 0x00 || _char == 0x09 || _char == 0x0a || _char == 0x0c || _char == 0x0d || _char == 0x20)
         return true;
       return false;
     }
@@ -561,7 +561,7 @@ namespace Converter.Parsers
     public void ReadChar()
     {
       if (_readPosition >= _buffer.Length)
-        _char = (byte)0x00;
+        _char = 0x00;
       else
         _char = _buffer[_readPosition];
 

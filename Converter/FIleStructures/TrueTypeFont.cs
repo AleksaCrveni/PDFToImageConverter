@@ -47,7 +47,7 @@
     public ushort EntrySelector;   // log2(maximum power of 2 <= numTables)
     public ushort RangeShift;      // number of tables in the font
 
-    // table directory
+    // table directory  
 
   }
 
