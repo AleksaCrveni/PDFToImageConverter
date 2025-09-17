@@ -22,11 +22,13 @@ namespace Converter.Parsers.PDF
     private Stack<int> intOperands;
     private Stack<double> realOperands;
     private Stack<string> stringOperands;
+    // TODO: maybe this stack isn't *really* needed
     private Stack<OperandType> operandTypes;
     // could be wrapped into struct and put inside operand types, but then all of the other would have it
     // this is more memory efficient I think
     private Stack<int> arrayLengths;
     private Stack<GraphicsState> GSS;
+    private GraphicsState currentGS;
     // TODO: maybe NULL check is redundant if we let it throw to end?
     public PDFGOParser(ReadOnlySpan<byte> buffer)
     {
@@ -45,26 +47,78 @@ namespace Converter.Parsers.PDF
 
     public void ParseAll()
     {
+      currentGS = new GraphicsState();
       uint val = ReadNext();
       // TODO: instead of string, we can return hexadecimals or numbers
       // since they are all less than 4char strings
       // TODO: move these to constants file
+      // TODO: load all as double or float and then cast to int if needed?
       switch (val)
       {
         case 0x77: // w
-        case 0x4a: // J
-        case 0x6a: // j
-        case 0x4d: // M
-        case 0x64: // d
-        case 0x7269: // ri
-        case 0x69: // i
-        case 0x7173: // qs
-          // graphics state
+          currentGS.LineWidth = GetNextStackValAsDouble();
           break;
+        case 0x4a: // J
+          // valid values 0, 1, 2
+          currentGS.LineCap = GetNextStackValAsInt();
+          break;
+        case 0x6a: // j
+          // valid values 0, 1, 2
+          currentGS.LineJoin = GetNextStackValAsInt();
+          break;
+        case 0x4d: // M
+          currentGS.MiterLimit = GetNextStackValAsDouble();
+          break;
+        case 0x64: // d
+          DashPattern dashPattern = new DashPattern();
+          int phase = GetNextStackValAsInt();
+          int[] dashArr = new int[arrayLengths.Pop()];
+          for (int dpIndex = dashArr.Length; dpIndex >= 0; dpIndex--)
+          {
+            dashArr[dpIndex] = GetNextStackValAsInt();
+          }
+
+          currentGS.DashPattern = dashPattern;
+          break;
+        case 0x7269: // ri
+          operandTypes.Pop();
+          string renderingIntentString = stringOperands.Pop();
+
+          bool valid = Enum.TryParse(renderingIntentString, out RenderingIntent ri);
+          if (!valid)
+            ri = RenderingIntent.Null;
+
+          currentGS.RenderingIntent = ri;
+          break;
+        case 0x69: // i
+          currentGS.Flatness = GetNextStackValAsDouble();
+          break;
+        case 0x7173: // qs
+          // Name of gs paramter dict that is in ExtGState subdict in current resorouceDict
+          // do it later
+          throw new Exception("Implement dictname (gs)");
+          break;
+
+        // special graphics states
         case 0x71: // q
+          GSS.Push(currentGS);
+          break;
         case 0x51: // Q
+          currentGS = GSS.Pop();
+          break;
         case 0x636d: // cm
-          // special graphics state
+          // a b c e d f - real numbers but can be saved as ints
+          CTM newCtm = new CTM();
+          // get it as reverse since its stack
+
+          newCtm.yLen = GetNextStackValAsDouble();
+          newCtm.xLen = GetNextStackValAsDouble();
+          newCtm.yOrientation = GetNextStackValAsDouble();
+          newCtm.xOrientation = GetNextStackValAsDouble();
+          newCtm.yLocation = GetNextStackValAsDouble();
+          newCtm.xLocation = GetNextStackValAsDouble();
+
+          currentGS.CTM = newCtm;
           break;
         case 0x6d: // m
         case 0x49:  // I
@@ -279,6 +333,21 @@ namespace Converter.Parsers.PDF
       }
     }
 
+    private double GetNextStackValAsDouble()
+    {
+      if (operandTypes.Pop() == OperandType.INT)
+        return intOperands.Pop();
+      else
+        return realOperands.Pop();
+    }
+
+    private int GetNextStackValAsInt()
+    {
+      if (operandTypes.Pop() == OperandType.INT)
+        return intOperands.Pop();
+      else
+        return (int)realOperands.Pop();
+    }
     // we are at '/'
     private void GetName()
     {

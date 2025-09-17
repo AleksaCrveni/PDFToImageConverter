@@ -12,14 +12,14 @@ namespace Converter.FileStructures
 
   // this data specified in page descriptions
   // Table 52 + 53 
-  public class GraphicsState
+  public struct GraphicsState
   {
     public GraphicsState()
     {
 
     }
     // Device Independent
-    public object[] CTM;
+    public CTM CTM;
     public object ClippingPath;
     public List<ColorSpace> ColorSpace;
     public object Color;
@@ -27,9 +27,9 @@ namespace Converter.FileStructures
     public double LineWidth;
     public int LineCap;
     public int LineJoin;
-    public int MiterLimit;
-    public object DashPattern;
-    public object RenderingIntent;
+    public double MiterLimit;
+    public DashPattern DashPattern;
+    public RenderingIntent RenderingIntent;
     public bool StrokeAdjustment;
     public object[] BlendMode;
     public object SoftMask;
@@ -48,11 +48,48 @@ namespace Converter.FileStructures
     public double Smoothness;
   }
 
+  public struct DashPattern
+  {
+    public int[] DashArray;
+    public int Phase;
+  }
+  public struct CTM
+  {
+    public CTM (double _xLocation, double _yLocation, double _xOrientation, double _yOrientation, double _xLen, double _yLen)
+    {
+      xLocation = _xLocation;
+      yLocation = _yLocation;
+      xOrientation = _xOrientation;
+      yOrientation = _yOrientation;
+      xLen = _xLen;
+      yLen = _yLen;
+    }
+    // origin location
+    public double xLocation;
+    public double yLocation;
+
+    // axis orientation
+    public double xOrientation;
+    public double yOrientation;
+
+    // lengths of the units along each axis
+    public double xLen;
+    public double yLen;
+  }
+
   public enum ColorSpace
   {
     DeviceGray
   }
 
+  public enum RenderingIntent
+  {
+    Null = 0,
+    AbsoluteColorimetric,
+    RelativeColorimetric,
+    Saturation,
+    Perceptual
+  }
 
   public class TextObject
   {
