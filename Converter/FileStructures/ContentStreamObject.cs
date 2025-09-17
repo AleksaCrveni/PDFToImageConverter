@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Drawing;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -57,24 +58,24 @@ namespace Converter.FileStructures
   {
     public CTM (double _xLocation, double _yLocation, double _xOrientation, double _yOrientation, double _xLen, double _yLen)
     {
-      xLocation = _xLocation;
-      yLocation = _yLocation;
-      xOrientation = _xOrientation;
-      yOrientation = _yOrientation;
-      xLen = _xLen;
-      yLen = _yLen;
+      XLocation = _xLocation;
+      YLocation = _yLocation;
+      XOrientation = _xOrientation;
+      YOrientation = _yOrientation;
+      XxLen = _xLen;
+      YLen = _yLen;
     }
     // origin location
-    public double xLocation;
-    public double yLocation;
+    public double XLocation;
+    public double YLocation;
 
     // axis orientation
-    public double xOrientation;
-    public double yOrientation;
+    public double XOrientation;
+    public double YOrientation;
 
     // lengths of the units along each axis
-    public double xLen;
-    public double yLen;
+    public double XxLen;
+    public double YLen;
   }
 
   public enum ColorSpace
@@ -95,6 +96,25 @@ namespace Converter.FileStructures
   {
   }
 
+  public struct MyPoint()
+  {
+    public int X1;
+    public int Y1;
+    public int X2;
+    public int Y2;
+    public int X3;
+    public int Y3;
+
+  }
+  // not sure if any othe rparamters will be needed wrap it in now
+  public struct PathConstruction
+  {
+    public List<(PathConstructOperator, MyPoint)> PathConstructs;
+    public PathConstruction()
+    {
+      PathConstructs = new List<(PathConstructOperator, MyPoint)>();
+    }
+  }
   public class PathObject
   { }
   public class ShadingObject
@@ -109,5 +129,16 @@ namespace Converter.FileStructures
   public class ClippingPathObject
   {
 
+  }
+
+  public enum PathConstructOperator : uint
+  {
+    m = 0x6d,
+    l = 0x0c,
+    c,
+    v,
+    y,
+    h,
+    re
   }
 }

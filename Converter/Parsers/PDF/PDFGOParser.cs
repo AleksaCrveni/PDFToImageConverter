@@ -29,6 +29,8 @@ namespace Converter.Parsers.PDF
     private Stack<int> arrayLengths;
     private Stack<GraphicsState> GSS;
     private GraphicsState currentGS;
+    private PathConstruction currentPC;
+    
     // TODO: maybe NULL check is redundant if we let it throw to end?
     public PDFGOParser(ReadOnlySpan<byte> buffer)
     {
@@ -38,6 +40,8 @@ namespace Converter.Parsers.PDF
       operandTypes = new Stack<OperandType>();
       arrayLengths = new Stack<int>();
       GSS = new Stack<GraphicsState>();
+      currentGS = new GraphicsState();
+      currentPC = new PathConstruction();
     }
 
     public PDFGOParser(Span<byte> buffer)
@@ -53,8 +57,10 @@ namespace Converter.Parsers.PDF
       // since they are all less than 4char strings
       // TODO: move these to constants file
       // TODO: load all as double or float and then cast to int if needed?
+      MyPoint mp;
       switch (val)
       {
+        #region gss&sgs
         case 0x77: // w
           currentGS.LineWidth = GetNextStackValAsDouble();
           break;
@@ -111,24 +117,72 @@ namespace Converter.Parsers.PDF
           CTM newCtm = new CTM();
           // get it as reverse since its stack
 
-          newCtm.yLen = GetNextStackValAsDouble();
-          newCtm.xLen = GetNextStackValAsDouble();
-          newCtm.yOrientation = GetNextStackValAsDouble();
-          newCtm.xOrientation = GetNextStackValAsDouble();
-          newCtm.yLocation = GetNextStackValAsDouble();
-          newCtm.xLocation = GetNextStackValAsDouble();
+          newCtm.YLen = GetNextStackValAsDouble();
+          newCtm.XxLen = GetNextStackValAsDouble();
+          newCtm.YOrientation = GetNextStackValAsDouble();
+          newCtm.XOrientation = GetNextStackValAsDouble();
+          newCtm.YLocation = GetNextStackValAsDouble();
+          newCtm.XLocation = GetNextStackValAsDouble();
 
           currentGS.CTM = newCtm;
           break;
+#endregion gss&sgs
+        #region pathConstruction
         case 0x6d: // m
-        case 0x49:  // I
-        case 0x63: // c
-        case 0x76: // v
-        case 0x79: // y
-        case 0x68: // h
-        case 0x7265: // re
-          // path construction
+          currentPC.PathConstructs.Clear();
+          mp = new MyPoint();
+          mp.Y1 = GetNextStackValAsInt();
+          mp.X1 = GetNextStackValAsInt();
+          currentPC.PathConstructs.Add((PathConstructOperator.m, mp));
           break;
+        case 0x6c: // l
+          mp = new MyPoint();
+          mp.Y1 = GetNextStackValAsInt();
+          mp.X1 = GetNextStackValAsInt();
+          currentPC.PathConstructs.Add((PathConstructOperator.l, mp));
+          break;
+        case 0x63: // c
+          mp = new MyPoint();
+          mp.Y3 = GetNextStackValAsInt();
+          mp.X3 = GetNextStackValAsInt();
+          mp.Y2 = GetNextStackValAsInt();
+          mp.X2 = GetNextStackValAsInt();
+          mp.Y1 = GetNextStackValAsInt();
+          mp.X1 = GetNextStackValAsInt();
+          currentPC.PathConstructs.Add((PathConstructOperator.c, mp));
+          break;
+        case 0x76: // v
+          mp = new MyPoint();
+          mp.Y3 = GetNextStackValAsInt();
+          mp.X3 = GetNextStackValAsInt();
+          mp.Y2 = GetNextStackValAsInt();
+          mp.X2 = GetNextStackValAsInt();
+          currentPC.PathConstructs.Add((PathConstructOperator.v, mp));
+          break;
+        case 0x79: // y
+          mp = new MyPoint();
+          mp.Y3 = GetNextStackValAsInt();
+          mp.X3 = GetNextStackValAsInt();
+          mp.Y1 = GetNextStackValAsInt();
+          mp.X1 = GetNextStackValAsInt();
+          currentPC.PathConstructs.Add((PathConstructOperator.y, mp));
+          break;
+        case 0x68: // h
+          mp = new MyPoint();
+          currentPC.PathConstructs.Add((PathConstructOperator.h, mp));
+          break;
+        case 0x7265: // re
+          mp = new MyPoint();
+          
+          // use this as width
+          mp.X3 = GetNextStackValAsInt();
+          /// use this as height
+          mp.Y3 = GetNextStackValAsInt();
+          mp.Y1 = GetNextStackValAsInt();
+          mp.X1 = GetNextStackValAsInt();
+          currentPC.PathConstructs.Add((PathConstructOperator.re, mp));
+          break;
+        #endregion pathConstruction
         case 0x53: // S
         case 0x73: // s
         case 0x66: // f
