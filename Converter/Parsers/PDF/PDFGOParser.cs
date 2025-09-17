@@ -30,7 +30,7 @@ namespace Converter.Parsers.PDF
     private Stack<GraphicsState> GSS;
     private GraphicsState currentGS;
     private PathConstruction currentPC;
-    
+    private TextObject currentTextObject;
     // TODO: maybe NULL check is redundant if we let it throw to end?
     public PDFGOParser(ReadOnlySpan<byte> buffer)
     {
@@ -183,9 +183,13 @@ namespace Converter.Parsers.PDF
           currentPC.PathConstructs.Add((PathConstructOperator.re, mp));
           break;
         #endregion pathConstruction
+        #region pathPainting
         case 0x53: // S
         case 0x73: // s
         case 0x66: // f
+          
+          currentPC.PathConstructs.Clear();
+          break;
         case 0x46: // F
         case 0x662a: // f*
         case 0x42: // B
@@ -193,16 +197,28 @@ namespace Converter.Parsers.PDF
         case 0x62: // b
         case 0x622a: // b*
         case 0x6e: // n
+          // CHECK CLIPPING PATH SECTION
           // path painting
           break;
+        #endregion pathPainting
+        #region clippingPath
         case 0x57: // W
+          currentPC.NonZeroClippingPath = true;
+          break;
         case 0x572a: // W*
+          currentPC.EvenOddClippingPath = true;
           // clipping paths
           break;
+        #endregion clippingPath
+        #region textObjects
         case 0x4254: // BT
-        case 0x4554: // ET
-          // text objects
+          currentTextObject.InitMatrixes();
           break;
+        case 0x4554: // ET
+          // end
+          break;
+        #endregion textObjects
+        #region textState
         case 0x5463: // Tc
         case 0x5477: // Tw
         case 0x547a: // Tz
@@ -210,20 +226,24 @@ namespace Converter.Parsers.PDF
         case 0x5466: // Tf
         case 0x5472: // Tr
         case 0x5473: // Ts
-          // text state
           break;
+        #endregion textState
+        #region textPositioning;
         case 0x5464: // Td
         case 0x5444: // TD
         case 0x546d: // Tm
         case 0x542a: // T*
           // text positioning
           break;
+        #endregion textPositioning;
+        #region textShowing
         case 0x546a: // Tj
         case 0x544a: // TJ
-        case 0x27: // '
-        case 0x22: // "
+        case 0x27:   // '
+        case 0x22:   // "
           // text showing
           break;
+        #endregion textShowing
         case 0x6430: // d0
         case 0x6431: // d1
           // type 3 fonts

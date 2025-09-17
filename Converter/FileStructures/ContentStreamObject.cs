@@ -2,8 +2,10 @@
 using System.Collections.Generic;
 using System.Drawing;
 using System.Linq;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading.Tasks;
+using System.Transactions;
 
 namespace Converter.FileStructures
 {
@@ -94,6 +96,19 @@ namespace Converter.FileStructures
 
   public class TextObject
   {
+    public TextObject()
+    {
+      InitMatrixes();
+    }
+    public List<string> Literal;
+    public double[,] TextMatrix;
+    public double[,] TextLineMatrix;
+
+    public void InitMatrixes()
+    {
+      TextMatrix = new double[3, 3] { { 0, 0, 0 }, { 0, 0, 0 }, { 0, 0, 0 } };
+      TextLineMatrix =  new double[3, 3] { { 0, 0, 0 }, { 0, 0, 0 }, { 0, 0, 0 } };
+    }
   }
 
   public struct MyPoint()
@@ -109,11 +124,14 @@ namespace Converter.FileStructures
   // not sure if any othe rparamters will be needed wrap it in now
   public struct PathConstruction
   {
+    // instead of list this could be queue type FIFO
     public List<(PathConstructOperator, MyPoint)> PathConstructs;
     public PathConstruction()
     {
       PathConstructs = new List<(PathConstructOperator, MyPoint)>();
     }
+    public bool NonZeroClippingPath = false;
+    public bool EvenOddClippingPath = false;
   }
   public class PathObject
   { }
