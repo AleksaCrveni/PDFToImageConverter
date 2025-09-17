@@ -1,4 +1,5 @@
 ﻿using Converter.FileStructures;
+using System.Globalization;
 using System.Text;
 
 namespace Converter.Parsers.PDF
@@ -10,6 +11,7 @@ namespace Converter.Parsers.PDF
   /// Just have 3 Stacks to store operands, for now because we don't have discrimated unions and I don't want to use object
   /// TODO: see max values for operands, if they are small then we can use single 32 bit unsigned integer to store any data
   /// regardless if its decimal or not
+  /// TODO: See if building AST first would be better and faster
   /// </summary>
   public ref struct PDFGOParser
   {
@@ -21,13 +23,18 @@ namespace Converter.Parsers.PDF
     private Stack<double> realOperands;
     private Stack<string> stringOperands;
     private Stack<OperandType> operandTypes;
+    // could be wrapped into struct and put inside operand types, but then all of the other would have it
+    // this is more memory efficient I think
+    private Stack<int> arrayLengths;
     private Stack<GraphicsState> GSS;
+    // TODO: maybe NULL check is redundant if we let it throw to end?
     public PDFGOParser(ReadOnlySpan<byte> buffer)
     {
       _buffer = buffer;
-      intOperands = new Stack<int>();
-      realOperands = new Stack<double>();
+      intOperands = new Stack<int>(100);
+      realOperands = new Stack<double>(100);
       operandTypes = new Stack<OperandType>();
+      arrayLengths = new Stack<int>();
       GSS = new Stack<GraphicsState>();
     }
 
@@ -38,7 +45,7 @@ namespace Converter.Parsers.PDF
 
     public void ParseAll()
     {
-      uint val = ReadNextString();
+      uint val = ReadNext();
       // TODO: instead of string, we can return hexadecimals or numbers
       // since they are all less than 4char strings
       // TODO: move these to constants file
@@ -158,19 +165,147 @@ namespace Converter.Parsers.PDF
     ///  digit -> can be number or real
     ///  [ -> array
     ///  / -> name
-    ///  ( -> string literal
+    ///  ( -> string literal (ENCODE THIS WITH UNICODE or something global)
     ///  other char -> most likely operator
     ///  if its operator return uint value of it otherwise return 0
     /// </summary>
     /// <returns></returns>
+    // TODO: think about storing byte[] instead of string, not sure if it matters
     private uint ReadNext()
     {
       SkipWhiteSpace();
-      int startPos = _pos;
-      while (!IsCurrentCharPDFWhitespaceOrNewLine())
-        ReadChar();
+     
+
+      if (IsCurrentCharPartOfOperator() && _char != PDFConstants.NULL)
+      {
+        int startPos = _pos;
+        while (!IsCurrentCharPDFWhitespaceOrNewLine())
+          ReadChar();
+        ReadOnlySpan<byte> value = _buffer.Slice(startPos, _pos - startPos);
+        return BitConverter.ToUInt32(value);
+      }
+
+      // is a number, either real or int
+      if (IsCurrentCharDigit() || _char == '-')
+      {
+        GetNumber();
+        return 0;
+      }
+
+      // is a name
+      if (_char == '/')
+      {
+        GetName();
+        return 0;
+      }
+
+      // string literal
+      if (_char == '(')
+      {
+        GetStringLiteral();
+        return 0;
+      }
+
+      // array
+      if (_char == '[')
+      {
+        int count = 0;
+        while (_char != ']' && _char != PDFConstants.NULL)
+        {
+          SkipWhiteSpace();
+
+          if (IsCurrentCharDigit() || _char == '-')
+            GetNumber();
+
+          // is a name
+          if (_char == '/')
+            GetName();
+
+          // string literal
+          if (_char == '(')
+            GetStringLiteral();
+
+          count++;
+        }
+        operandTypes.Push(OperandType.ARRAY);
+        arrayLengths.Push(count);
+        return 0;
+      }
 
       return 0;
+    }
+
+    private void GetNumber()
+    {
+      int startPos = _pos;
+      int negativeMulti = 1;
+      if (_char == '-')
+      {
+        negativeMulti = -1;
+        ReadChar();
+      }
+
+      int integer = 0;
+      int baseIndex = -1;
+      while ((!IsCurrentCharPDFWhitespaceOrNewLine() || !IsCurrentCharDigit()) && _char != PDFConstants.NULL)
+      {
+        if (_char == '.')
+        {
+          baseIndex = _pos - startPos;
+          ReadChar();
+          continue;
+        }
+
+        integer = integer * 10 + CharUnicodeInfo.GetDecimalDigitValue((char)_char);
+        ReadChar();
+      }
+
+
+      if (baseIndex == -1)
+      {
+        // number is integer
+        intOperands.Push(integer * negativeMulti);
+        operandTypes.Push(OperandType.INT);
+      }
+      else
+      {
+        // number has no decimals but is expected to be double
+        // i.e 253.0
+        if (_pos - baseIndex - startPos == 1)
+          realOperands.Push((double)(integer * negativeMulti));
+        else
+          realOperands.Push((integer / Math.Pow(10, _pos - baseIndex - startPos - 1)) * negativeMulti);
+        operandTypes.Push(OperandType.DOUBLE);
+      }
+    }
+
+    // we are at '/'
+    private void GetName()
+    {
+      ReadChar();
+      int startPos = _pos;
+      while (!IsCurrentCharPDFWhitespaceOrNewLine() && _char != PDFConstants.NULL)
+      {
+        ReadChar();
+      }
+
+     stringOperands.Push(Encoding.Default.GetString(_buffer.Slice(startPos, _pos - startPos)));
+     operandTypes.Push(OperandType.STRING);
+    }
+
+    // we are at '('
+    private void GetStringLiteral()
+    {
+      ReadChar();
+      int startPos = _pos;
+      while (_char != ')' || _char == PDFConstants.NULL)
+      {
+        ReadChar();
+      }
+
+      stringOperands.Push(Encoding.Default.GetString(_buffer.Slice(startPos, _pos - startPos)));
+      operandTypes.Push(OperandType.STRING);
+      ReadChar(); // skip ')'
     }
     
     private void ReadChar()
@@ -184,14 +319,28 @@ namespace Converter.Parsers.PDF
       _pos = _readPos++;
     }
 
+    /// <summary>
+    /// True means that its part of operand and false means that its part of operator
+    /// </summary>
+    /// <returns></returns>
+    private bool IsCurrentCharPartOfOperator()
+    {
+      if ((_char >= 65 && _char <= 90) || (_char >= 97 && _char <= 122) || _char == '\'' || _char == '\"')
+        return true;
+      return false;
+    }
     private bool IsCurrentCharPDFWhitespaceOrNewLine()
     {
-      return _char == PDFConstants.SP || _char == PDFConstants.LF || _char == PDFConstants.CR;
+      return _char == PDFConstants.SP || _char == PDFConstants.LF || _char == PDFConstants.CR || _char == PDFConstants.NULL;
     }
     private void SkipWhiteSpace()
     {
-      while (IsCurrentCharPDFWhitespaceOrNewLine())
+      while (IsCurrentCharPDFWhitespaceOrNewLine() && _char != PDFConstants.NULL)
         ReadChar();
+    }
+    private bool IsCurrentCharDigit()
+    {
+      return (_char >= 48 && _char <= 57);
     }
   }
 
@@ -200,5 +349,6 @@ namespace Converter.Parsers.PDF
     INT,
     DOUBLE,
     STRING,
+    ARRAY,
   }
 }
