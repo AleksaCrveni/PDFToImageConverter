@@ -13,7 +13,7 @@ namespace Converter.Parsers.PDF
   /// regardless if its decimal or not
   /// TODO: See if building AST first would be better and faster
   /// </summary>
-  public ref struct PDFGOParser
+  public ref struct PDFGOInterpreter
   {
     private ReadOnlySpan<byte> _buffer;
     private int _pos = 0;
@@ -32,7 +32,7 @@ namespace Converter.Parsers.PDF
     private PathConstruction currentPC;
     private TextObject currentTextObject;
     // TODO: maybe NULL check is redundant if we let it throw to end?
-    public PDFGOParser(ReadOnlySpan<byte> buffer)
+    public PDFGOInterpreter(ReadOnlySpan<byte> buffer, )
     {
       _buffer = buffer;
       intOperands = new Stack<int>(100);
@@ -44,7 +44,7 @@ namespace Converter.Parsers.PDF
       currentPC = new PathConstruction();
     }
 
-    public PDFGOParser(Span<byte> buffer)
+    public PDFGOInterpreter(Span<byte> buffer)
     {
       _buffer = buffer;
     }
@@ -58,6 +58,7 @@ namespace Converter.Parsers.PDF
       // TODO: move these to constants file
       // TODO: load all as double or float and then cast to int if needed?
       MyPoint mp;
+      string literal;
       switch (val)  
       {
         #region gss&sgs
@@ -214,10 +215,11 @@ namespace Converter.Parsers.PDF
         #endregion clippingPath
         #region textObjects
         case 0x4254: // BT
+          currentTextObject.Active = false;
           currentTextObject.InitMatrixes();
           break;
         case 0x4554: // ET
-          // end
+          currentTextObject.Active = true;
           break;
         #endregion textObjects
         #region textState
@@ -226,6 +228,9 @@ namespace Converter.Parsers.PDF
         case 0x547a: // Tz
         case 0x544c: // TL
         case 0x5466: // Tf
+          currentTextObject.FontScaleFactor = GetNextStackValAsDouble();
+          currentTextObject.FontRef = GetNextStackValAsString();
+          break;
         case 0x5472: // Tr
         case 0x5473: // Ts
           break;
@@ -265,6 +270,7 @@ namespace Converter.Parsers.PDF
         #endregion textPositioning;
         #region textShowing
         case 0x546a: // Tj
+          literal = GetNextStackValAsString();
           
           break;
         case 0x544a: // TJ
@@ -451,6 +457,18 @@ namespace Converter.Parsers.PDF
         return intOperands.Pop();
       else
         return (int)realOperands.Pop();
+    }
+
+    private string GetNextStackValAsString()
+    {
+      OperandType t = operandTypes.Pop();
+      if (t == OperandType.STRING)
+        return stringOperands.Pop();
+      if (t == OperandType.INT)
+        return intOperands.Pop().ToString();
+      if (t == OperandType.DOUBLE)
+        return realOperands.Pop().ToString();
+      return "";
     }
     // we are at '/'
     private void GetName()

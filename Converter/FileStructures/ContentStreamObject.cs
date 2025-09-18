@@ -99,13 +99,16 @@ namespace Converter.FileStructures
     public TextObject()
     {
       InitMatrixes();
+      Active = false;
     }
     public List<string> Literal;
     public double[,] TextMatrix;
     // at new line, TLM will capture value of TM
     public double[,] TextLineMatrix;
-
-    
+    public string FontRef;
+    public double FontScaleFactor;
+    // to know if we are inside or not
+    public bool Active;
     public void InitMatrixes()
     {
       TextMatrix = MyMath.RealIdentityMatrix3x3();
