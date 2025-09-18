@@ -58,7 +58,7 @@ namespace Converter.Parsers.PDF
       // TODO: move these to constants file
       // TODO: load all as double or float and then cast to int if needed?
       MyPoint mp;
-      switch (val)
+      switch (val)  
       {
         #region gss&sgs
         case 0x77: // w
@@ -189,6 +189,8 @@ namespace Converter.Parsers.PDF
         case 0x66: // f
           
           currentPC.PathConstructs.Clear();
+          currentPC.EvenOddClippingPath = false;
+          currentPC.NonZeroClippingPath = false;
           break;
         case 0x46: // F
         case 0x662a: // f*
@@ -232,13 +234,41 @@ namespace Converter.Parsers.PDF
         case 0x5464: // Td
         case 0x5444: // TD
         case 0x546d: // Tm
+          //f
+          double tmOp = GetNextStackValAsDouble();
+          currentTextObject.TextMatrix[2, 1] = tmOp;
+          currentTextObject.TextLineMatrix[2, 1] = tmOp;
+          // e
+          tmOp = GetNextStackValAsDouble();
+          currentTextObject.TextMatrix[2, 0] = tmOp;
+          currentTextObject.TextLineMatrix[1, 0] = tmOp;
+          // d
+          tmOp = GetNextStackValAsDouble();
+          currentTextObject.TextMatrix[1, 1] = tmOp;
+          currentTextObject.TextLineMatrix[1, 1] = tmOp;
+          // c
+          tmOp = GetNextStackValAsDouble();
+          currentTextObject.TextMatrix[1, 0] = tmOp;
+          currentTextObject.TextLineMatrix[1, 0] = tmOp;
+          // b
+          tmOp = GetNextStackValAsDouble();
+          currentTextObject.TextMatrix[0, 1] = tmOp;
+          currentTextObject.TextLineMatrix[0, 1] = tmOp;
+          // a
+          tmOp = GetNextStackValAsDouble();
+          currentTextObject.TextMatrix[0, 0] = tmOp;
+          currentTextObject.TextLineMatrix[0, 0] = tmOp;
+          break;
         case 0x542a: // T*
           // text positioning
           break;
         #endregion textPositioning;
         #region textShowing
         case 0x546a: // Tj
+          
+          break;
         case 0x544a: // TJ
+          break;
         case 0x27:   // '
         case 0x22:   // "
           // text showing

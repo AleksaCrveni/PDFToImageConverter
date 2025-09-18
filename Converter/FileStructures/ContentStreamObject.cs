@@ -102,13 +102,16 @@ namespace Converter.FileStructures
     }
     public List<string> Literal;
     public double[,] TextMatrix;
+    // at new line, TLM will capture value of TM
     public double[,] TextLineMatrix;
 
+    
     public void InitMatrixes()
     {
-      TextMatrix = new double[3, 3] { { 0, 0, 0 }, { 0, 0, 0 }, { 0, 0, 0 } };
-      TextLineMatrix =  new double[3, 3] { { 0, 0, 0 }, { 0, 0, 0 }, { 0, 0, 0 } };
+      TextMatrix = MyMath.RealIdentityMatrix3x3();
+      TextLineMatrix = MyMath.RealIdentityMatrix3x3();
     }
+
   }
 
   public struct MyPoint()
