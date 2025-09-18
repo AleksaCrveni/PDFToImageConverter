@@ -2,6 +2,7 @@
 
 namespace Converter.Writers.TIFF
 {
+  // Write empty and then save stream and be able to modify it
   public class TIFFBilevelWriter : IDisposable
   {
     Stream _stream;
@@ -32,16 +33,58 @@ namespace Converter.Writers.TIFF
         options.Height = Random.Shared.Next(options.MinRandomHeight, options.MaxRandomHeight + 1);
       WriteImageMain(ref options, ImgDataMode.RANDOM);
     }
-
+    delegate void WriteImageData(ref BufferWriter writer, ulong byteCount, ulong stripSize, int remainder);
     private void WriteImageMain(ref TIFFWriterOptions options, ImgDataMode mode)
     {
       Span<byte> writeBuffer = options.AllowStackAlloct ? stackalloc byte[8192] : new byte[8192];
       BufferWriter writer = new BufferWriter(ref writeBuffer, options.IsLittleEndian);
       TIFFInternals.WriteHeader(ref _stream, ref writeBuffer, options.IsLittleEndian);
-      WriteRandomImage(ref writer, ref options);
+      WriteImageData func = WriteRandomImageData;
+      switch (mode)
+      {
+        case ImgDataMode.EMPTY:
+          func = WriteEmptyImageData;
+          break;
+        case ImgDataMode.RANDOM:
+          func = WriteRandomImageData;
+          break;
+      }
+      WriteRandomImage(ref writer, ref options, func);
     }
 
-    private void WriteRandomImage(ref BufferWriter writer, ref TIFFWriterOptions options)
+    private void WriteEmptyImageData(ref BufferWriter writer, ulong byteCount, ulong stripSize, int remainder)
+    {
+      // TODO: Fill with 1 depending on isZero
+      for (ulong i = 0; i < byteCount; i += (ulong)stripSize)
+      {
+        // read random value into each buffer stuff and then write
+        writer._buffer.Fill(0);
+        // do entire buffer because we know we are in range and no need to refresh
+        _stream.Write(writer._buffer);
+      }
+
+      // write remainder
+      Span<byte> remainderSizeBuffer = writer._buffer.Slice(0, remainder);
+      Random.Shared.NextBytes(remainderSizeBuffer);
+      _stream.Write(remainderSizeBuffer);
+    }
+
+    private void WriteRandomImageData(ref BufferWriter writer, ulong byteCount, ulong stripSize, int remainder)
+    {
+      for (ulong i = 0; i < byteCount; i += (ulong)stripSize)
+      {
+        // read random value into each buffer stuff and then write
+        Random.Shared.NextBytes(writer._buffer);
+        // do entire buffer because we know we are in range and no need to refresh
+        _stream.Write(writer._buffer);
+      }
+
+      // write remainder
+      Span<byte> remainderSizeBuffer = writer._buffer.Slice(0, remainder);
+      Random.Shared.NextBytes(remainderSizeBuffer);
+      _stream.Write(remainderSizeBuffer);
+    }
+    private void WriteRandomImage(ref BufferWriter writer, ref TIFFWriterOptions options, WriteImageData writeImageData)
     {
       int pos = 0;
       BilevelData data= new BilevelData();
@@ -61,18 +104,7 @@ namespace Converter.Writers.TIFF
       data.StripCount = (int)stripCount;
       data.RowsPerStrip = (int)rowsPerStrip;
       data.ImageDataOffset = (int)_stream.Position;
-      for (ulong i = 0; i < byteCount; i += (ulong)stripSize)
-      {
-        // read random value into each buffer stuff and then write
-        Random.Shared.NextBytes(writer._buffer);
-        // do entire buffer because we know we are in range and no need to refresh
-        _stream.Write(writer._buffer);
-      }
-
-      // write remainder
-      Span<byte> remainderSizeBuffer = writer._buffer.Slice(0, remainder);
-      Random.Shared.NextBytes(remainderSizeBuffer);
-      _stream.Write(remainderSizeBuffer);
+      writeImageData(ref writer, byteCount, (ulong)stripSize, remainder);
 
       data.StripOffsetsPointer = (int)_stream.Position;
       pos = 0;
