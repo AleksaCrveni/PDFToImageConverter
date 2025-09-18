@@ -1,10 +1,10 @@
-﻿using Converter.FIleStructures;
+﻿using Converter.FileStructures.TIFF;
 
-namespace Converter.Writers
+namespace Converter.Writers.TIFF
 {
   public static class TIFFWriter
   {
-    private static int DEFAULT_STRIP_SIZE = 8192;
+   
     /// <summary>
     /// Writes random bilevel tiff file with random width or heigh depending on option values passed
     /// </summary>
@@ -37,7 +37,7 @@ namespace Converter.Writers
     {
       if (File.Exists(path))
         File.Delete(path);
-      FileStream fs = File.Create(path);
+      Stream fs = File.Create(path);
 
       if (options.Width == 0)
         options.Width = Random.Shared.Next(options.MinRandomWidth, options.MaxRandomWidth + 1);
@@ -47,7 +47,7 @@ namespace Converter.Writers
       // use one buffer, always write in 8K intervals
       Span<byte> writeBuffer = options.AllowStackAlloct ? stackalloc byte[8192] : new byte[8192];
       BufferWriter writer = new BufferWriter(ref writeBuffer, options.IsLittleEndian);
-      WriteHeader(ref fs, ref writeBuffer, options.IsLittleEndian);
+      TIFFInternals.WriteHeader(ref fs, ref writeBuffer, options.IsLittleEndian);
 
       switch (tiffType)
       {
@@ -68,148 +68,15 @@ namespace Converter.Writers
       }
     }
 
-    // No need to use BufferWriter its ok
-    static void WriteHeader(ref FileStream fs, ref Span<byte> writeBuffer, bool isLittleEndian = true)
-    {
-      if (!isLittleEndian)
-      {
-        writeBuffer[0] = (byte)'M';
-        writeBuffer[1] = (byte)'M';
-        writeBuffer[2] = 0;
-        writeBuffer[3] = 42;
-      }
-      else
-      {
-        writeBuffer[0] = (byte)'I';
-        writeBuffer[1] = (byte)'I';
-        writeBuffer[2] = 42;
-        writeBuffer[3] = 0;
-      }
-      // write IFD after data later
-      writeBuffer[4] = 0;
-      writeBuffer[5] = 0;
-      writeBuffer[6] = 0;
-      writeBuffer[7] = 0;
-
-      // maybe dont have to write instantly
-      fs.Write(writeBuffer.Slice(0, 8));
-    }
 
     // TODO: fix all these castings and stuff about var sizes
-    static void WriteRandomBilevelImageAndMetadata(ref FileStream fs, ref BufferWriter writer, ref TIFFWriterOptions options, Compression compression = Compression.NoCompression)
+    static void WriteRandomBilevelImageAndMetadata(ref Stream fs, ref BufferWriter writer, ref TIFFWriterOptions options, Compression compression = Compression.NoCompression)
     {
-      int pos = 0;
       
-      // support later
-      if (compression != Compression.NoCompression)
-        throw new NotImplementedException("This Compression not suppported yet!");
-
-      // divide by 8 because with no compression and bilevel values are either 0 or 1 and they are packed in bits
-      ulong byteCount = ((uint)options.Width * (uint)options.Height) / 8;
-
-      // write in ~8k Strips
-      // smallest stripsize that can be used where rowsPerStrip will be whole number
-      // get closest number to 8192 that is dividable by 8192 / options.height
-      int stripSize = DEFAULT_STRIP_SIZE;
-
-      CalculateStripAndRowInfo(byteCount, options.Height, ref stripSize, out uint stripCount, out int rowsPerStrip, out int remainder);
-      int imageDataStartPointer = (int)fs.Position;
-      for (ulong i = 0; i < byteCount; i += (ulong)stripSize)
-      {
-        // read random value into each buffer stuff and then write
-        Random.Shared.NextBytes(writer._buffer);
-        // do entire buffer because we know we are in range and no need to refresh
-        fs.Write(writer._buffer);
-      }
-
-      // write remainder
-      Span<byte> remainderSizeBuffer = writer._buffer.Slice(0, remainder);
-      Random.Shared.NextBytes(remainderSizeBuffer);
-      fs.Write(remainderSizeBuffer);
-
-      int stripOffsetPointer = (int)fs.Position;
-      pos = 0;
-      for (int i = 0; i < stripCount; i++)
-      {
-        // little endian only!
-        writer.WriteUnsigned32ToBuffer(ref pos, (uint)imageDataStartPointer);
-        imageDataStartPointer += stripSize;
-      }
-      fs.Write(writer._buffer.Slice(0,pos));
-
-      int stripCountPointer = (int)fs.Position;
-      pos = 0;
-      for (int i = 0; i < stripCount - 1; i++)
-      {
-        writer.WriteUnsigned32ToBuffer(ref pos, (uint)stripSize);
-      }
-
-      if (remainder == 0)
-        remainder = stripSize;
-      writer.WriteUnsigned32ToBuffer(ref pos, (uint)remainder);
-
-      fs.Write(writer._buffer.Slice(0, pos));
-
-      pos = 0;
-      int tagCount = 11;
-      // write IFD 'header' lenght
-      writer.WriteUnsigned16ToBuffer(ref pos, (ushort)tagCount);
-      // These tags should be in sequence according to JHOVE validator
-      // this means that they should be written from smallest to largest enum values
-      WriteIFDEntryToBuffer(ref writer, ref pos, TagType.ImageWidth, TagSize.SHORT, 1,
-        (uint)options.Width);
-      WriteIFDEntryToBuffer(ref writer, ref pos, TagType.ImageLength, TagSize.SHORT, 1,
-        (uint)options.Height);
-      WriteIFDEntryToBuffer(ref writer, ref pos, TagType.BitsPerSample, TagSize.SHORT, 1,
-        1);
-      WriteIFDEntryToBuffer(ref writer, ref pos, TagType.Compression, TagSize.SHORT, 1,
-        (uint)Compression.NoCompression);
-      WriteIFDEntryToBuffer(ref writer, ref pos, TagType.PhotometricInterpretation, TagSize.SHORT, 1,
-        (uint)PhotometricInterpretation.WhiteIsZero);
-      WriteIFDEntryToBuffer(ref writer, ref pos, TagType.StripOffsetsPointer, TagSize.LONG, stripCount,
-        (uint)stripOffsetPointer);
-      WriteIFDEntryToBuffer(ref writer, ref pos, TagType.RowsPerStrip, TagSize.LONG, 1,
-        (uint)rowsPerStrip);
-      WriteIFDEntryToBuffer(ref writer, ref pos, TagType.StripByteCountsPointer, TagSize.LONG, stripCount,
-        (uint)stripCountPointer);
-      // Have to write 2 more entiries so start offsets for rationals will be fs.Position + 2 (2 *12) + 4
-      WriteIFDEntryToBuffer(ref writer, ref pos, TagType.XResolution, TagSize.RATIONAL, 1,
-        (uint)(fs.Position + 2 + (tagCount * 12) + 4));
-      WriteIFDEntryToBuffer(ref writer, ref pos, TagType.YResolution, TagSize.RATIONAL, 1,
-        (uint)(fs.Position + 2 + (tagCount * 12) + 4 + 8));
-      WriteIFDEntryToBuffer(ref writer, ref pos, TagType.ResolutionUnit, TagSize.SHORT, 1,
-        (uint)ResolutionUnit.Inch);
-
-      // write 4 bytes of 0s for next IFD address
-      writer.WriteUnsigned32ToBuffer(ref pos, 0);
-
-      // get IFD start pos before we write again
-      uint IFDStartPos = (uint)fs.Position;
-      fs.Write(writer._buffer.Slice(0, pos));
-
-      // write IFD offset in header first 4-7 bytes
-      fs.Position = 4;
-      pos = 0;
-      writer.WriteUnsigned32ToBuffer(ref pos, IFDStartPos);
-      fs.Write(writer._buffer.Slice(0, pos));
-
-      // go back to end
-      fs.Seek(0, SeekOrigin.End);
-
-      pos = 0;
-      writer.WriteUnsigned32ToBuffer(ref pos, 72);
-      writer.WriteUnsigned32ToBuffer(ref pos, 1);
-
-      // YRes
-      writer.WriteUnsigned32ToBuffer(ref pos, 72);
-      writer.WriteUnsigned32ToBuffer(ref pos, 1);
-
-      fs.Write(writer._buffer.Slice(0, pos));
-      fs.Flush();
       fs.Dispose();
     }
 
-    static void WriteRandomGrayScaleImageAndMetadata(ref FileStream fs, ref BufferWriter writer, ref TIFFWriterOptions
+    static void WriteRandomGrayScaleImageAndMetadata(ref Stream fs, ref BufferWriter writer, ref TIFFWriterOptions
       options, Compression compression = Compression.NoCompression)
     {
       int pos = 0;
@@ -220,14 +87,14 @@ namespace Converter.Writers
         throw new NotImplementedException("This Compression not suppported yet!");
 
       // divide by 8 because with no compression and bilevel values are either 0 or 1 and they are packed in bits
-      ulong byteCount = ((uint)options.Width * (uint)options.Height) / (8 / bitsPerSample);
+      ulong byteCount = (uint)options.Width * (uint)options.Height / (8 / bitsPerSample);
 
       // write in ~8k Strips
       // smallest stripsize that can be used where rowsPerStrip will be whole number
       // get closest number to 8192 that is dividable by 8192 / options.height
-      int stripSize = DEFAULT_STRIP_SIZE;
+      int stripSize = TIFFInternals.DEFAULT_STRIP_SIZE;
 
-      CalculateStripAndRowInfo(byteCount, options.Height, ref stripSize, out uint stripCount, out int rowsPerStrip, out int remainder);
+      TIFFInternals.CalculateStripAndRowInfo(byteCount, options.Height, ref stripSize, out uint stripCount, out int rowsPerStrip, out int remainder);
       int imageDataStartPointer = (int)fs.Position;
       // write data
       for (ulong i = 0; i < byteCount; i += (ulong)stripSize)
@@ -275,28 +142,28 @@ namespace Converter.Writers
       writer.WriteUnsigned16ToBuffer(ref pos, (ushort)tagCount);
       // These tags should be in sequence according to JHOVE validator
       // this means that they should be written from smallest to largest enum values
-      WriteIFDEntryToBuffer(ref writer, ref pos, TagType.ImageWidth, TagSize.SHORT, 1,
+      TIFFInternals.WriteIFDEntryToBuffer(ref writer, ref pos, TagType.ImageWidth, TagSize.SHORT, 1,
         (uint)options.Width);
-      WriteIFDEntryToBuffer(ref writer, ref pos, TagType.ImageLength, TagSize.SHORT, 1,
+      TIFFInternals.WriteIFDEntryToBuffer(ref writer, ref pos, TagType.ImageLength, TagSize.SHORT, 1,
         (uint)options.Height);
-      WriteIFDEntryToBuffer(ref writer, ref pos, TagType.BitsPerSample, TagSize.SHORT, 1,
+      TIFFInternals.WriteIFDEntryToBuffer(ref writer, ref pos, TagType.BitsPerSample, TagSize.SHORT, 1,
         bitsPerSample);
-      WriteIFDEntryToBuffer(ref writer, ref pos, TagType.Compression, TagSize.SHORT, 1,
+      TIFFInternals.WriteIFDEntryToBuffer(ref writer, ref pos, TagType.Compression, TagSize.SHORT, 1,
         (uint)Compression.NoCompression);
-      WriteIFDEntryToBuffer(ref writer, ref pos, TagType.PhotometricInterpretation, TagSize.SHORT, 1,
+      TIFFInternals.WriteIFDEntryToBuffer(ref writer, ref pos, TagType.PhotometricInterpretation, TagSize.SHORT, 1,
         (uint)PhotometricInterpretation.WhiteIsZero);
-      WriteIFDEntryToBuffer(ref writer, ref pos, TagType.StripOffsetsPointer, TagSize.LONG, stripCount,
+      TIFFInternals.WriteIFDEntryToBuffer(ref writer, ref pos, TagType.StripOffsetsPointer, TagSize.LONG, stripCount,
         (uint)stripOffsetPointer);
-      WriteIFDEntryToBuffer(ref writer, ref pos, TagType.RowsPerStrip, TagSize.LONG, 1,
+      TIFFInternals.WriteIFDEntryToBuffer(ref writer, ref pos, TagType.RowsPerStrip, TagSize.LONG, 1,
         (uint)rowsPerStrip);
-      WriteIFDEntryToBuffer(ref writer, ref pos, TagType.StripByteCountsPointer, TagSize.LONG, stripCount,
+      TIFFInternals.WriteIFDEntryToBuffer(ref writer, ref pos, TagType.StripByteCountsPointer, TagSize.LONG, stripCount,
         (uint)stripCountPointer);
       // Have to write 2 more entiries so start offsets for rationals will be fs.Position + 2 (2 *12) + 4
-      WriteIFDEntryToBuffer(ref writer, ref pos, TagType.XResolution, TagSize.RATIONAL, 1,
-        (uint)(fs.Position + 2 + (tagCount * 12) + 4));
-      WriteIFDEntryToBuffer(ref writer, ref pos, TagType.YResolution, TagSize.RATIONAL, 1,
-        (uint)(fs.Position + 2 + (tagCount * 12) + 4 + 8));
-      WriteIFDEntryToBuffer(ref writer, ref pos, TagType.ResolutionUnit, TagSize.SHORT, 1,
+      TIFFInternals.WriteIFDEntryToBuffer(ref writer, ref pos, TagType.XResolution, TagSize.RATIONAL, 1,
+        (uint)(fs.Position + 2 + tagCount * 12 + 4));
+      TIFFInternals.WriteIFDEntryToBuffer(ref writer, ref pos, TagType.YResolution, TagSize.RATIONAL, 1,
+        (uint)(fs.Position + 2 + tagCount * 12 + 4 + 8));
+      TIFFInternals.WriteIFDEntryToBuffer(ref writer, ref pos, TagType.ResolutionUnit, TagSize.SHORT, 1,
         (uint)ResolutionUnit.Inch);
 
       // write 4 bytes of 0s for next IFD address
@@ -329,7 +196,7 @@ namespace Converter.Writers
       fs.Dispose();
     }
 
-    static void WriteRandomPaletteImageAndMetadata(ref FileStream fs, ref BufferWriter writer, ref TIFFWriterOptions options, Compression compression = Compression.NoCompression)
+    static void WriteRandomPaletteImageAndMetadata(ref Stream fs, ref BufferWriter writer, ref TIFFWriterOptions options, Compression compression = Compression.NoCompression)
     {
       int pos = 0;
       // allowed either 4 or 8
@@ -339,14 +206,14 @@ namespace Converter.Writers
         throw new NotImplementedException("This Compression not suppported yet!");
 
       // divide by 8 because with no compression and bilevel values are either 0 or 1 and they are packed in bits
-      ulong byteCount = ((uint)options.Width * (uint)options.Height) / (8 / bitsPerSample);
+      ulong byteCount = (uint)options.Width * (uint)options.Height / (8 / bitsPerSample);
 
       // write in ~8k Strips
       // smallest stripsize that can be used where rowsPerStrip will be whole number
       // get closest number to 8192 that is dividable by 8192 / options.height
-      int stripSize = DEFAULT_STRIP_SIZE;
+      int stripSize = TIFFInternals.DEFAULT_STRIP_SIZE;
 
-      CalculateStripAndRowInfo(byteCount, options.Height, ref stripSize, out uint stripCount, out int rowsPerStrip, out int remainder);
+      TIFFInternals.CalculateStripAndRowInfo(byteCount, options.Height, ref stripSize, out uint stripCount, out int rowsPerStrip, out int remainder);
       int imageDataStartPointer = (int)fs.Position;
       // write data
       for (ulong i = 0; i < byteCount; i += (ulong)stripSize)
@@ -388,7 +255,7 @@ namespace Converter.Writers
       fs.Write(writer._buffer.Slice(0, pos));
 
       // size of each R G B channels
-      int paletteChannelSize = IntPow(2, bitsPerSample);
+      int paletteChannelSize = MyMath.IntPow(2, bitsPerSample);
       // IFD
       pos = 0;
       int tagCount = 12;
@@ -396,31 +263,31 @@ namespace Converter.Writers
       writer.WriteUnsigned16ToBuffer(ref pos, (ushort)tagCount);
       // These tags should be in sequence according to JHOVE validator
       // this means that they should be written from smallest to largest enum values
-      WriteIFDEntryToBuffer(ref writer, ref pos, TagType.ImageWidth, TagSize.SHORT, 1,
+      TIFFInternals.WriteIFDEntryToBuffer(ref writer, ref pos, TagType.ImageWidth, TagSize.SHORT, 1,
         (uint)options.Width);
-      WriteIFDEntryToBuffer(ref writer, ref pos, TagType.ImageLength, TagSize.SHORT, 1,
+      TIFFInternals.WriteIFDEntryToBuffer(ref writer, ref pos, TagType.ImageLength, TagSize.SHORT, 1,
         (uint)options.Height);
-      WriteIFDEntryToBuffer(ref writer, ref pos, TagType.BitsPerSample, TagSize.SHORT, 1,
+      TIFFInternals.WriteIFDEntryToBuffer(ref writer, ref pos, TagType.BitsPerSample, TagSize.SHORT, 1,
         bitsPerSample);
-      WriteIFDEntryToBuffer(ref writer, ref pos, TagType.Compression, TagSize.SHORT, 1,
+      TIFFInternals.WriteIFDEntryToBuffer(ref writer, ref pos, TagType.Compression, TagSize.SHORT, 1,
         (uint)Compression.NoCompression);
-      WriteIFDEntryToBuffer(ref writer, ref pos, TagType.PhotometricInterpretation, TagSize.SHORT, 1,
+      TIFFInternals.WriteIFDEntryToBuffer(ref writer, ref pos, TagType.PhotometricInterpretation, TagSize.SHORT, 1,
         (uint)PhotometricInterpretation.Pallete);
-      WriteIFDEntryToBuffer(ref writer, ref pos, TagType.StripOffsetsPointer, TagSize.LONG, stripCount,
+      TIFFInternals.WriteIFDEntryToBuffer(ref writer, ref pos, TagType.StripOffsetsPointer, TagSize.LONG, stripCount,
         (uint)stripOffsetPointer);
-      WriteIFDEntryToBuffer(ref writer, ref pos, TagType.RowsPerStrip, TagSize.LONG, 1,
+      TIFFInternals.WriteIFDEntryToBuffer(ref writer, ref pos, TagType.RowsPerStrip, TagSize.LONG, 1,
         (uint)rowsPerStrip);
-      WriteIFDEntryToBuffer(ref writer, ref pos, TagType.StripByteCountsPointer, TagSize.LONG, stripCount,
+      TIFFInternals.WriteIFDEntryToBuffer(ref writer, ref pos, TagType.StripByteCountsPointer, TagSize.LONG, stripCount,
         (uint)stripCountPointer);
       // Have to write 2 more entiries so start offsets for rationals will be fs.Position + 2 (2 *12) + 4
-      WriteIFDEntryToBuffer(ref writer, ref pos, TagType.XResolution, TagSize.RATIONAL, 1,
-        (uint)(fs.Position + 2 + (tagCount * 12) + 4));
-      WriteIFDEntryToBuffer(ref writer, ref pos, TagType.YResolution, TagSize.RATIONAL, 1,
-        (uint)(fs.Position + 2 + (tagCount * 12) + 4 + 8));
-      WriteIFDEntryToBuffer(ref writer, ref pos, TagType.ResolutionUnit, TagSize.SHORT, 1,
+      TIFFInternals.WriteIFDEntryToBuffer(ref writer, ref pos, TagType.XResolution, TagSize.RATIONAL, 1,
+        (uint)(fs.Position + 2 + tagCount * 12 + 4));
+      TIFFInternals.WriteIFDEntryToBuffer(ref writer, ref pos, TagType.YResolution, TagSize.RATIONAL, 1,
+        (uint)(fs.Position + 2 + tagCount * 12 + 4 + 8));
+      TIFFInternals.WriteIFDEntryToBuffer(ref writer, ref pos, TagType.ResolutionUnit, TagSize.SHORT, 1,
         (uint)ResolutionUnit.Inch);
-      WriteIFDEntryToBuffer(ref writer, ref pos, TagType.ColorMap, TagSize.SHORT, (ushort)(3 * paletteChannelSize),
-        (uint)(fs.Position + 2 + (tagCount * 12) + 4 + 16));
+      TIFFInternals.WriteIFDEntryToBuffer(ref writer, ref pos, TagType.ColorMap, TagSize.SHORT, (ushort)(3 * paletteChannelSize),
+        (uint)(fs.Position + 2 + tagCount * 12 + 4 + 16));
 
       // write 4 bytes of 0s for next IFD address4
       writer.WriteUnsigned32ToBuffer(ref pos, 0);
@@ -454,12 +321,12 @@ namespace Converter.Writers
       Random.Shared.NextBytes(writer._buffer.Slice(pos + 256 * 2, 256 * 2));
       Random.Shared.NextBytes(writer._buffer.Slice(pos + 256 * 4, 256 * 2));
 
-      fs.Write(writer._buffer.Slice(0, pos + (3 * 256 * 2)));
+      fs.Write(writer._buffer.Slice(0, pos + 3 * 256 * 2));
       fs.Flush();
       fs.Dispose();
     }
 
-    static void WriteRandomRGBImageAndMetadata(ref FileStream fs, ref BufferWriter writer, ref TIFFWriterOptions
+    static void WriteRandomRGBImageAndMetadata(ref Stream fs, ref BufferWriter writer, ref TIFFWriterOptions
       options, Compression compression = Compression.NoCompression)
     {
       int pos = 0;
@@ -470,14 +337,14 @@ namespace Converter.Writers
       if (compression != Compression.NoCompression)
         throw new NotImplementedException("This Compression not suppported yet!");
 
-      ulong byteCount = ((uint)options.Width * (uint)options.Height) * samplesPerPixel;
+      ulong byteCount = (uint)options.Width * (uint)options.Height * samplesPerPixel;
 
       // write in ~8k Strips
       // smallest stripsize that can be used where rowsPerStrip will be whole number
       // get closest number to 8192 that is dividable by 8192 / options.height
-      int stripSize = DEFAULT_STRIP_SIZE;
+      int stripSize = TIFFInternals.DEFAULT_STRIP_SIZE;
 
-      CalculateStripAndRowInfo(byteCount, options.Height, ref stripSize, out uint stripCount, out int rowsPerStrip, out int remainder);
+      TIFFInternals.CalculateStripAndRowInfo(byteCount, options.Height, ref stripSize, out uint stripCount, out int rowsPerStrip, out int remainder);
       int imageDataStartPointer = (int)fs.Position;
       // write data
       for (ulong i = 0; i < byteCount; i += (ulong)stripSize)
@@ -525,30 +392,30 @@ namespace Converter.Writers
       writer.WriteUnsigned16ToBuffer(ref pos, (ushort)tagCount);
       // These tags should be in sequence according to JHOVE validator
       // this means that they should be written from smallest to largest enum values
-      WriteIFDEntryToBuffer(ref writer, ref pos, TagType.ImageWidth, TagSize.SHORT, 1,
+      TIFFInternals.WriteIFDEntryToBuffer(ref writer, ref pos, TagType.ImageWidth, TagSize.SHORT, 1,
         (uint)options.Width);
-      WriteIFDEntryToBuffer(ref writer, ref pos, TagType.ImageLength, TagSize.SHORT, 1,
+      TIFFInternals.WriteIFDEntryToBuffer(ref writer, ref pos, TagType.ImageLength, TagSize.SHORT, 1,
         (uint)options.Height);
-      WriteIFDEntryToBuffer(ref writer, ref pos, TagType.BitsPerSample, TagSize.SHORT, 3,
-        (uint)(fs.Position + 2 + (tagCount * 12) + 4));
-      WriteIFDEntryToBuffer(ref writer, ref pos, TagType.Compression, TagSize.SHORT, 1,
+      TIFFInternals.WriteIFDEntryToBuffer(ref writer, ref pos, TagType.BitsPerSample, TagSize.SHORT, 3,
+        (uint)(fs.Position + 2 + tagCount * 12 + 4));
+      TIFFInternals.WriteIFDEntryToBuffer(ref writer, ref pos, TagType.Compression, TagSize.SHORT, 1,
         (uint)Compression.NoCompression);
-      WriteIFDEntryToBuffer(ref writer, ref pos, TagType.PhotometricInterpretation, TagSize.SHORT, 1,
+      TIFFInternals.WriteIFDEntryToBuffer(ref writer, ref pos, TagType.PhotometricInterpretation, TagSize.SHORT, 1,
         (uint)PhotometricInterpretation.RGB);
-      WriteIFDEntryToBuffer(ref writer, ref pos, TagType.StripOffsetsPointer, TagSize.LONG, stripCount,
+      TIFFInternals.WriteIFDEntryToBuffer(ref writer, ref pos, TagType.StripOffsetsPointer, TagSize.LONG, stripCount,
         (uint)stripOffsetPointer);
-      WriteIFDEntryToBuffer(ref writer, ref pos, TagType.SamplesPerPixel, TagSize.SHORT, 1,
+      TIFFInternals.WriteIFDEntryToBuffer(ref writer, ref pos, TagType.SamplesPerPixel, TagSize.SHORT, 1,
         samplesPerPixel);
-      WriteIFDEntryToBuffer(ref writer, ref pos, TagType.RowsPerStrip, TagSize.LONG, 1,
+      TIFFInternals.WriteIFDEntryToBuffer(ref writer, ref pos, TagType.RowsPerStrip, TagSize.LONG, 1,
         (uint)rowsPerStrip);
-      WriteIFDEntryToBuffer(ref writer, ref pos, TagType.StripByteCountsPointer, TagSize.LONG, stripCount,
+      TIFFInternals.WriteIFDEntryToBuffer(ref writer, ref pos, TagType.StripByteCountsPointer, TagSize.LONG, stripCount,
         (uint)stripCountPointer);
       // Have to write 2 more entiries so start offsets for rationals will be fs.Position + 2 (2 *12) + 4 + 6 (bitsPersample 3 8's))
-      WriteIFDEntryToBuffer(ref writer, ref pos, TagType.XResolution, TagSize.RATIONAL, 1,
-        (uint)(fs.Position + 2 + (tagCount * 12) + 4 + 6));
-      WriteIFDEntryToBuffer(ref writer, ref pos, TagType.YResolution, TagSize.RATIONAL, 1,
-        (uint)(fs.Position + 2 + (tagCount * 12) + 4 + 6 + 8));
-      WriteIFDEntryToBuffer(ref writer, ref pos, TagType.ResolutionUnit, TagSize.SHORT, 1,
+      TIFFInternals.WriteIFDEntryToBuffer(ref writer, ref pos, TagType.XResolution, TagSize.RATIONAL, 1,
+        (uint)(fs.Position + 2 + tagCount * 12 + 4 + 6));
+      TIFFInternals.WriteIFDEntryToBuffer(ref writer, ref pos, TagType.YResolution, TagSize.RATIONAL, 1,
+        (uint)(fs.Position + 2 + tagCount * 12 + 4 + 6 + 8));
+      TIFFInternals.WriteIFDEntryToBuffer(ref writer, ref pos, TagType.ResolutionUnit, TagSize.SHORT, 1,
         (uint)ResolutionUnit.Inch);
       // write 4 bytes of 0s for next IFD address4
       writer.WriteUnsigned32ToBuffer(ref pos, 0);
@@ -584,49 +451,11 @@ namespace Converter.Writers
       fs.Dispose();
     }
 
-    static void WriteIFDEntryToBuffer(ref BufferWriter writer, ref int pos,TagType tag, TagSize t, uint count, uint valueOrOffset)
-    {
-      // 12 bytes
-      // tag
-      writer.WriteUnsigned16ToBuffer(ref pos, (ushort)tag);
-      // Type
-      writer.WriteUnsigned16ToBuffer(ref pos, (ushort)t);
-      // Count
-      writer.WriteUnsigned32ToBuffer(ref pos, count);
-      // value
-      writer.WriteUnsigned32ToBuffer(ref pos, valueOrOffset);
-    }
+    
 
-    static void CalculateStripAndRowInfo(ulong byteCount, int height, ref int stripSize, out uint stripCount, out int rowsPerStrip, out int remainder)
-    {
-      stripSize = stripSize - (stripSize % height);
-      stripCount = (uint)Math.Ceiling(byteCount / (decimal)stripSize);
-      if ((uint)byteCount % stripSize > 0)
-        stripCount++;
+    
 
-      rowsPerStrip = height - 1 / (int)stripCount;
-      remainder = Convert.ToInt32((uint)byteCount % stripSize);
-    }
-
-    static int IntPow(int x, uint pow)
-    {
-      if (pow > 32)
-        throw new Exception("Power too big!");
-
-      int ret = 1;
-      while (pow != 0)
-      {
-        if ((pow & 1) == 1)
-          ret *= x;
-        x *= x;
-
-        if (BitConverter.IsLittleEndian)
-          pow >>= 1;
-        else
-          pow <<= 1;
-      }
-      return ret;
-    }
+   
   }
 
   /// <summary> Options for TIFF Writer
@@ -672,6 +501,8 @@ namespace Converter.Writers
     /// Allow writer buffer to be allocated on the stack. Buffer size is 8192 bytes. If false, buffer will be allocated on heap. Default is false.
     /// </summary>
     public bool AllowStackAlloct = false;
+
+    public Compression Compression = Compression.NoCompression;
   }
 
   enum TIFFType

@@ -1,4 +1,5 @@
-﻿using Converter.FIleStructures;
+﻿using Converter.FileStructures.TIFF;
+
 namespace Converter.Parsers.FileParsers
 {
   // NOTE: FOR NOW JUST SUPPORT LITTLE ENDIAN

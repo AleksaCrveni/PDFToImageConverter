@@ -1,4 +1,4 @@
-﻿namespace Converter.Writers
+﻿namespace Converter.Writers.TIFF
 {
   /// <summary>
   /// Helper struct to write to buffer with specified options that are passed in constructor

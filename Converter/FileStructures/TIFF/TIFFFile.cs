@@ -1,4 +1,4 @@
-﻿namespace Converter.FIleStructures
+﻿namespace Converter.FileStructures.TIFF
 {
   public class TIFFFile
   {
@@ -41,7 +41,7 @@
   {
     public Tag() { }
     public PhotometricInterpretation? PhotometricInterpretation;
-    public Compression? Compression = FIleStructures.Compression.NoCompression;
+    public Compression? Compression = TIFF.Compression.NoCompression;
     public ushort? BitsPerSample;
     public uint ImageLength; // required
     public uint ImageWidth; // required

@@ -32,7 +32,7 @@ namespace Converter.Parsers.PDF
     private PathConstruction currentPC;
     private TextObject currentTextObject;
     // TODO: maybe NULL check is redundant if we let it throw to end?
-    public PDFGOInterpreter(ReadOnlySpan<byte> buffer, )
+    public PDFGOInterpreter(ReadOnlySpan<byte> buffer)
     {
       _buffer = buffer;
       intOperands = new Stack<int>(100);
