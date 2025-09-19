@@ -1,4 +1,5 @@
 ﻿using Converter.FileStructures.TIFF;
+using System.Reflection.Metadata;
 
 namespace Converter.Writers.TIFF
 {
@@ -33,23 +34,13 @@ namespace Converter.Writers.TIFF
         options.Height = Random.Shared.Next(options.MinRandomHeight, options.MaxRandomHeight + 1);
       WriteImageMain(ref options, ImgDataMode.RANDOM);
     }
-    delegate void WriteImageData(ref BufferWriter writer, ulong byteCount, ulong stripSize, int remainder);
+
     private void WriteImageMain(ref TIFFWriterOptions options, ImgDataMode mode)
     {
       Span<byte> writeBuffer = options.AllowStackAlloct ? stackalloc byte[8192] : new byte[8192];
       BufferWriter writer = new BufferWriter(ref writeBuffer, options.IsLittleEndian);
       TIFFInternals.WriteHeader(ref _stream, ref writeBuffer, options.IsLittleEndian);
-      WriteImageData func = WriteRandomImageData;
-      switch (mode)
-      {
-        case ImgDataMode.EMPTY:
-          func = WriteEmptyImageData;
-          break;
-        case ImgDataMode.RANDOM:
-          func = WriteRandomImageData;
-          break;
-      }
-      WriteRandomImage(ref writer, ref options, func);
+      WriteRandomImage(ref writer, ref options, mode);
     }
 
     private void WriteEmptyImageData(ref BufferWriter writer, ulong byteCount, ulong stripSize, int remainder)
@@ -84,7 +75,7 @@ namespace Converter.Writers.TIFF
       Random.Shared.NextBytes(remainderSizeBuffer);
       _stream.Write(remainderSizeBuffer);
     }
-    private void WriteRandomImage(ref BufferWriter writer, ref TIFFWriterOptions options, WriteImageData writeImageData)
+    private void WriteRandomImage(ref BufferWriter writer, ref TIFFWriterOptions options, ImgDataMode mode)
     {
       int pos = 0;
       BilevelData data= new BilevelData();
@@ -104,7 +95,17 @@ namespace Converter.Writers.TIFF
       data.StripCount = (int)stripCount;
       data.RowsPerStrip = (int)rowsPerStrip;
       data.ImageDataOffset = (int)_stream.Position;
-      writeImageData(ref writer, byteCount, (ulong)stripSize, remainder);
+
+      // Write image data
+      switch (mode)
+      {
+        case ImgDataMode.EMPTY:
+          WriteEmptyImageData(ref writer, byteCount, (ulong)stripSize, remainder);
+          break;
+        case ImgDataMode.RANDOM:
+          WriteRandomImageData(ref writer, byteCount, (ulong)stripSize, remainder);
+          break;
+      }
 
       data.StripOffsetsPointer = (int)_stream.Position;
       pos = 0;
