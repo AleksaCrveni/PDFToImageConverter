@@ -1,27 +1,28 @@
 ﻿using Converter.FileStructures.TIFF;
-using System.Reflection.Metadata;
 
 namespace Converter.Writers.TIFF
 {
   // Write empty and then save stream and be able to modify it
-  public class TIFFBilevelWriter : IDisposable
+  public class TIFFBilevelWriter : ITIFFWriter,  IDisposable
   {
     Stream _stream;
     private bool disposedValue;
-
+    private ulong imageDataLength;
+    private BilevelData data;
     public TIFFBilevelWriter(string destination)
     {
       _stream = File.Create(destination);
       if (_stream == null)
         throw new Exception("Unable to create file stream to destination!");
+      data = new BilevelData();
     }
 
     public TIFFBilevelWriter(Stream destinationStream)
     {
       _stream = destinationStream;
       _stream.Position = 0;
+      data = new BilevelData();
     }
-
     public void WriteEmptyImage(ref TIFFWriterOptions options)
     {
       WriteImageMain(ref options, ImgDataMode.EMPTY);
@@ -33,6 +34,16 @@ namespace Converter.Writers.TIFF
       if (options.Height == 0)
         options.Height = Random.Shared.Next(options.MinRandomHeight, options.MaxRandomHeight + 1);
       WriteImageMain(ref options, ImgDataMode.RANDOM);
+    }
+    /// <summary>
+    /// 
+    /// </summary>
+    /// <param name="x"></param>
+    /// <param name="y"></param>
+    /// <param name="bitmap">basically describes image data to paint, where 1 entry is 1 pixel</param>
+    public void WriteIntoImageData(int x, int y, int[,] bitmap)
+    {
+      
     }
 
     private void WriteImageMain(ref TIFFWriterOptions options, ImgDataMode mode)
@@ -78,14 +89,13 @@ namespace Converter.Writers.TIFF
     private void WriteRandomImage(ref BufferWriter writer, ref TIFFWriterOptions options, ImgDataMode mode)
     {
       int pos = 0;
-      BilevelData data= new BilevelData();
       // support later
       if (options.Compression != Compression.NoCompression)
         throw new NotImplementedException("This Compression not suppported yet!");
 
       // divide by 8 because with no compression and bilevel values are either 0 or 1 and they are packed in bits
       ulong byteCount = (uint)options.Width * (uint)options.Height / 8;
-
+      imageDataLength = byteCount;
       // write in ~8k Strips
       // smallest stripsize that can be used where rowsPerStrip will be whole number
       // get closest number to 8192 that is dividable by 8192 / options.height
