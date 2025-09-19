@@ -4,7 +4,7 @@ namespace Converter.Writers.TIFF
 {
   public class TIFFInternals
   {
-    public static int DEFAULT_STRIP_SIZE = 8192;
+    public static readonly int DEFAULT_STRIP_SIZE = 8192;
     public static void WriteIFDEntryToBuffer(ref BufferWriter writer, ref int pos, TagType tag, TagSize t, uint count, uint valueOrOffset)
     {
       // 12 bytes

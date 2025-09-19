@@ -1,4 +1,6 @@
 ﻿using Converter.FileStructures;
+using Converter.FIleStructures;
+using Converter.Parsers.Fonts;
 using System.Globalization;
 using System.Text;
 
@@ -31,8 +33,9 @@ namespace Converter.Parsers.PDF
     private GraphicsState currentGS;
     private PathConstruction currentPC;
     private TextObject currentTextObject;
+    private List<FontData> _fontInfo;
     // TODO: maybe NULL check is redundant if we let it throw to end?
-    public PDFGOInterpreter(ReadOnlySpan<byte> buffer)
+    public PDFGOInterpreter(ReadOnlySpan<byte> buffer, List<FontData> fontInfo)
     {
       _buffer = buffer;
       intOperands = new Stack<int>(100);
@@ -42,11 +45,20 @@ namespace Converter.Parsers.PDF
       GSS = new Stack<GraphicsState>();
       currentGS = new GraphicsState();
       currentPC = new PathConstruction();
+      _fontInfo = fontInfo;
     }
 
-    public PDFGOInterpreter(Span<byte> buffer)
+    public PDFGOInterpreter(Span<byte> buffer, List<FontData> fontInfo)
     {
       _buffer = buffer;
+      intOperands = new Stack<int>(100);
+      realOperands = new Stack<double>(100);
+      operandTypes = new Stack<OperandType>();
+      arrayLengths = new Stack<int>();
+      GSS = new Stack<GraphicsState>();
+      currentGS = new GraphicsState();
+      currentPC = new PathConstruction();
+      _fontInfo = fontInfo;
     }
 
     public void ParseAll()
@@ -271,7 +283,6 @@ namespace Converter.Parsers.PDF
         #region textShowing
         case 0x546a: // Tj
           literal = GetNextStackValAsString();
-          
           break;
         case 0x544a: // TJ
           break;

@@ -74,6 +74,14 @@ namespace Converter.Parsers.PDF
       ParseCatalogDictionary(file);
       ParseRootPageTree(file);
       ParsePagesData(file);
+      ConvertPageDataToImage(file);
+    }
+
+    private void ConvertPageDataToImage(PDFFile file)
+    {
+      byte[] rawContent = file.PageInformation[0].ContentDict.RawStreamData;
+      PDFGOInterpreter pdfGo = new PDFGOInterpreter(rawContent.AsSpan(), file.PageInformation[0].ResourceDict.Font);
+      pdfGo.ParseAll();
     }
 
     // TODO: process resource and content in parallel?
@@ -162,8 +170,7 @@ namespace Converter.Parsers.PDF
       // go to next line
       helper.SkipWhiteSpace();
       Span<byte> encodedSpan = buffer.Slice(helper._position, (int)encodedStreamLen);
-      ReadOnlySpan<byte> decodedSpan = DecodeFilter(ref encodedSpan, contentDict.Filters);
-      contentDict.DecodedStreamData = Encoding.Default.GetString(decodedSpan);
+      contentDict.RawStreamData = DecodeFilter(ref encodedSpan, contentDict.Filters);
     }
 
     private void ParseFontFileDictAndStream(PDFFile file, (int objectIndex, int) objectPosition, ref FontFileInfo fontFileInfo, ref CommonStreamDict commonStreamDict)
@@ -250,14 +257,8 @@ namespace Converter.Parsers.PDF
       // go to next line
       helper.SkipWhiteSpace();
       Span<byte> encodedSpan = buffer.Slice(helper._position, (int)encodedStreamLen);
-      ReadOnlySpan<byte> decodedSpan = DecodeFilter(ref encodedSpan, commonStreamDict.Filters);
-      commonStreamDict.DecodedStreamData = Encoding.Default.GetString(decodedSpan);
+      commonStreamDict.RawStreamData = DecodeFilter(ref encodedSpan, commonStreamDict.Filters);
       fontFileInfo.CommonStreamInfo = commonStreamDict;
-
-      TrueTypeFont ttf = new TrueTypeFont();
-      TTFParser ttfParser = new TTFParser();
-      ttfParser.Init(ref decodedSpan, ref ttf);
-      ttfParser.Parse();
     }
 
     private void ParseCommonStreamDictAsExtension(PDFFile file, ref SpanParseHelper helper, string tokenString, ref CommonStreamDict dict)
@@ -427,12 +428,12 @@ namespace Converter.Parsers.PDF
             helper.SkipWhiteSpace();
             FontInfo fontInfo = new FontInfo();
             int bytesRead = 0;
-            Dictionary<string, FontInfo> fontData;
+            List<FontData> fontData = new List<FontData>();
             if (helper._char == '<' && helper.IsCurrentCharacterSameAsNext())
             {
               helper.ReadChar();
               // use this because we dont know when dict ends so we can just skip those and not read again on main buffer
-              fontData = ParseFontIRDictionary(file, helper._buffer.Slice(helper._position), true);
+              ParseFontIRDictionary(file, helper._buffer.Slice(helper._position), true, ref fontData);
             }
             else
             {
@@ -442,14 +443,14 @@ namespace Converter.Parsers.PDF
 
               // use array pool
               Span<byte> irBuffer = new byte[objectLength];
-
+              
               long prevPos = file.Stream.Position;
               file.Stream.Position = objectByteOffset;
               readBytes = file.Stream.Read(irBuffer);
               // do i need this...?
               if (irBuffer.Length != readBytes)
                 throw new InvalidDataException("Invalid data");
-              fontData = ParseFontIRDictionary(file, irBuffer, false);
+              ParseFontIRDictionary(file, irBuffer, false, ref fontData);
               file.Stream.Position = prevPos;
             }
 
@@ -477,7 +478,7 @@ namespace Converter.Parsers.PDF
     }
 
     // TODO: fix this as well, after you add array pooling of some kind
-    private Dictionary<string, FontInfo> ParseFontIRDictionary(PDFFile file, ReadOnlySpan<byte> buffer, bool dictOpen)
+    private void ParseFontIRDictionary(PDFFile file, ReadOnlySpan<byte> buffer, bool dictOpen, ref List<FontData> fontData)
     {
       SpanParseHelper helper = new SpanParseHelper(ref buffer);
 
@@ -493,6 +494,8 @@ namespace Converter.Parsers.PDF
       FontInfo fontInfo;
       long objectByteOffset = 0;
       long objectLength = 0;
+      FontData fd;
+      TTFParser ttfParser;
 
       // make this larger in size so it can be reused, otherwise make new one
       // or maybe new one could be come main buffer since its bigger..??
@@ -500,13 +503,14 @@ namespace Converter.Parsers.PDF
       // but i think these should always be under 8k
       Span<byte> mainBuffer = new byte[KB * 8];
       long origPos = file.Stream.Position;
-      Dictionary<string, FontInfo> fontData = new();
       while (helper._char != '>' && !helper.IsCurrentCharacterSameAsNext())
       {
         key = helper.GetNextToken();
         if (key == "")
           break;
         fontInfo = new FontInfo();
+        fd = new FontData();
+        ttfParser = new TTFParser();
         (int objectIndex, int _) IR = helper.GetNextIndirectReference();
         objectByteOffset = file.CrossReferenceEntries[IR.objectIndex].TenDigitValue;
         objectLength = GetDistanceToNextObject(IR.objectIndex, objectByteOffset, file);
@@ -516,11 +520,16 @@ namespace Converter.Parsers.PDF
         if (bytesRead != irBuffer.Length)
           throw new InvalidDataException("Invalid font dict lenght!");
         ParseFontDictionary(file, irBuffer, ref fontInfo);
-        fontData.Add(key, fontInfo);
+        fd.Key = key;
+        fd.FontInfo = fontInfo;
+
+        ttfParser.Init(ref fontInfo.FontDescriptor.FontFile.CommonStreamInfo.RawStreamData);
+        ttfParser.ParseFontDirectory();
+        fd.Parser = ttfParser;
+        fontData.Add(fd);
         helper.ReadUntilNonWhiteSpaceDelimiter();
       }
       file.Stream.Position = origPos;
-      return fontData;
     }
 
 

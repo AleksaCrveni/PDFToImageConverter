@@ -1,4 +1,5 @@
 ﻿using Converter.FileStructures;
+using Converter.FileStructures.TIFF;
 using System.Buffers.Binary;
 using System.Reflection.Metadata.Ecma335;
 
@@ -10,49 +11,33 @@ namespace Converter.Parsers.Fonts
   /// Values that are passed to read functions of compared in switch cases are not random
   /// They are all defined in reference manual https://developer.apple.com/fonts/TrueType-Reference-Manual/
   /// </summary>
-  public ref struct TTFParser
+  public class TTFParser
   {
-    private ReadOnlySpan<byte> _buffer;
+    private byte[] _buffer;
     private TrueTypeFont _ttf;
     // size of byte in bits, for some reason some archs have non 8 bit byte size
     private int byteSize;
     // use endOfArr internally to know if you reached end of array or not
     private uint endOfArr;
     private uint beginOfSfnt;
+
     
-    public void Init(ref ReadOnlySpan<byte> buffer, ref TrueTypeFont ttf)
+    public void Init(ref byte[]buffer)
     {
       _buffer = buffer;
-      _ttf = ttf;
-      InitInternal();
-    }
-
-
-    public void Init(ref Span<byte> buffer, ref TrueTypeFont ttf)
-    {
-      _buffer = (ReadOnlySpan<byte>)buffer;
-      _ttf = ttf;
-      InitInternal();
-    }
-
-    public void InitInternal()
-    {
+      _ttf = new TrueTypeFont();
       byteSize = 8;
       endOfArr = 0;
       beginOfSfnt = 0;
     }
 
-    public void Parse()
-    {
-      ParseFontDirectory();
-    }
-
     public void ParseFontDirectory()
     {
+      ReadOnlySpan<byte> buffer = _buffer.AsSpan();
       FontDirectory fd = new FontDirectory();
       TableOffsets tOff = new TableOffsets();
       int mainPos = 0;
-      uint scalarType = ReadUInt32(ref _buffer, mainPos);
+      uint scalarType = ReadUInt32(ref buffer, mainPos);
       mainPos += 4;
       fd.ScalarType = scalarType switch
       {
@@ -64,10 +49,10 @@ namespace Converter.Parsers.Fonts
         _ => throw new InvalidDataException("Invalid scalar type in the embedded true font!")
       };
 
-      fd.NumTables = ReadUInt16(ref _buffer, mainPos);
-      fd.SearchRange= ReadUInt16(ref _buffer, mainPos +2);
-      fd.EntrySelector = ReadUInt16(ref _buffer, mainPos +4);
-      fd.RangeShift = ReadUInt16(ref _buffer, mainPos +6);
+      fd.NumTables = ReadUInt16(ref buffer, mainPos);
+      fd.SearchRange= ReadUInt16(ref buffer, mainPos +2);
+      fd.EntrySelector = ReadUInt16(ref buffer, mainPos +4);
+      fd.RangeShift = ReadUInt16(ref buffer, mainPos +6);
       mainPos += 8;
 
       uint tag = 0;
@@ -76,17 +61,17 @@ namespace Converter.Parsers.Fonts
       uint length;
       uint pad = 0;
       
-      ReadOnlySpan<byte> tableBuffer;
+      FakeSpan tableBuffer;
       // TODO: Optimize to do binary search?
       for (int i = 0; i < fd.NumTables; i++)
       {
-        tag = ReadUInt32(ref _buffer, mainPos);
-        checkSum = ReadUInt32(ref _buffer, mainPos + 4);
+        tag = ReadUInt32(ref buffer, mainPos);
+        checkSum = ReadUInt32(ref buffer, mainPos + 4);
         // offset from beggning of sfnt , thats why we add here
-        offset = ReadUInt32(ref _buffer, mainPos + 4 + 4) + beginOfSfnt;
+        offset = ReadUInt32(ref buffer, mainPos + 4 + 4) + beginOfSfnt;
         // does not include padded bytes, so i want to include them as well to stay on long boundary
         // and tight as possible 
-        length = ReadUInt32(ref _buffer, mainPos + 4 + 4 + 4);
+        length = ReadUInt32(ref buffer, mainPos + 4 + 4 + 4);
         mainPos += 16;
         pad = length % 4;
         length += pad;
@@ -99,7 +84,7 @@ namespace Converter.Parsers.Fonts
         {
           // do something special
         }
-        tableBuffer = _buffer.Slice((int)offset, (int)length);
+        tableBuffer = new FakeSpan((int)offset, (int)length);
 
         if (checkSum != 0 && checkSum != CalculateCheckSum(ref tableBuffer, length))
           throw new InvalidDataException("Check sum failed!");
@@ -190,12 +175,12 @@ namespace Converter.Parsers.Fonts
       {
         throw new InvalidDataException("Missing one of the required tables!");
       }
-
-      _ttf.NumOfGlyphs = ReadUInt16(ref tOff.maxp, 4);
+      ReadOnlySpan<byte> slice = buffer.Slice(tOff.maxp.Position, tOff.maxp.Length);
+      _ttf.NumOfGlyphs = ReadUInt16(ref slice, 4);
       _ttf.Svg = -1; // ??
-
+      slice = buffer.Slice(tOff.cmap.Position, tOff.cmap.Length);
       // Find number of cmap subtables and check encodings
-      ushort numOfCmapSubtables = ReadUInt16(ref tOff.cmap, 2);
+      ushort numOfCmapSubtables = ReadUInt16(ref slice, 2);
       ReadOnlySpan<byte> encodingSubtable;
       ushort platformID;
       ushort platformSpecificID;
@@ -203,7 +188,7 @@ namespace Converter.Parsers.Fonts
       for (int i = 0; i < numOfCmapSubtables; i++)
       {
         // 4 -> skip cmap index, 8 is size of encoding subtable and there can be multiple
-        encodingSubtable = tOff.cmap.Slice(4 + 8 * i, 8);
+        encodingSubtable = slice.Slice(4 + 8 * i, 8);
         platformID = ReadUInt16(ref encodingSubtable, 0);
         platformSpecificID = ReadUInt16(ref encodingSubtable, 2);
         offset = ReadUInt32(ref encodingSubtable, 4);
@@ -232,8 +217,8 @@ namespace Converter.Parsers.Fonts
 
       if (_ttf.IndexMapOffset == 0)
         throw new InvalidDataException("Missing index map!");
-
-      _ttf.IndexToLocFormat = ReadUInt16(ref tOff.head, 50);
+      slice = slice = buffer.Slice(tOff.head.Position, tOff.head.Length);
+      _ttf.IndexToLocFormat = ReadUInt16(ref slice, 50);
 
       _ttf.FontDirectory = fd;
       _ttf.Offsets = tOff;
@@ -241,7 +226,8 @@ namespace Converter.Parsers.Fonts
 
     public float ScaleForPixelHeight(float lineHeight)
     {
-      int fHeight = ReadSignedInt16(ref _ttf.Offsets.hhea, 4) - ReadSignedInt16(ref _ttf.Offsets.hhea, 6);
+      ReadOnlySpan<byte> hhea = _buffer.AsSpan().Slice(_ttf.Offsets.hhea.Position, _ttf.Offsets.hhea.Length);
+      int fHeight = ReadSignedInt16(ref hhea, 4) - ReadSignedInt16(ref hhea, 6);
       return lineHeight / fHeight;
     }
 
@@ -267,11 +253,12 @@ namespace Converter.Parsers.Fonts
 
     private byte ReadByte(ref ReadOnlySpan<byte> buffer, int pos)
     {
-      return _buffer[pos];
+      return buffer[pos];
     }
 
-    private uint CalculateCheckSum(ref ReadOnlySpan<byte> tableBuffer, uint numOfBytesInTable)
+    private uint CalculateCheckSum(ref FakeSpan dataPos, uint numOfBytesInTable)
     {
+      ReadOnlySpan<byte> tableBuffer = new ReadOnlySpan<byte>(_buffer, dataPos.Position, dataPos.Length);
       uint sum = 0;
       uint nLongs = (numOfBytesInTable + 3) / 4;
       int i = 0;

@@ -1,4 +1,7 @@
-﻿namespace Converter.FIleStructures
+﻿using Converter.Parsers.Fonts;
+using System.Security.AccessControl;
+
+namespace Converter.FIleStructures
 {
   public class PDFFile
   {
@@ -201,9 +204,16 @@
     public Dictionary<object, object> Shading;
     public Dictionary<object, object> XObject;
     // key is arbitary so it has to be a string and its used to reference this fonts
-    public Dictionary<string, FontInfo> Font;
+    public List<FontData> Font;
     public List<string> ProcSet;
     public Dictionary<object, object> Properties;
+  }
+
+  public struct FontData
+  {
+    public string Key;
+    public FontInfo FontInfo;
+    public TTFParser Parser;
   }
 
   // Table 111
@@ -259,6 +269,7 @@
     public int MaxWidth;
     public int MissingWidth;
     public FontFileInfo FontFile;
+    public FontType FontType;
     // byte string
     public string CharSet;
   }
@@ -336,7 +347,7 @@
     // so just in case i will support both for length
     public long Length;
     public List<Filter> Filters = new List<Filter>() { Filter.Null };
-    public string DecodedStreamData;
+    public byte[] RawStreamData;
   }
 
 

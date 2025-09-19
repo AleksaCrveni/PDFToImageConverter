@@ -1,9 +1,11 @@
-﻿namespace Converter.FileStructures
+﻿using Converter.FileStructures.TIFF;
+
+namespace Converter.FileStructures
 {
   /// <summary>
   /// R -> required, O -> optional, SD -> needed for some OSes, Offsets -> OF
   /// </summary>
-  public ref struct TrueTypeFont
+  public struct TrueTypeFont
   {
     public TrueTypeFont() { }
 
@@ -15,26 +17,26 @@
     public ushort IndexToLocFormat;
   }
 
-  public ref struct TableOffsets
+  public struct TableOffsets
   {
 
     public TableOffsets() { }
-    public ReadOnlySpan<byte> cmap = new ReadOnlySpan<byte>(); // R
-    public ReadOnlySpan<byte> glyf = new ReadOnlySpan<byte>(); // R
-    public ReadOnlySpan<byte> head = new ReadOnlySpan<byte>(); // R
-    public ReadOnlySpan<byte> hhea = new ReadOnlySpan<byte>(); // R
-    public ReadOnlySpan<byte> hmtx = new ReadOnlySpan<byte>(); // R
-    public ReadOnlySpan<byte> loca = new ReadOnlySpan<byte>(); // R
-    public ReadOnlySpan<byte> maxp = new ReadOnlySpan<byte>(); // R
-    public ReadOnlySpan<byte> name = new ReadOnlySpan<byte>(); // R
-    public ReadOnlySpan<byte> post = new ReadOnlySpan<byte>(); // R
+    public FakeSpan cmap = new FakeSpan(); // R
+    public FakeSpan glyf = new FakeSpan(); // R
+    public FakeSpan head = new FakeSpan(); // R
+    public FakeSpan hhea = new FakeSpan(); // R
+    public FakeSpan hmtx = new FakeSpan(); // R
+    public FakeSpan loca = new FakeSpan(); // R
+    public FakeSpan maxp = new FakeSpan(); // R
+    public FakeSpan name = new FakeSpan(); // R
+    public FakeSpan post = new FakeSpan(); // R
 
-    public ReadOnlySpan<byte> cvt  = new ReadOnlySpan<byte>(); // SD
-    public ReadOnlySpan<byte> fpgm = new ReadOnlySpan<byte>(); // SD
-    public ReadOnlySpan<byte> hdmx = new ReadOnlySpan<byte>(); // SD
-    public ReadOnlySpan<byte> kern = new ReadOnlySpan<byte>(); // SD
-    public ReadOnlySpan<byte> OS_2 = new ReadOnlySpan<byte>(); // SD
-    public ReadOnlySpan<byte> prep = new ReadOnlySpan<byte>(); // SD
+    public FakeSpan cvt  = new FakeSpan(); // SD
+    public FakeSpan fpgm = new FakeSpan(); // SD
+    public FakeSpan hdmx = new FakeSpan(); // SD
+    public FakeSpan kern = new FakeSpan(); // SD
+    public FakeSpan OS_2 = new FakeSpan(); // SD
+    public FakeSpan prep = new FakeSpan(); // SD
   }
 
 
