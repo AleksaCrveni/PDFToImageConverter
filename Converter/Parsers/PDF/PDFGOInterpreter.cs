@@ -21,7 +21,7 @@ namespace Converter.Parsers.PDF
     private ReadOnlySpan<byte> _buffer;
     private int _pos = 0;
     private int _readPos = 0;
-    private byte _char; // current char
+    private byte _char = PDFConstants.SP; // current char, init it to non null val
     private Stack<int> intOperands;
     private Stack<double> realOperands;
     private Stack<string> stringOperands;
@@ -36,6 +36,7 @@ namespace Converter.Parsers.PDF
     private TextObject currentTextObject;
     private List<FontData> _fontInfo;
     private ITIFFWriter _writer;
+    private Span<byte> fourByteSlice;
     // TODO: maybe NULL check is redundant if we let it throw to end?
     public PDFGOInterpreter(ReadOnlySpan<byte> buffer, List<FontData> fontInfo, ITIFFWriter tiffWriter)
     {
@@ -63,6 +64,7 @@ namespace Converter.Parsers.PDF
       currentPC = new PathConstruction();
       _fontInfo = fontInfo;
       _writer = tiffWriter;
+      fourByteSlice = new byte[4];
     }
 
     public void ParseAll()
@@ -75,268 +77,273 @@ namespace Converter.Parsers.PDF
       // TODO: load all as double or float and then cast to int if needed?
       MyPoint mp;
       string literal;
-      switch (val)  
+      while (_char != PDFConstants.NULL)
       {
-        #region gss&sgs
-        case 0x77: // w
-          currentGS.LineWidth = GetNextStackValAsDouble();
-          break;
-        case 0x4a: // J
-          // valid values 0, 1, 2
-          currentGS.LineCap = GetNextStackValAsInt();
-          break;
-        case 0x6a: // j
-          // valid values 0, 1, 2
-          currentGS.LineJoin = GetNextStackValAsInt();
-          break;
-        case 0x4d: // M
-          currentGS.MiterLimit = GetNextStackValAsDouble();
-          break;
-        case 0x64: // d
-          DashPattern dashPattern = new DashPattern();
-          int phase = GetNextStackValAsInt();
-          int[] dashArr = new int[arrayLengths.Pop()];
-          for (int dpIndex = dashArr.Length; dpIndex >= 0; dpIndex--)
-          {
-            dashArr[dpIndex] = GetNextStackValAsInt();
-          }
+        switch (val)
+        {
+          #region gss&sgs
+          case 0x77: // w
+            currentGS.LineWidth = GetNextStackValAsDouble();
+            break;
+          case 0x4a: // J
+                     // valid values 0, 1, 2
+            currentGS.LineCap = GetNextStackValAsInt();
+            break;
+          case 0x6a: // j
+                     // valid values 0, 1, 2
+            currentGS.LineJoin = GetNextStackValAsInt();
+            break;
+          case 0x4d: // M
+            currentGS.MiterLimit = GetNextStackValAsDouble();
+            break;
+          case 0x64: // d
+            DashPattern dashPattern = new DashPattern();
+            int phase = GetNextStackValAsInt();
+            int[] dashArr = new int[arrayLengths.Pop()];
+            for (int dpIndex = dashArr.Length; dpIndex >= 0; dpIndex--)
+            {
+              dashArr[dpIndex] = GetNextStackValAsInt();
+            }
 
-          currentGS.DashPattern = dashPattern;
-          break;
-        case 0x7269: // ri
-          operandTypes.Pop();
-          string renderingIntentString = stringOperands.Pop();
+            currentGS.DashPattern = dashPattern;
+            break;
+          case 0x7269: // ri
+            operandTypes.Pop();
+            string renderingIntentString = stringOperands.Pop();
 
-          bool valid = Enum.TryParse(renderingIntentString, out RenderingIntent ri);
-          if (!valid)
-            ri = RenderingIntent.Null;
+            bool valid = Enum.TryParse(renderingIntentString, out RenderingIntent ri);
+            if (!valid)
+              ri = RenderingIntent.Null;
 
-          currentGS.RenderingIntent = ri;
-          break;
-        case 0x69: // i
-          currentGS.Flatness = GetNextStackValAsDouble();
-          break;
-        case 0x7173: // qs
-          // Name of gs paramter dict that is in ExtGState subdict in current resorouceDict
-          // do it later
-          throw new Exception("Implement dictname (gs)");
-          break;
+            currentGS.RenderingIntent = ri;
+            break;
+          case 0x69: // i
+            currentGS.Flatness = GetNextStackValAsDouble();
+            break;
+          case 0x7173: // qs
+                       // Name of gs paramter dict that is in ExtGState subdict in current resorouceDict
+                       // do it later
+            throw new Exception("Implement dictname (gs)");
+            break;
 
-        // special graphics states
-        case 0x71: // q
-          GSS.Push(currentGS);
-          break;
-        case 0x51: // Q
-          currentGS = GSS.Pop();
-          break;
-        case 0x636d: // cm
-          // a b c e d f - real numbers but can be saved as ints
-          CTM newCtm = new CTM();
-          // get it as reverse since its stack
+          // special graphics states
+          case 0x71: // q
+            GSS.Push(currentGS);
+            break;
+          case 0x51: // Q
+            currentGS = GSS.Pop();
+            break;
+          case 0x636d: // cm
+                       // a b c e d f - real numbers but can be saved as ints
+            CTM newCtm = new CTM();
+            // get it as reverse since its stack
 
-          newCtm.YLen = GetNextStackValAsDouble();
-          newCtm.XxLen = GetNextStackValAsDouble();
-          newCtm.YOrientation = GetNextStackValAsDouble();
-          newCtm.XOrientation = GetNextStackValAsDouble();
-          newCtm.YLocation = GetNextStackValAsDouble();
-          newCtm.XLocation = GetNextStackValAsDouble();
+            newCtm.YLen = GetNextStackValAsDouble();
+            newCtm.XxLen = GetNextStackValAsDouble();
+            newCtm.YOrientation = GetNextStackValAsDouble();
+            newCtm.XOrientation = GetNextStackValAsDouble();
+            newCtm.YLocation = GetNextStackValAsDouble();
+            newCtm.XLocation = GetNextStackValAsDouble();
 
-          currentGS.CTM = newCtm;
-          break;
-#endregion gss&sgs
-        #region pathConstruction
-        case 0x6d: // m
-          currentPC.PathConstructs.Clear();
-          mp = new MyPoint();
-          mp.Y1 = GetNextStackValAsInt();
-          mp.X1 = GetNextStackValAsInt();
-          currentPC.PathConstructs.Add((PathConstructOperator.m, mp));
-          break;
-        case 0x6c: // l
-          mp = new MyPoint();
-          mp.Y1 = GetNextStackValAsInt();
-          mp.X1 = GetNextStackValAsInt();
-          currentPC.PathConstructs.Add((PathConstructOperator.l, mp));
-          break;
-        case 0x63: // c
-          mp = new MyPoint();
-          mp.Y3 = GetNextStackValAsInt();
-          mp.X3 = GetNextStackValAsInt();
-          mp.Y2 = GetNextStackValAsInt();
-          mp.X2 = GetNextStackValAsInt();
-          mp.Y1 = GetNextStackValAsInt();
-          mp.X1 = GetNextStackValAsInt();
-          currentPC.PathConstructs.Add((PathConstructOperator.c, mp));
-          break;
-        case 0x76: // v
-          mp = new MyPoint();
-          mp.Y3 = GetNextStackValAsInt();
-          mp.X3 = GetNextStackValAsInt();
-          mp.Y2 = GetNextStackValAsInt();
-          mp.X2 = GetNextStackValAsInt();
-          currentPC.PathConstructs.Add((PathConstructOperator.v, mp));
-          break;
-        case 0x79: // y
-          mp = new MyPoint();
-          mp.Y3 = GetNextStackValAsInt();
-          mp.X3 = GetNextStackValAsInt();
-          mp.Y1 = GetNextStackValAsInt();
-          mp.X1 = GetNextStackValAsInt();
-          currentPC.PathConstructs.Add((PathConstructOperator.y, mp));
-          break;
-        case 0x68: // h
-          mp = new MyPoint();
-          currentPC.PathConstructs.Add((PathConstructOperator.h, mp));
-          break;
-        case 0x7265: // re
-          mp = new MyPoint();
-          
-          // use this as width
-          mp.X3 = GetNextStackValAsInt();
-          /// use this as height
-          mp.Y3 = GetNextStackValAsInt();
-          mp.Y1 = GetNextStackValAsInt();
-          mp.X1 = GetNextStackValAsInt();
-          currentPC.PathConstructs.Add((PathConstructOperator.re, mp));
-          break;
-        #endregion pathConstruction
-        #region pathPainting
-        case 0x53: // S
-        case 0x73: // s
-        case 0x66: // f
-          
-          currentPC.PathConstructs.Clear();
-          currentPC.EvenOddClippingPath = false;
-          currentPC.NonZeroClippingPath = false;
-          break;
-        case 0x46: // F
-        case 0x662a: // f*
-        case 0x42: // B
-        case 0x422a: // B*
-        case 0x62: // b
-        case 0x622a: // b*
-        case 0x6e: // n
-          // CHECK CLIPPING PATH SECTION
-          // path painting
-          break;
-        #endregion pathPainting
-        #region clippingPath
-        case 0x57: // W
-          currentPC.NonZeroClippingPath = true;
-          break;
-        case 0x572a: // W*
-          currentPC.EvenOddClippingPath = true;
-          // clipping paths
-          break;
-        #endregion clippingPath
-        #region textObjects
-        case 0x4254: // BT
-          currentTextObject.Active = false;
-          currentTextObject.InitMatrixes();
-          break;
-        case 0x4554: // ET
-          currentTextObject.Active = true;
-          break;
-        #endregion textObjects
-        #region textState
-        case 0x5463: // Tc
-        case 0x5477: // Tw
-        case 0x547a: // Tz
-        case 0x544c: // TL
-        case 0x5466: // Tf
-          currentTextObject.FontScaleFactor = GetNextStackValAsDouble();
-          currentTextObject.FontRef = GetNextStackValAsString();
-          break;
-        case 0x5472: // Tr
-        case 0x5473: // Ts
-          break;
-        #endregion textState
-        #region textPositioning;
-        case 0x5464: // Td
-        case 0x5444: // TD
-        case 0x546d: // Tm
-          //f
-          double tmOp = GetNextStackValAsDouble();
-          currentTextObject.TextMatrix[2, 1] = tmOp;
-          currentTextObject.TextLineMatrix[2, 1] = tmOp;
-          // e
-          tmOp = GetNextStackValAsDouble();
-          currentTextObject.TextMatrix[2, 0] = tmOp;
-          currentTextObject.TextLineMatrix[1, 0] = tmOp;
-          // d
-          tmOp = GetNextStackValAsDouble();
-          currentTextObject.TextMatrix[1, 1] = tmOp;
-          currentTextObject.TextLineMatrix[1, 1] = tmOp;
-          // c
-          tmOp = GetNextStackValAsDouble();
-          currentTextObject.TextMatrix[1, 0] = tmOp;
-          currentTextObject.TextLineMatrix[1, 0] = tmOp;
-          // b
-          tmOp = GetNextStackValAsDouble();
-          currentTextObject.TextMatrix[0, 1] = tmOp;
-          currentTextObject.TextLineMatrix[0, 1] = tmOp;
-          // a
-          tmOp = GetNextStackValAsDouble();
-          currentTextObject.TextMatrix[0, 0] = tmOp;
-          currentTextObject.TextLineMatrix[0, 0] = tmOp;
-          break;
-        case 0x542a: // T*
-          // text positioning
-          break;
-        #endregion textPositioning;
-        #region textShowing
-        case 0x546a: // Tj
-          literal = GetNextStackValAsString();
-          break;
-        case 0x544a: // TJ
-          break;
-        case 0x27:   // '
-        case 0x22:   // "
-          // text showing
-          break;
-        #endregion textShowing
-        case 0x6430: // d0
-        case 0x6431: // d1
-          // type 3 fonts
-          break;
-        case 0x4353: // CS
-        case 0x6373: // cs
-        case 0x5343: // SC
-        case 0x53434e: // SCN
-        case 0x7363: // sc
-        case 0x73636e: // scn
-        case 0x47: // G
-        case 0x67: // g
-        case 0x5247: // RG
-        case 0x7267: // rg
-        case 0x4b: // K
-        case 0x6b: // k
-          // color
-          break;
-        case 0x7368: // sh
-          // shading patterns
-          break;
-        case 0x7249: // BI
-        case 0x4944: // ID
-        case 0x4549: // EI
-          // inline images
-          break;
-        case 0x446f: // Do
-          // XObject
-          break;
-        case 0x4d50: // MP
-        case 0x4450: // DP
-        case 0x424d43: // BMC
-        case 0x424443: // BDC
-        case 0x454d43: // EMC
-          // Marked content
-          break;
-        case 0x4258: // BX
-        case 0x4558: // EX
-          // Compatibility
-          break;
-        default:
-          break;
+            currentGS.CTM = newCtm;
+            break;
+          #endregion gss&sgs
+          #region pathConstruction
+          case 0x6d: // m
+            currentPC.PathConstructs.Clear();
+            mp = new MyPoint();
+            mp.Y1 = GetNextStackValAsInt();
+            mp.X1 = GetNextStackValAsInt();
+            currentPC.PathConstructs.Add((PathConstructOperator.m, mp));
+            break;
+          case 0x6c: // l
+            mp = new MyPoint();
+            mp.Y1 = GetNextStackValAsInt();
+            mp.X1 = GetNextStackValAsInt();
+            currentPC.PathConstructs.Add((PathConstructOperator.l, mp));
+            break;
+          case 0x63: // c
+            mp = new MyPoint();
+            mp.Y3 = GetNextStackValAsInt();
+            mp.X3 = GetNextStackValAsInt();
+            mp.Y2 = GetNextStackValAsInt();
+            mp.X2 = GetNextStackValAsInt();
+            mp.Y1 = GetNextStackValAsInt();
+            mp.X1 = GetNextStackValAsInt();
+            currentPC.PathConstructs.Add((PathConstructOperator.c, mp));
+            break;
+          case 0x76: // v
+            mp = new MyPoint();
+            mp.Y3 = GetNextStackValAsInt();
+            mp.X3 = GetNextStackValAsInt();
+            mp.Y2 = GetNextStackValAsInt();
+            mp.X2 = GetNextStackValAsInt();
+            currentPC.PathConstructs.Add((PathConstructOperator.v, mp));
+            break;
+          case 0x79: // y
+            mp = new MyPoint();
+            mp.Y3 = GetNextStackValAsInt();
+            mp.X3 = GetNextStackValAsInt();
+            mp.Y1 = GetNextStackValAsInt();
+            mp.X1 = GetNextStackValAsInt();
+            currentPC.PathConstructs.Add((PathConstructOperator.y, mp));
+            break;
+          case 0x68: // h
+            mp = new MyPoint();
+            currentPC.PathConstructs.Add((PathConstructOperator.h, mp));
+            break;
+          case 0x7265: // re
+            mp = new MyPoint();
+
+            // use this as width
+            mp.X3 = GetNextStackValAsInt();
+            /// use this as height
+            mp.Y3 = GetNextStackValAsInt();
+            mp.Y1 = GetNextStackValAsInt();
+            mp.X1 = GetNextStackValAsInt();
+            currentPC.PathConstructs.Add((PathConstructOperator.re, mp));
+            break;
+          #endregion pathConstruction
+          #region pathPainting
+          case 0x53: // S
+          case 0x73: // s
+          case 0x66: // f
+
+            currentPC.PathConstructs.Clear();
+            currentPC.EvenOddClippingPath = false;
+            currentPC.NonZeroClippingPath = false;
+            break;
+          case 0x46: // F
+          case 0x662a: // f*
+          case 0x42: // B
+          case 0x422a: // B*
+          case 0x62: // b
+          case 0x622a: // b*
+          case 0x6e: // n
+                     // CHECK CLIPPING PATH SECTION
+                     // path painting
+            break;
+          #endregion pathPainting
+          #region clippingPath
+          case 0x57: // W
+            currentPC.NonZeroClippingPath = true;
+            break;
+          case 0x572a: // W*
+            currentPC.EvenOddClippingPath = true;
+            // clipping paths
+            break;
+          #endregion clippingPath
+          #region textObjects
+          case 0x4254: // BT
+            currentTextObject.Active = false;
+            currentTextObject.InitMatrixes();
+            break;
+          case 0x4554: // ET
+            currentTextObject.Active = true;
+            break;
+          #endregion textObjects
+          #region textState
+          case 0x5463: // Tc
+          case 0x5477: // Tw
+          case 0x547a: // Tz
+          case 0x544c: // TL
+          case 0x5466: // Tf
+            currentTextObject.FontScaleFactor = GetNextStackValAsDouble();
+            currentTextObject.FontRef = GetNextStackValAsString();
+            break;
+          case 0x5472: // Tr
+          case 0x5473: // Ts
+            break;
+          #endregion textState
+          #region textPositioning;
+          case 0x5464: // Td
+          case 0x5444: // TD
+          case 0x546d: // Tm
+                       //f
+            double tmOp = GetNextStackValAsDouble();
+            currentTextObject.TextMatrix[2, 1] = tmOp;
+            currentTextObject.TextLineMatrix[2, 1] = tmOp;
+            // e
+            tmOp = GetNextStackValAsDouble();
+            currentTextObject.TextMatrix[2, 0] = tmOp;
+            currentTextObject.TextLineMatrix[1, 0] = tmOp;
+            // d
+            tmOp = GetNextStackValAsDouble();
+            currentTextObject.TextMatrix[1, 1] = tmOp;
+            currentTextObject.TextLineMatrix[1, 1] = tmOp;
+            // c
+            tmOp = GetNextStackValAsDouble();
+            currentTextObject.TextMatrix[1, 0] = tmOp;
+            currentTextObject.TextLineMatrix[1, 0] = tmOp;
+            // b
+            tmOp = GetNextStackValAsDouble();
+            currentTextObject.TextMatrix[0, 1] = tmOp;
+            currentTextObject.TextLineMatrix[0, 1] = tmOp;
+            // a
+            tmOp = GetNextStackValAsDouble();
+            currentTextObject.TextMatrix[0, 0] = tmOp;
+            currentTextObject.TextLineMatrix[0, 0] = tmOp;
+            break;
+          case 0x542a: // T*
+                       // text positioning
+            break;
+          #endregion textPositioning;
+          #region textShowing
+          case 0x546a: // Tj
+            literal = GetNextStackValAsString();
+            break;
+          case 0x544a: // TJ
+            break;
+          case 0x27:   // '
+          case 0x22:   // "
+                       // text showing
+            break;
+          #endregion textShowing
+          case 0x6430: // d0
+          case 0x6431: // d1
+                       // type 3 fonts
+            break;
+          case 0x4353: // CS
+          case 0x6373: // cs
+          case 0x5343: // SC
+          case 0x53434e: // SCN
+          case 0x7363: // sc
+          case 0x73636e: // scn
+          case 0x47: // G
+          case 0x67: // g
+          case 0x5247: // RG
+          case 0x7267: // rg
+          case 0x4b: // K
+          case 0x6b: // k
+                     // color
+            break;
+          case 0x7368: // sh
+                       // shading patterns
+            break;
+          case 0x7249: // BI
+          case 0x4944: // ID
+          case 0x4549: // EI
+                       // inline images
+            break;
+          case 0x446f: // Do
+                       // XObject
+            break;
+          case 0x4d50: // MP
+          case 0x4450: // DP
+          case 0x424d43: // BMC
+          case 0x424443: // BDC
+          case 0x454d43: // EMC
+                         // Marked content
+            break;
+          case 0x4258: // BX
+          case 0x4558: // EX
+                       // Compatibility
+            break;
+          default:
+            break;
+        }
+
+        val = ReadNext();
       }
     }
     /// <summary>
@@ -360,8 +367,10 @@ namespace Converter.Parsers.PDF
         int startPos = _pos;
         while (!IsCurrentCharPDFWhitespaceOrNewLine())
           ReadChar();
-        ReadOnlySpan<byte> value = _buffer.Slice(startPos, _pos - startPos);
-        return BitConverter.ToUInt32(value);
+        fourByteSlice.Fill(0);
+        for (int i = 0; i < _pos - startPos; i++)
+          fourByteSlice[i] = _buffer[startPos + i];
+        return BitConverter.ToUInt32(fourByteSlice);
       }
 
       // is a number, either real or int
