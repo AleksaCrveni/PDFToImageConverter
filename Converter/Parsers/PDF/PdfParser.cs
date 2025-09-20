@@ -1,6 +1,7 @@
 ﻿using Converter.FileStructures;
 using Converter.FIleStructures;
 using Converter.Parsers.Fonts;
+using Converter.Writers.TIFF;
 using System.Globalization;
 using System.IO.Compression;
 using System.Runtime.CompilerServices;
@@ -80,7 +81,15 @@ namespace Converter.Parsers.PDF
     private void ConvertPageDataToImage(PDFFile file)
     {
       byte[] rawContent = file.PageInformation[0].ContentDict.RawStreamData;
-      PDFGOInterpreter pdfGo = new PDFGOInterpreter(rawContent.AsSpan(), file.PageInformation[0].ResourceDict.Font);
+      ITIFFWriter writer = new TIFFBilevelWriter("convertTest.pdf");
+      TIFFWriterOptions tiffOptions = new TIFFWriterOptions()
+      {
+        Width = (int)file.PageInformation[0].MediaBox.urX,
+        Height = (int)file.PageInformation[0].MediaBox.urY,
+      };
+      writer.WriteEmptyImage(ref tiffOptions);
+
+      PDFGOInterpreter pdfGo = new PDFGOInterpreter(rawContent.AsSpan(), file.PageInformation[0].ResourceDict.Font, writer);
       pdfGo.ParseAll();
     }
 

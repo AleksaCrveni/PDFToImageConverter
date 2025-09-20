@@ -1,6 +1,7 @@
 ﻿using Converter.FileStructures;
 using Converter.FIleStructures;
 using Converter.Parsers.Fonts;
+using Converter.Writers.TIFF;
 using System.Globalization;
 using System.Text;
 
@@ -34,8 +35,9 @@ namespace Converter.Parsers.PDF
     private PathConstruction currentPC;
     private TextObject currentTextObject;
     private List<FontData> _fontInfo;
+    private ITIFFWriter _writer;
     // TODO: maybe NULL check is redundant if we let it throw to end?
-    public PDFGOInterpreter(ReadOnlySpan<byte> buffer, List<FontData> fontInfo)
+    public PDFGOInterpreter(ReadOnlySpan<byte> buffer, List<FontData> fontInfo, ITIFFWriter tiffWriter)
     {
       _buffer = buffer;
       intOperands = new Stack<int>(100);
@@ -46,9 +48,10 @@ namespace Converter.Parsers.PDF
       currentGS = new GraphicsState();
       currentPC = new PathConstruction();
       _fontInfo = fontInfo;
+      _writer = tiffWriter;
     }
 
-    public PDFGOInterpreter(Span<byte> buffer, List<FontData> fontInfo)
+    public PDFGOInterpreter(Span<byte> buffer, List<FontData> fontInfo, ITIFFWriter tiffWriter)
     {
       _buffer = buffer;
       intOperands = new Stack<int>(100);
@@ -59,6 +62,7 @@ namespace Converter.Parsers.PDF
       currentGS = new GraphicsState();
       currentPC = new PathConstruction();
       _fontInfo = fontInfo;
+      _writer = tiffWriter;
     }
 
     public void ParseAll()
