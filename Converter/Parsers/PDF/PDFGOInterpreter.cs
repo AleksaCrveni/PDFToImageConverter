@@ -435,7 +435,7 @@ namespace Converter.Parsers.PDF
 
       int integer = 0;
       int baseIndex = -1;
-      while ((!IsCurrentCharPDFWhitespaceOrNewLine() || !IsCurrentCharDigit()) && _char != PDFConstants.NULL)
+      while ((IsCurrentCharDigit() || _char == '.') && _char != PDFConstants.NULL && !IsCurrentCharPDFWhitespaceOrNewLine())
       {
         if (_char == '.')
         {
