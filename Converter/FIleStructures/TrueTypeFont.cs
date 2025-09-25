@@ -16,6 +16,7 @@ namespace Converter.FileStructures
     public int IndexMapOffset;
     public ushort IndexToLocFormat;
     public ushort CmapFormat;
+    public bool Cff;
   }
 
   public struct TableOffsets

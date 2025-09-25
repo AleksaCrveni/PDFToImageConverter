@@ -2,6 +2,7 @@
 using Converter.FileStructures.TIFF;
 using System;
 using System.Buffers.Binary;
+using System.Reflection;
 
 namespace Converter.Parsers.Fonts
 {
@@ -313,10 +314,73 @@ namespace Converter.Parsers.Fonts
       int fHeight = ReadSignedInt32(ref buffer, _ttf.Offsets.hhea.Position + 4) - ReadSignedInt32(ref buffer, _ttf.Offsets.hhea.Position + 6);
       return lineHeight / fHeight;
     }
+    public int GetGlyphOffset(ref ReadOnlySpan<byte> buffer, int glyphIndex)
+    {
+      int g1, g2;
+      // glyph index out of range
+      if (glyphIndex >= _ttf.NumOfGlyphs)
+        return -1;
+      // uknown index -> glyph map format
+      if (_ttf.IndexToLocFormat >= 2)
+        return -1;
 
+      if (_ttf.IndexToLocFormat == 0)
+      {
+        g1 = _ttf.Offsets.glyf.Position + ReadUInt16(ref buffer, _ttf.Offsets.loca.Position + glyphIndex * 2) * 2;
+        g2 = _ttf.Offsets.glyf.Position + ReadUInt16(ref buffer, _ttf.Offsets.loca.Position + glyphIndex * 2 + 2) * 2;
+      } else
+      {
+        // not sure about this cast
+        g1 = _ttf.Offsets.glyf.Position + (int)ReadUInt32(ref buffer, _ttf.Offsets.loca.Position + glyphIndex * 4);
+        g2 = _ttf.Offsets.glyf.Position + (int)ReadUInt32(ref buffer, _ttf.Offsets.loca.Position + glyphIndex * 4 +4);
+      }
+
+      // if length is 0 return -1??
+      if (g1 == g2)
+        return -1;
+
+      return g1;
+    }
+    public bool GetGlyphBox(int glyphIndex, ref int x0, ref int y0, ref int x1, ref int y1)
+    {
+      // TODO: if cff = true its open type font?
+      if (_ttf.Cff)
+      {
+        throw new NotImplementedException();
+      } else
+      {
+
+        ReadOnlySpan<byte> buffer = _buffer.AsSpan();
+        int g = GetGlyphOffset(ref buffer, glyphIndex);
+        if (g < 0)
+          return false;
+
+        x0 = ReadUInt16(ref buffer, g + 2);
+        y0 = ReadUInt16(ref buffer, g + 4);
+        x1 = ReadUInt16(ref buffer, g + 6);
+        y1 = ReadUInt16(ref buffer, g + 8);
+      }
+      return true;
+    }
+
+    #region antialiasing software rasterizer
     public void GetGlyphBitmapBoxSubpixel(int glyphIndex, float scaleX, float scaleY, float shiftX, float shiftY, ref int ix0, ref int iy0, ref int ix1, ref int iy1)
     {
+      int x0 = 0;
+      int y0 = 0;
+      int x1 = 0;
+      int y1 = 0;
 
+      if (!GetGlyphBox(glyphIndex, ref x0, ref y0, ref x1, ref y1))
+      {
+        ix0 = 0;
+        iy0 = 0;
+        ix1 = 0;
+        iy1 = 0;
+      } else
+      {
+        // TODO: finish this
+      }
     }
 
     public void GetGlyphBitmapBox(int glyphIndex, float scaleX, float scaleY, ref int ix0, ref int iy0, ref int ix1, ref int iy1)
@@ -334,8 +398,9 @@ namespace Converter.Parsers.Fonts
     {
       GetCodepointBitmapBoxSubpixel(unicodeCodepoint, scaleX, scaleY, 0, 0, ref ix0, ref iy0, ref ix1, ref iy1);
     }
+    #endregion antialiasing software rasterizer
 
-
+    #region reader functions
     private uint ReadUInt32(ref ReadOnlySpan<byte> buffer, int pos)
     {
       return BinaryPrimitives.ReadUInt32BigEndian(buffer.Slice(pos, 4));
@@ -360,7 +425,7 @@ namespace Converter.Parsers.Fonts
     {
       return buffer[pos];
     }
-
+    #endregion reader functions
     private uint CalculateCheckSum(ref FakeSpan dataPos, uint numOfBytesInTable)
     {
       ReadOnlySpan<byte> tableBuffer = new ReadOnlySpan<byte>(_buffer, dataPos.Position, dataPos.Length);
