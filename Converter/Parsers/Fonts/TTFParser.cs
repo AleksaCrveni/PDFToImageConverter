@@ -303,6 +303,13 @@ namespace Converter.Parsers.Fonts
       return lineHeight / fHeight;
     }
 
+    public void GetFontVMetrics(ref int ascent, ref int descent, ref int lineGap)
+    {
+      ReadOnlySpan<byte> buffer = _buffer.AsSpan();
+      ascent  = ReadSignedInt32(ref buffer, _ttf.Offsets.hhea.Position + 4);
+      descent = ReadSignedInt32(ref buffer, _ttf.Offsets.hhea.Position + 6);
+      lineGap = ReadSignedInt32(ref buffer, _ttf.Offsets.hhea.Position + 8);
+    }
     private uint ReadUInt32(ref ReadOnlySpan<byte> buffer, int pos)
     {
       return BinaryPrimitives.ReadUInt32BigEndian(buffer.Slice(pos, 4));

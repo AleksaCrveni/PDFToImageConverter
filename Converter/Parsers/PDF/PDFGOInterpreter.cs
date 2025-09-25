@@ -259,7 +259,6 @@ namespace Converter.Parsers.PDF
           case 0x5464: // Td
           case 0x5444: // TD
           case 0x546d: // Tm
-                       //f
             double tmOp = GetNextStackValAsDouble();
             currentTextObject.TextMatrix[2, 1] = tmOp;
             currentTextObject.TextLineMatrix[2, 1] = tmOp;
