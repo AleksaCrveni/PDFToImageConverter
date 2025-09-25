@@ -223,15 +223,6 @@ namespace Converter.Parsers.Fonts
       _ttf.Offsets = tOff;
     }
 
-    /// <summary>
-    /// Gets Glyphs Height Metrics via codepoint
-    /// if codepoint is cached GetGlyphHMetrics could be called directly
-    /// </summary>
-    public void GetCodepointHMetrics(int unicodeCodepoint, ref int advanceWidth, ref int leftSideBearing)
-    {
-      int glyphIndex = FindGlyphIndex(unicodeCodepoint);
-      GetGlyphHMetrics(glyphIndex, ref advanceWidth, ref leftSideBearing);
-    }
 
     public void GetGlyphHMetrics(int glyphIndex, ref int advanceWidth, ref int leftSideBearing)
     {
@@ -297,6 +288,17 @@ namespace Converter.Parsers.Fonts
       return 0;
     }
 
+
+    /// <summary>
+    /// Gets Glyphs Height Metrics via codepoint
+    /// if codepoint is cached GetGlyphHMetrics could be called directly
+    /// </summary>
+    public void GetCodepointHMetrics(int unicodeCodepoint, ref int advanceWidth, ref int leftSideBearing)
+    {
+      int glyphIndex = FindGlyphIndex(unicodeCodepoint);
+      GetGlyphHMetrics(glyphIndex, ref advanceWidth, ref leftSideBearing);
+    }
+
     public void GetFontVMetrics(ref int ascent, ref int descent, ref int lineGap)
     {
       ReadOnlySpan<byte> buffer = _buffer.AsSpan();
@@ -311,6 +313,28 @@ namespace Converter.Parsers.Fonts
       int fHeight = ReadSignedInt32(ref buffer, _ttf.Offsets.hhea.Position + 4) - ReadSignedInt32(ref buffer, _ttf.Offsets.hhea.Position + 6);
       return lineHeight / fHeight;
     }
+
+    public void GetGlyphBitmapBoxSubpixel(int glyphIndex, float scaleX, float scaleY, float shiftX, float shiftY, ref int ix0, ref int iy0, ref int ix1, ref int iy1)
+    {
+
+    }
+
+    public void GetGlyphBitmapBox(int glyphIndex, float scaleX, float scaleY, ref int ix0, ref int iy0, ref int ix1, ref int iy1)
+    {
+      GetGlyphBitmapBoxSubpixel(glyphIndex, scaleX, scaleY, 0, 0, ref ix0, ref iy0, ref ix1, ref iy1);
+    }
+
+    public void GetCodepointBitmapBoxSubpixel(int unicodeCodepoint, float scaleX, float scaleY, float shiftX, float shiftY, ref int ix0, ref int iy0, ref int ix1, ref int iy1)
+    {
+      int glyphIndex = FindGlyphIndex(unicodeCodepoint);
+      GetGlyphBitmapBoxSubpixel(glyphIndex, scaleX, scaleY, shiftX, shiftY, ref ix0, ref iy0, ref ix1, ref iy1);
+    }
+
+    public void GetCodepointBitmapBox(int unicodeCodepoint, float scaleX, float scaleY, ref int ix0, ref int iy0, ref int ix1, ref int iy1)
+    {
+      GetCodepointBitmapBoxSubpixel(unicodeCodepoint, scaleX, scaleY, 0, 0, ref ix0, ref iy0, ref ix1, ref iy1);
+    }
+
 
     private uint ReadUInt32(ref ReadOnlySpan<byte> buffer, int pos)
     {
