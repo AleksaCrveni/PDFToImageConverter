@@ -1,5 +1,6 @@
 ﻿using Converter.FileStructures;
 using Converter.FileStructures.TIFF;
+using System;
 using System.Buffers.Binary;
 
 namespace Converter.Parsers.Fonts
@@ -296,13 +297,6 @@ namespace Converter.Parsers.Fonts
       return 0;
     }
 
-    public float ScaleForPixelHeight(float lineHeight)
-    {
-      ReadOnlySpan<byte> hhea = _buffer.AsSpan().Slice(_ttf.Offsets.hhea.Position, _ttf.Offsets.hhea.Length);
-      int fHeight = ReadSignedInt16(ref hhea, 4) - ReadSignedInt16(ref hhea, 6);
-      return lineHeight / fHeight;
-    }
-
     public void GetFontVMetrics(ref int ascent, ref int descent, ref int lineGap)
     {
       ReadOnlySpan<byte> buffer = _buffer.AsSpan();
@@ -310,6 +304,14 @@ namespace Converter.Parsers.Fonts
       descent = ReadSignedInt32(ref buffer, _ttf.Offsets.hhea.Position + 6);
       lineGap = ReadSignedInt32(ref buffer, _ttf.Offsets.hhea.Position + 8);
     }
+
+    public float ScaleForPixelHeight(float lineHeight)
+    {
+      ReadOnlySpan<byte> buffer = _buffer.AsSpan();
+      int fHeight = ReadSignedInt32(ref buffer, _ttf.Offsets.hhea.Position + 4) - ReadSignedInt32(ref buffer, _ttf.Offsets.hhea.Position + 6);
+      return lineHeight / fHeight;
+    }
+
     private uint ReadUInt32(ref ReadOnlySpan<byte> buffer, int pos)
     {
       return BinaryPrimitives.ReadUInt32BigEndian(buffer.Slice(pos, 4));
