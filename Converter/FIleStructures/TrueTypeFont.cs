@@ -13,8 +13,9 @@ namespace Converter.FileStructures
     public TableOffsets Offsets;
     public ushort NumOfGlyphs;
     public int Svg;
-    public uint IndexMapOffset;
+    public int IndexMapOffset;
     public ushort IndexToLocFormat;
+    public ushort CmapFormat;
   }
 
   public struct TableOffsets

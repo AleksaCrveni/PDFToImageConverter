@@ -1,8 +1,6 @@
 ﻿using Converter.FileStructures;
 using Converter.FileStructures.TIFF;
 using System.Buffers.Binary;
-using System.Reflection.Metadata.Ecma335;
-
 
 namespace Converter.Parsers.Fonts
 {
@@ -20,7 +18,6 @@ namespace Converter.Parsers.Fonts
     // use endOfArr internally to know if you reached end of array or not
     private uint endOfArr;
     private uint beginOfSfnt;
-
     
     public void Init(ref byte[]buffer)
     {
@@ -50,9 +47,9 @@ namespace Converter.Parsers.Fonts
       };
 
       fd.NumTables = ReadUInt16(ref buffer, mainPos);
-      fd.SearchRange= ReadUInt16(ref buffer, mainPos +2);
-      fd.EntrySelector = ReadUInt16(ref buffer, mainPos +4);
-      fd.RangeShift = ReadUInt16(ref buffer, mainPos +6);
+      fd.SearchRange = ReadUInt16(ref buffer, mainPos + 2);
+      fd.EntrySelector = ReadUInt16(ref buffer, mainPos + 4);
+      fd.RangeShift = ReadUInt16(ref buffer, mainPos + 6);
       mainPos += 8;
 
       uint tag = 0;
@@ -60,7 +57,7 @@ namespace Converter.Parsers.Fonts
       uint offset = 0;
       uint length;
       uint pad = 0;
-      
+
       FakeSpan tableBuffer;
       // TODO: Optimize to do binary search?
       for (int i = 0; i < fd.NumTables; i++)
@@ -157,7 +154,7 @@ namespace Converter.Parsers.Fonts
             throw new Exception("Tag not implemented yet!");
 #endif
             break;
-          }
+        }
       }
 
       // TODO: cmpa is needed only for non CIDFont dicts
@@ -166,12 +163,12 @@ namespace Converter.Parsers.Fonts
         tOff.hhea.Length == 0 ||
         tOff.loca.Length == 0 ||
         tOff.maxp.Length == 0 ||
-        tOff.cvt.Length  == 0 ||
+        tOff.cvt.Length == 0 ||
         tOff.prep.Length == 0 ||
         tOff.glyf.Length == 0 ||
         tOff.hmtx.Length == 0 ||
         tOff.fpgm.Length == 0 ||
-        tOff.cmap.Length == 0   )
+        tOff.cmap.Length == 0)
       {
         throw new InvalidDataException("Missing one of the required tables!");
       }
@@ -201,27 +198,102 @@ namespace Converter.Parsers.Fonts
             {
               case (ushort)MSPlatformSpecificID.MS_UnicodeBMP:
               case (ushort)MSPlatformSpecificID.MS_UnicodeFULL:
-                _ttf.IndexMapOffset = offset; 
+                _ttf.IndexMapOffset = tOff.cmap.Position + (int)offset;
                 break;
-              
+
             }
             break;
           case (ushort)FileStructures.PlatformID.Unicode:
-            _ttf.IndexMapOffset = offset;
+            _ttf.IndexMapOffset = tOff.cmap.Position + (int)offset;
             break;
           case (ushort)FileStructures.PlatformID.Macintosh:
-            _ttf.IndexMapOffset = offset;
+            _ttf.IndexMapOffset = tOff.cmap.Position + (int)offset;
             break;
         }
       }
 
       if (_ttf.IndexMapOffset == 0)
         throw new InvalidDataException("Missing index map!");
-      slice = slice = buffer.Slice(tOff.head.Position, tOff.head.Length);
+      _ttf.CmapFormat = ReadUInt16(ref buffer, (int)_ttf.IndexMapOffset);
+      slice = buffer.Slice(tOff.head.Position, tOff.head.Length);
       _ttf.IndexToLocFormat = ReadUInt16(ref slice, 50);
 
       _ttf.FontDirectory = fd;
       _ttf.Offsets = tOff;
+    }
+
+    /// <summary>
+    /// Gets Glyphs Height Metrics via codepoint
+    /// if codepoint is cached GetGlyphHMetrics could be called directly
+    /// </summary>
+    public void GetCodepointHMetrics(int unicodeCodepoint, ref int advanceWidth, ref int leftSideBearing)
+    {
+      int glyphIndex = FindGlyphIndex(unicodeCodepoint);
+      GetGlyphHMetrics(glyphIndex, ref advanceWidth, ref leftSideBearing);
+    }
+
+    public void GetGlyphHMetrics(int glyphIndex, ref int advanceWidth, ref int leftSideBearing)
+    {
+      ReadOnlySpan<byte> buffer = _buffer.AsSpan();
+      ushort numOfLongHorMetrics = ReadUInt16(ref buffer, _ttf.Offsets.hhea.Position + 34);
+      if (glyphIndex < numOfLongHorMetrics)
+      {
+        // 4 * glyph index because each HorMetrics struct is 4 bytes (2 for advancedWidth and 2 for leftSideBearing)
+        advanceWidth = ReadSignedInt16(ref buffer, _ttf.Offsets.hdmx.Position + 4 * glyphIndex);
+        leftSideBearing = ReadSignedInt16(ref buffer, _ttf.Offsets.hdmx.Position + 4 * glyphIndex + 2);
+      } else
+      {
+        advanceWidth = ReadSignedInt16(ref buffer, _ttf.Offsets.hdmx.Position + 4 * (numOfLongHorMetrics -1));
+        leftSideBearing = ReadSignedInt16(ref buffer, _ttf.Offsets.hdmx.Position + 4 * numOfLongHorMetrics + 2*(glyphIndex - numOfLongHorMetrics)) ;
+      }
+    }
+
+    // TODO: See if caching format data is better
+    public int FindGlyphIndex(int unicodeCodepoint)
+    {
+      if (_ttf.CmapFormat == 0)
+      {
+        throw new NotImplementedException();
+      } else if (_ttf.CmapFormat == 2)
+      {
+        throw new NotImplementedException();
+      } else if (_ttf.CmapFormat == 4)
+      {
+        throw new NotImplementedException();
+      } else if (_ttf.CmapFormat == 6)
+      {
+        ReadOnlySpan<byte> buffer = _buffer.AsSpan();
+        ushort length = ReadUInt16(ref buffer, _ttf.IndexMapOffset + 2);
+        ushort lang = ReadUInt16(ref buffer, _ttf.IndexMapOffset + 4);
+        ushort firstCode = ReadUInt16(ref buffer, _ttf.IndexMapOffset + 6);
+        ushort entryCount = ReadUInt16(ref buffer, _ttf.IndexMapOffset + 8);
+        // ensure its in range, codepoints are desnly packed, which means they are in continuous array in order
+        if (unicodeCodepoint >= firstCode && (unicodeCodepoint - firstCode) < entryCount)
+          // * 2 because data in 2 bytes each in this format
+          return ReadUInt16(ref buffer, _ttf.IndexMapOffset + 10 + (unicodeCodepoint - firstCode) * 2);
+        return 0;
+      } else if (_ttf.CmapFormat == 8)
+      {
+        throw new NotImplementedException();
+      } else if (_ttf.CmapFormat == 10)
+      {
+        throw new NotImplementedException();
+      } else if (_ttf.CmapFormat == 12)
+      {
+        throw new NotImplementedException();
+      } else if (_ttf.CmapFormat == 13)
+      {
+        throw new NotImplementedException();
+      } else if (_ttf.CmapFormat == 14)
+      {
+        throw new NotImplementedException();
+      }
+      else
+      {
+        throw new InvalidDataException($"Format {_ttf.CmapFormat} is not valid CMAP format!");
+      }
+
+      return 0;
     }
 
     public float ScaleForPixelHeight(float lineHeight)
@@ -248,7 +320,7 @@ namespace Converter.Parsers.Fonts
     private short ReadSignedInt16(ref ReadOnlySpan<byte> buffer, int pos)
     {
       return BinaryPrimitives.ReadInt16BigEndian(buffer.Slice(pos, 2));
-      
+
     }
 
     private byte ReadByte(ref ReadOnlySpan<byte> buffer, int pos)
