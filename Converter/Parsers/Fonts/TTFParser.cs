@@ -17,7 +17,7 @@ namespace Converter.Parsers.Fonts
     private int byteSize;
     // use endOfArr internally to know if you reached end of array or not
     private uint endOfArr;
-    private uint beginOfSfnt
+    private uint beginOfSfnt;
     
     public void Init(ref byte[]buffer)
     {
@@ -402,6 +402,41 @@ namespace Converter.Parsers.Fonts
     }
     #endregion antialiasing software rasterizer
 
+    public void Rasterize(ref BmpS result, float flatnessInPixels, ref List<TTFVertex> vertices, int numOfVerts, float scaleX, float scaleY, float shiftX, float shiftY, int xOff, int yOff, bool invert)
+    {
+      float scale = scaleX > scaleY ? scaleY : scaleX;
+      int windingCount = 0;
+      int[] windingLengths; // ??
+      // TOOD: continue
+    }
+
+    public void SetVertex(ref TTFVertex vertex, byte type, int x, int y, int cx, int cy)
+    {
+      vertex.type = type;
+      vertex.x  = (short) x;
+      vertex.y  = (short) y;
+      vertex.cx = (short)cx;
+      vertex.cy = (short)cy;
+    }
+
+    public int CloseShape(ref List<TTFVertex> vertices, int numOfVertices, bool wasOff, bool startOff, int sx, int sy, int scx, int scy, int cx, int cy)
+    {
+      TTFVertex vertex;
+      vertex = vertices[numOfVertices++];
+      if (startOff)
+      {
+        if (wasOff)
+          SetVertex(ref vertex, (byte)VMove.VCURVE, (cx + scx) >> 1, (cy + scy) >> 1, cx, cy);
+        SetVertex(ref vertex, (byte)VMove.VCURVE, sx, sy, scx, scy);
+      } else
+      {
+        if (wasOff)
+          SetVertex(ref vertex, (byte)VMove.VCURVE, sx, sy, cx, cy);
+        else
+          SetVertex(ref vertex, (byte)VMove.VLINE, sx, sy, 0, 0);
+      }
+      return numOfVertices;
+    }
 
     /// <summary>
     /// 
@@ -412,7 +447,7 @@ namespace Converter.Parsers.Fonts
     public int GetGlyphShapeTT(int glyphIndex, ref List<TTFVertex> vertices)
     {
       short numOfContours;
-      uint endPtsOfContoursOffset;
+      int endPtsOfContoursOffset;
       // *data
       int startOffset = (int)_ttf.StartOffset;
       int numOfVertices = 0;
@@ -424,16 +459,308 @@ namespace Converter.Parsers.Fonts
 
       if (numOfContours > 0)
       {
+        // Simples shapes
         byte flags = 0;
         byte flagCount = 0;
-        int ins, i, j, m, n, nextMove, wasOff, off, startOff;
+        int j = 0;
+        int insLen, i, m, numOfFlags, off;
+        bool wasOff = false;
+        bool startOff = false;
         int x, y, cx, cy, sx, sy, scx, scy;
-        uint pointsOffset;
-      } else if (numOfContours < 0)
-      {
-        
-      }
+        int pointsOffset;
+        int origPointsOffset;
+        int nextMove = 0;
+        // go to end of Table 14
+        endPtsOfContoursOffset = startOffset + g + 10;
 
+        // ins is instruction length, total bytes neededfor instruction
+        // Table 15: Simple glyph definition - Insturction length
+        // numOfCounters * 2 skips endOfCountours array
+        insLen = ReadUInt16(ref buffer, endPtsOfContoursOffset + numOfContours * 2);
+
+        // pointsOffset is offset in array of flags in table 15
+        // we skip up to insLen and then entire instructuion array that is 1 byte each ( +insLen)
+        pointsOffset = endPtsOfContoursOffset + numOfContours * 2 + 2 + insLen;
+        origPointsOffset = pointsOffset;
+        // i have no idea which data this is , its like last value of contours array
+        // maybe because its point indice its + 1??
+        numOfFlags = 1 + ReadUInt16(ref buffer, endPtsOfContoursOffset + numOfContours * 2 - 2);
+
+        m = numOfContours + 2 * numOfContours; // loose bound how many vertices we need
+        if (vertices == null)
+          vertices = new List<TTFVertex>();
+        
+        // in first pass, we load uninterpreted data into the allocated array
+        // above, shifted to the end of the array so we won't overwrite it when
+        // we create our final data starting from the front
+        
+        // offset for uninterpreted data
+        off = m - numOfFlags;
+        // TODO: do this for now because thats how its done in stb
+        // refactor oonce understood how its used better
+        for (i =0; i < off + numOfFlags; i++)
+        {
+          vertex = new TTFVertex();
+          vertices.Add(vertex);
+        }
+        // 1. Load flags
+        for (i = 0; i < numOfFlags; i++)
+        {
+          if (flagCount == 0)
+          {
+            flags = ReadByte(ref buffer, pointsOffset++);
+            if ((flags & 8) == 8) // TODO: is this right?!
+              flagCount = ReadByte(ref buffer, pointsOffset++);
+          }
+          else
+            flagCount--;
+          // not most efficient
+          vertex = vertices[off + i];
+          vertex.type = flags;
+          vertices[off + i] = vertex;
+        }
+
+        // 2. Load x coordinates
+        x = 0;
+        for (i =0; i < numOfFlags; i++)
+        {
+          flags = vertices[off + i].type;
+          if ((flags & 2) == 2)
+          {
+            short dx = ReadByte(ref buffer, pointsOffset++);
+            x += ((flags & 16) == 16) ? dx : -dx; //?
+          } else
+          {
+            if ((flags & 16) != 16)
+            {
+              short val = (short)(ReadByte(ref buffer, origPointsOffset) * 256);
+              val += ReadByte(ref buffer, origPointsOffset + 1);
+              x = x + val;
+              pointsOffset += 2;
+            }
+          }
+
+          vertex = vertices[off + i];
+          vertex.x = (short)x;
+          vertices[off + i] = vertex;
+        }
+
+        // 3. Load y coordinates
+        y = 0;
+        for (i = 0; i < numOfFlags; i++)
+        {
+          flags = vertices[off + i].type;
+          if ((flags & 4) == 4)
+          {
+            short dy = ReadByte(ref buffer, pointsOffset++);
+            y += ((flags & 32) == 32) ? dy : -dy; //?
+          }
+          else
+          {
+            if ((flags & 32) != 32)
+            {
+              short val = (short)(ReadByte(ref buffer, origPointsOffset) * 256);
+              val += ReadByte(ref buffer, origPointsOffset + 1);
+              y = y + val;
+              pointsOffset += 2;
+            }
+          }
+          vertex = vertices[off + i];
+          vertex.y = (short)y;
+          vertices[off + i] = vertex;
+        }
+
+        // 4. Converert to familiar format
+        numOfVertices = 0;
+        cx = cy = sx = sy = scx = scy = 0;
+        for (i = 0; i < numOfVertices; i++)
+        {
+          // curr
+          vertex = vertices[off + i];
+          flags = vertex.type;
+          x = vertex.x;
+          y = vertex.y;
+
+          if (nextMove == i)
+          {
+            if (i != 0)
+              numOfVertices = CloseShape(ref vertices, numOfVertices, wasOff, startOff, sx, sy, scx, scy, cx, cy);
+
+            startOff = (flags & 1) != 1;
+            // next
+            vertex = vertices[off + i + 1];
+            if (startOff)
+            {
+              // if we start off with an off-curve point, then when we need to find a point on the curve
+              // where we can start, and we need to save some state for when we wraparound.
+              scx = x;
+              scy = y;
+              byte type = vertex.type;
+              if ((type & 1) != 1)
+              {
+                // next point is also a curve point, so interpolate an on point curve
+                sx = (x + vertex.x) >> 1;
+                sy = (y + vertex.y) >> 1;
+              }
+              else
+              {
+                // otherwise just use the next point as our start point
+                sx = vertex.x;
+                sy = vertex.y;
+                i++;
+              }
+            }
+            else
+            {
+              sx = x;
+              sy = y;
+            }
+
+            vertex = vertices[numOfVertices++];
+            SetVertex(ref vertex, (byte)VMove.VMOVE, sx, sy, 0, 0);
+            wasOff = false;
+            nextMove = 1 + ReadUInt16(ref buffer, endPtsOfContoursOffset + j * 2);
+            j++;
+          } else
+          {
+            vertex = vertices[numOfVertices++];
+            // if its a currve
+            if ((flags & 1) != 1)
+            {
+              if (wasOff) // two off-curv control points in a row means interpolate an on-curve midpoint
+                SetVertex(ref vertex, (byte)VMove.VCURVE, (cx + x) >> 1, (cy + y) >> 1, cx, cy);
+              cx = x;
+              cy = y;
+              wasOff = true;
+            }
+            else
+            {
+              if (wasOff)
+                SetVertex(ref vertex, (byte)VMove.VCURVE, x, y, cx, cy);
+              else
+                SetVertex(ref vertex, (byte)VMove.VLINE, x, y, 0, 0);
+              wasOff = false;
+            }
+          }
+        }
+        numOfVertices = CloseShape(ref vertices, numOfVertices, wasOff, startOff, sx, sy, scx, scy, cx, cy);
+      }
+      else if (numOfContours < 0)
+      {
+        // Compound shapes
+        bool more = true;
+        int compOffset = (int)_ttf.StartOffset + g + 10;
+        numOfVertices = 0;
+        vertex = new TTFVertex();
+        List<TTFVertex> compVertex = new List<TTFVertex>();
+        List<TTFVertex> tempVertex = new List<TTFVertex>();
+        Span<float> mtx = stackalloc float[6] { 1, 0, 0, 1, 0, 0 };
+        while (more)
+        {
+          // setup
+          ushort flags, gidx;
+          float m, n;
+          mtx[0] = 1;
+          mtx[1] = 0;
+          mtx[2] = 0;
+          mtx[3] = 1;
+          mtx[4] = 0;
+          mtx[5] = 0;
+          int compNumVerts = 0;
+          int i;
+          compVertex.Clear();
+          tempVertex.Clear();
+          // end setup
+
+          flags = (ushort)ReadSignedInt16(ref buffer, compOffset);
+          compOffset += 2;
+          gidx = (ushort)ReadSignedInt16(ref buffer, compOffset);
+          compOffset += 2;
+
+          if ((flags & 2) == 2) // XY values
+          {
+            // ??
+            if ((flags & 1) == 1)
+            {
+              mtx[4] = ReadSignedInt16(ref buffer, compOffset);
+              compOffset += 2;
+              mtx[5] = ReadSignedInt16(ref buffer, compOffset);
+              compOffset += 2;
+            } else
+            {
+              mtx[4] = ReadByte(ref buffer, compOffset++);
+              mtx[5] = ReadByte(ref buffer, compOffset++);
+            }
+          } else
+          {
+            // matching point
+            throw new NotImplementedException();
+          }
+
+          if ((flags &  (1 << 3)) != 0) // we have a scale
+          {
+            mtx[0] = mtx[3] = ReadSignedInt16(ref buffer, compOffset) / 16384.0f;
+            compOffset += 2;
+            mtx[1] = mtx[2] = 0;
+          } else if ((flags & (1 << 6)) != 0) // we have an x and y scale
+          {
+            mtx[0] = ReadSignedInt16(ref buffer, compOffset) / 16384.0f;
+            compOffset += 2;
+            mtx[1] = mtx[2] = 0;
+            mtx[3] = ReadSignedInt16(ref buffer, compOffset) / 16384.0f;
+            compOffset += 2;
+          } else if ((flags & (1 << 7)) != 0)
+          {
+            mtx[0] = ReadSignedInt16(ref buffer, compOffset) / 16384.0f;
+            compOffset += 2;
+            mtx[1] = ReadSignedInt16(ref buffer, compOffset) / 16384.0f;
+            compOffset += 2;
+            mtx[2] = ReadSignedInt16(ref buffer, compOffset) / 16384.0f;
+            compOffset += 2;
+            mtx[3] = ReadSignedInt16(ref buffer, compOffset) / 16384.0f;
+            compOffset += 2;
+          }
+
+          // Find transformation scales
+          m = (float)Math.Sqrt(mtx[0] * mtx[0] + mtx[1] * mtx[1]);
+          n = (float)Math.Sqrt(mtx[2] * mtx[2] + mtx[3] * mtx[3]);
+
+          // Get indexed glyph
+          compNumVerts = GetGlyphShape(gidx, ref compVertex);
+          if (compNumVerts > 0)
+          {
+            // Transform vertices
+            for (i =0; i < compNumVerts; i++)
+            {
+              vertex = compVertex[i];
+              short x, y;
+              x = vertex.x;
+              y = vertex.y;
+              vertex.x = (short)(m * (mtx[0] * x + mtx[2] * y + mtx[4]));
+              vertex.y = (short)(m * (mtx[1] * x + mtx[3] * y + mtx[5]));
+
+              x = vertex.cx;
+              y = vertex.cy;
+              vertex.cx = (short)(m * (mtx[0] * x + mtx[2] * y + mtx[4]));
+              vertex.cy = (short)(m * (mtx[1] * x + mtx[3] * y + mtx[5]));
+            }
+
+            // Append vertices
+            // null check not needed?
+            if (numOfVertices > 0 && vertices != null)
+            {
+              tempVertex.AddRange(vertices);
+            }
+            tempVertex.AddRange(compVertex);
+            vertices.Clear(); // needed?
+            vertices = tempVertex;
+            numOfVertices += compNumVerts;
+          }
+
+          more = (flags & (1 << 5)) > 0;
+        }
+      }
+      return numOfVertices;
     }
 
     /// <summary>
@@ -456,9 +783,23 @@ namespace Converter.Parsers.Fonts
 
     public void MakeGlyphBitmapSubpixel(ref byte[] bitmapArr, int glyphWidth, int glyphHeight, int glyphStride, float scaleX, float scaleY, float shiftX, float shiftY, int glyphIndex)
     {
-      int ix0, iy0;
-      List<TTFVertex> vertices;
-      int numOfVerts = 
+      int ix0 = 0;
+      int iy0 = 0;
+      int ix1 = 0;
+      int iy1 = 0;
+      List<TTFVertex> vertices = new List<TTFVertex>();
+      int numOfVerts = GetGlyphShape(glyphIndex, ref vertices);
+      BmpS gbm = new BmpS();
+      
+      GetGlyphBitmapBoxSubpixel(glyphIndex, scaleX, scaleY, shiftX, shiftY, ref ix0, ref iy0, ref ix1, ref iy1);
+      gbm.Pixels = bitmapArr;
+      gbm.W = glyphWidth;
+      gbm.H = glyphHeight;
+      gbm.Stride = glyphStride;
+
+      if (gbm.W > 0 && gbm.H > 0)
+        Rasterize(ref gbm, 0.35f, ref vertices, numOfVerts, scaleX, scaleY, shiftX, shiftY, ix0, iy0, true);
+
     }
     public void MakeCodepointBitmapSubpixel(ref byte[] bitmapArr, int glyphWidth, int glyphHeight, int glyphStride, float scaleX, float scaleY, float shiftX, float shiftY, int unicodeCodepoint)
     {

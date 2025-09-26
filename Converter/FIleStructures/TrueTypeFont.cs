@@ -22,8 +22,8 @@ namespace Converter.FileStructures
 
   public struct TTFVertex
   {
-    short x, y, cx, cy, cx1, cy1;
-    byte type, padding;
+    public short x, y, cx, cy, cx1, cy1;
+    public byte type, padding;
   }
 
   public struct TableOffsets
@@ -47,8 +47,32 @@ namespace Converter.FileStructures
     public FakeSpan OS_2 = new FakeSpan(); // SD
     public FakeSpan prep = new FakeSpan(); // SD
   }
+  // Glyph shapes
+  public enum VMove : byte
+  {
+    VMOVE = 1,
+    VLINE,
+    VCURVE,
+    VCUBIC
+  }
 
-
+  public struct PointF
+  {
+    public float X;
+    public float Y;
+    public PointF(float x, float y)
+    {
+      X = x;
+      Y = y;
+    }
+  }
+  // bitmap struct
+  public struct BmpS
+  {
+    public BmpS() { }
+    public int W, H, Stride = 0;
+    public byte[] Pixels;
+  }
   public struct FontDirectory
   {
     // offset subtable
