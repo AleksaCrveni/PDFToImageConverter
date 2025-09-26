@@ -341,7 +341,7 @@ namespace Converter.Parsers.Fonts
 
       return g1;
     }
-    public bool GetGlyphBox(int glyphIndex, ref int x0, ref int y0, ref int x1, ref int y1)
+    public bool GetGlyphBox(int glyphIndex, ref int xMin, ref int yMin, ref int xMax, ref int yMax)
     {
       // TODO: if cff = true its open type font?
       if (_ttf.Cff)
@@ -355,10 +355,10 @@ namespace Converter.Parsers.Fonts
         if (g < 0)
           return false;
 
-        x0 = ReadUInt16(ref buffer, g + 2);
-        y0 = ReadUInt16(ref buffer, g + 4);
-        x1 = ReadUInt16(ref buffer, g + 6);
-        y1 = ReadUInt16(ref buffer, g + 8);
+        xMin = ReadUInt16(ref buffer, g + 2);
+        yMin = ReadUInt16(ref buffer, g + 4);
+        xMax = ReadUInt16(ref buffer, g + 6);
+        yMax = ReadUInt16(ref buffer, g + 8);
       }
       return true;
     }
@@ -370,7 +370,7 @@ namespace Converter.Parsers.Fonts
       int y0 = 0;
       int x1 = 0;
       int y1 = 0;
-
+      // gets contour points of the glyph
       if (!GetGlyphBox(glyphIndex, ref x0, ref y0, ref x1, ref y1))
       {
         ix0 = 0;
@@ -379,7 +379,10 @@ namespace Converter.Parsers.Fonts
         iy1 = 0;
       } else
       {
-        // TODO: finish this
+        ix0 = (int)Math.Floor  ( x0 * scaleX + shiftX);
+        iy0 = (int)Math.Floor  (-y1 * scaleY + shiftY);
+        ix1 = (int)Math.Ceiling( x1 * scaleX + shiftX);
+        iy1 = (int)Math.Ceiling(-y0 * scaleY + shiftY);
       }
     }
 
