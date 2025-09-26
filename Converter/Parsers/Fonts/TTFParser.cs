@@ -1,8 +1,6 @@
 ﻿using Converter.FileStructures;
 using Converter.FileStructures.TIFF;
-using System;
 using System.Buffers.Binary;
-using System.Reflection;
 
 namespace Converter.Parsers.Fonts
 {
@@ -19,7 +17,7 @@ namespace Converter.Parsers.Fonts
     private int byteSize;
     // use endOfArr internally to know if you reached end of array or not
     private uint endOfArr;
-    private uint beginOfSfnt;
+    private uint beginOfSfnt
     
     public void Init(ref byte[]buffer)
     {
@@ -379,6 +377,7 @@ namespace Converter.Parsers.Fonts
         iy1 = 0;
       } else
       {
+        // is this subpixel since we round it?
         ix0 = (int)Math.Floor  ( x0 * scaleX + shiftX);
         iy0 = (int)Math.Floor  (-y1 * scaleY + shiftY);
         ix1 = (int)Math.Ceiling( x1 * scaleX + shiftX);
@@ -402,6 +401,75 @@ namespace Converter.Parsers.Fonts
       GetCodepointBitmapBoxSubpixel(unicodeCodepoint, scaleX, scaleY, 0, 0, ref ix0, ref iy0, ref ix1, ref iy1);
     }
     #endregion antialiasing software rasterizer
+
+
+    /// <summary>
+    /// 
+    /// </summary>
+    /// <param name="glyphIndex"></param>
+    /// <param name="vertices"></param>
+    /// <returns>Number of vertices</returns>
+    public int GetGlyphShapeTT(int glyphIndex, ref List<TTFVertex> vertices)
+    {
+      short numOfContours;
+      uint endPtsOfContoursOffset;
+      // *data
+      int startOffset = (int)_ttf.StartOffset;
+      int numOfVertices = 0;
+      TTFVertex vertex;
+      ReadOnlySpan<byte> buffer = new ReadOnlySpan<byte>();
+      int g = GetGlyphOffset(ref buffer, glyphIndex);
+
+      numOfContours = ReadSignedInt16(ref buffer, startOffset + g);
+
+      if (numOfContours > 0)
+      {
+        byte flags = 0;
+        byte flagCount = 0;
+        int ins, i, j, m, n, nextMove, wasOff, off, startOff;
+        int x, y, cx, cy, sx, sy, scx, scy;
+        uint pointsOffset;
+      } else if (numOfContours < 0)
+      {
+        
+      }
+
+    }
+
+    /// <summary>
+    /// 
+    /// </summary>
+    /// <param name="glyphIndex"></param>
+    /// <param name="vertices"></param>
+    /// <returns>Number of vertices</returns>
+    /// <exception cref="NotImplementedException"></exception>
+    public int GetGlyphShape(int glyphIndex, ref List<TTFVertex> vertices)
+    {
+      if (_ttf.Cff)
+      {
+        throw new NotImplementedException();
+        return 0;
+      }
+
+      return GetGlyphShapeTT(glyphIndex, ref vertices);
+    }
+
+    public void MakeGlyphBitmapSubpixel(ref byte[] bitmapArr, int glyphWidth, int glyphHeight, int glyphStride, float scaleX, float scaleY, float shiftX, float shiftY, int glyphIndex)
+    {
+      int ix0, iy0;
+      List<TTFVertex> vertices;
+      int numOfVerts = 
+    }
+    public void MakeCodepointBitmapSubpixel(ref byte[] bitmapArr, int glyphWidth, int glyphHeight, int glyphStride, float scaleX, float scaleY, float shiftX, float shiftY, int unicodeCodepoint)
+    {
+      int glyphIndex = FindGlyphIndex(unicodeCodepoint);
+      MakeGlyphBitmapSubpixel(ref bitmapArr, glyphWidth, glyphHeight, glyphStride, scaleX, scaleY, shiftX, shiftY, glyphIndex);
+    }
+
+    public void MakeCodepointBitmap(ref byte[] bitmapArr, int glyphWidth, int glyphHeight, int glyphStride, float scaleX, float scaleY, int unicodeCodepoint)
+    {
+      MakeCodepointBitmapSubpixel(ref bitmapArr, glyphWidth, glyphHeight, glyphStride, scaleX, scaleY, 0, 0, unicodeCodepoint);
+    }
 
     #region reader functions
     private uint ReadUInt32(ref ReadOnlySpan<byte> buffer, int pos)

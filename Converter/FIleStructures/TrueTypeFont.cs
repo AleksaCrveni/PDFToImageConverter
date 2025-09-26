@@ -17,6 +17,13 @@ namespace Converter.FileStructures
     public ushort IndexToLocFormat;
     public ushort CmapFormat;
     public bool Cff;
+    public uint StartOffset;
+  }
+
+  public struct TTFVertex
+  {
+    short x, y, cx, cy, cx1, cy1;
+    byte type, padding;
   }
 
   public struct TableOffsets
