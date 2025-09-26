@@ -1,0 +1,1 @@
+q Q q 0.6 i /Cs1 cs 1 1 1 sc 0 842 m 595 842 l 595 0 l 0 0 l h 0 842 m f 0\n0 0 sc 0 i q 1 0 0 -1 0 842 cm BT 16.5 0 0 -16.5 71 67 Tm /TT1 1 Tf (Nova Dusk PDF)\nTj ET Q q 1 0 0 -1 0 842 cm BT 11 0 0 -11 71 105 Tm /TT2 1 Tf [ (Just a simple PDF)\n96 (.) ] TJ ET Q Q

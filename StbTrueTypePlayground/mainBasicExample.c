@@ -44,14 +44,15 @@ int main(int argc, char const *argv[])
   int bitmapHeight = 256;
   
   // this is Ascent - Descent
-  int lineHeight = 128;
+  int lineHeight = 64;
 
   unsigned char* bitmap = calloc(bitmapWidth * bitmapHeight, sizeof(unsigned char));
 
   // I think we should use this for scale?? or just value from Text line matrix or something similar
   float scaleFactor = stbtt_ScaleForPixelHeight(&info, lineHeight);
 
-  char* textToTranslate = "testing";
+  char* textToTranslate = "this is excelelnttestldjsald";
+  char* textToTranslate2nd = "Second Row";
 
   int x = 0;
   // ascent and descent are defined in font descriptor, use those I think over getting i from  the font
@@ -67,8 +68,15 @@ int main(int argc, char const *argv[])
 
   int i =0;
   int len = strlen(textToTranslate);
+  int baseline = 0;
   for (i = 0; i < len; ++i)
   {
+    /*if (textToTranslate[i] == '@')
+    {
+      baseline += lineHeight;
+      x = 0;
+    }*/
+      
     int ax; // charatcter width
     int lsb; // left side bearing
 
@@ -79,7 +87,7 @@ int main(int argc, char const *argv[])
     stbtt_GetCodepointBitmapBox(&info, textToTranslate[i], scaleFactor, scaleFactor, &c_x0, &c_y0, &c_x1, &c_y1);
     
     // char height
-    int y = ascent + c_y0;
+    int y = ascent + c_y0 + baseline;
 
     int charOffset = x + roundf(lsb * scaleFactor) + (y * bitmapWidth);
     stbtt_MakeCodepointBitmap(&info, bitmap + charOffset, c_x1 - c_x0, c_y1 - c_y0, bitmapWidth, scaleFactor, scaleFactor, textToTranslate[i]);

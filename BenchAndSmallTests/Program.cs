@@ -2,7 +2,9 @@
 using BenchmarkDotNet.Running;
 using Converter;
 using Converter.FIleStructures;
+using Converter.Parsers.PDF;
 using Converter.Writers;
+using Converter.Writers.TIFF;
 //int count1 = 0b_0000_0001;
 //int count2 = 0b_1110_0010;
 
@@ -83,4 +85,8 @@ using Converter.Writers;
 //    AllowStackAlloct = true,
 //  });
 //}
-var runner = BenchmarkRunner.Run<MyBenches>();
+
+
+PdfParser pdfParser = new PdfParser();
+pdfParser.Parse(Files.BaseDocFilePath);
+//var runner = BenchmarkRunner.Run<MyBenches>();
