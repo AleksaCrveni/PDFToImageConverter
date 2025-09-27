@@ -449,11 +449,163 @@ namespace Converter.Parsers.Fonts
     }
     #endregion antialiasing software rasterizer
 
+    public void TesselateCubic(ref List<PointF> points, ref int numOfPoints, float x0, float y0, float x1, float y1, float x2, float y2, float x3, float y3, float objspaceFlatnessSquared, int n)
+    {
+      // TODO: this "flatness" calculation is just made-up nonsense that seems to work well enough
+      float dx0 = x1 - x0;
+      float dy0 = y1 - y0;
+      float dx1 = x2 - x1;
+      float dy1 = y2 - y1;
+      float dx2 = x3 - x2;
+      float dy2 = y3 - y2;
+      float dx = x3 - x0;
+      float dy = y3 - y0;
+      float longLen = (float)(Math.Sqrt(dx0 * dx0 + dy0 * dy0) + Math.Sqrt(dx1 * dx1 + dy1 * dy1) + Math.Sqrt(dx2 * dx2 + dy2 * dy2));
+      float shortLen = (float)Math.Sqrt(dx * dx + dy * dy);
+      float flatness_squared = longLen * longLen - shortLen * shortLen;
+
+      if (flatness_squared > objspaceFlatnessSquared)
+      {
+        float x01 = (x0 + x1) / 2;
+        float y01 = (y0 + y1) / 2;
+        float x12 = (x1 + x2) / 2;
+        float y12 = (y1 + y2) / 2;
+        float x23 = (x2 + x3) / 2;
+        float y23 = (y2 + y3) / 2;
+
+        float xa = (x01 + x12) / 2;
+        float ya = (y01 + y12) / 2;
+        float xb = (x12 + x23) / 2;
+        float yb = (y12 + y23) / 2;
+
+        float mx = (xa + xb) / 2;
+        float my = (ya + yb) / 2;
+
+        TesselateCubic(ref points, ref numOfPoints , x0, y0, x01, y01, xa, ya, mx, my, objspaceFlatnessSquared, n + 1);
+        TesselateCubic(ref points, ref numOfPoints , mx, my, xb, yb, x23, y23, x3, y3, objspaceFlatnessSquared, n + 1);
+      }
+      else
+      {
+        AddPoint(ref points, numOfPoints, x3, y3);
+        numOfPoints++;
+      }
+    }
+
+    // tesselate until threshold p is happy
+    // TODO: warped to compensate for non-linearn stretching (??)
+    public int TesselateCurve(ref List<PointF> points, ref int numOfPoints, float x0, float y0, float x1, float y1, float x2, float y2, float objspaceFlatnessSquared, int n)
+    {
+      // midpoint
+      float mx = (x0 + 2 * x1 + x2) / 4;
+      float my = (y0 + 2 * y1 + y2) / 4;
+      // versus directly drawn line
+      float dx = (x0 + x2) / 2 - mx;
+      float dy = (y0 + y2) / 2 - my;
+
+      if (n > 16) // 65536 segments on one curve better be enough!
+        return 1;
+      if (dx * dx + dy * dy > objspaceFlatnessSquared) // half-pixel error allowed.... need to be smaller if AA
+      {
+        TesselateCurve(ref points, ref numOfPoints, x0, y0, (x0 + x1) / 2.0f, (y0 + y1) / 2.0f, mx, my, objspaceFlatnessSquared, n + 1);
+        TesselateCurve(ref points, ref numOfPoints, mx, my, (x1 + x2) / 2.0f, (y1 + y2) / 2.0f, x2, y2, objspaceFlatnessSquared, n + 1);
+      }
+      else
+      {
+        AddPoint(ref points, numOfPoints, x2, y2);
+        numOfPoints++;
+      }
+      return 1;
+    }
+
+    public void AddPoint(ref List<PointF> points, int n, float x, float y)
+    {
+      if (points.Count == 0)
+        return;
+      PointF p = new PointF();
+      p.X = x;
+      p.Y = y;
+      points[n] = p;
+    }
+
+    public List<PointF> FlattenCurves(ref List<TTFVertex> vertices, int numOfVerts, float objspaceFlatness, ref List<int> windingLengths, ref int windingCount)
+    {
+      List<PointF> points = new List<PointF>();
+      int numOfPoints = 0;
+
+      float objspaceFlatnessSquared = objspaceFlatness * objspaceFlatness;
+      int i, pass;
+      int n = 0;
+      int start = 0;
+
+      // count how many "moves" there are to get the countour count
+      for (i = 0; i < numOfVerts; i++)
+      {
+        if (vertices[i].type == (byte)VMove.VMOVE)
+          n++;
+      }
+
+      windingCount = n;
+      if (n == 0)
+        return new List<PointF>();
+      
+      // make two passes through the points so we don't need to allocate too much?? (look at this later to be more C# like)
+      for (pass =0; pass < 2; ++pass)
+      {
+        float x = 0;
+        float y = 0;
+        if (pass == 1)
+          points.Clear(); // redundant just for clarity that its used in second pass
+
+        numOfPoints = 0;
+        n = -1;
+        TTFVertex vertex;
+        for (i =0; i < numOfVerts; i++)
+        {
+          vertex = vertices[i];
+          switch (vertex.type)
+          {
+            case (byte)VMove.VMOVE:
+              // start next countour
+              if (n >= 0)
+                windingLengths[n] = numOfPoints - start;
+              n++;
+              start = numOfPoints;
+              x = vertex.x;
+              y = vertex.y;
+              AddPoint(ref points, numOfPoints++, x, y);
+              break;
+            case (byte)VMove.VLINE:
+              x = vertex.x;
+              y = vertex.y;
+              AddPoint(ref points, numOfPoints++, x, y);
+              break;
+            case (byte)VMove.VCURVE:
+              TesselateCurve(ref points, ref numOfPoints, x, y, vertex.cx, vertex.cy, vertex.x, vertex.y, objspaceFlatnessSquared, 0);
+              x = vertex.x;
+              y = vertex.y;
+              break;
+            case (byte)VMove.VCUBIC:
+              TesselateCubic(ref points, ref numOfPoints, x, y, vertex.cx, vertex.cy, vertex.cx1, vertex.cy1, vertex.x, vertex.y, objspaceFlatness, 0);
+              x = vertex.x;
+              y = vertex.y;
+              break;
+            default:
+              break;
+          }
+        }
+        windingLengths[n] = numOfPoints - start;
+      }
+
+      return points;
+    }
+
     public void Rasterize(ref BmpS result, float flatnessInPixels, ref List<TTFVertex> vertices, int numOfVerts, float scaleX, float scaleY, float shiftX, float shiftY, int xOff, int yOff, bool invert)
     {
       float scale = scaleX > scaleY ? scaleY : scaleX;
       int windingCount = 0;
-      int[] windingLengths; // ??
+      List<int> windingLengths = new List<int>();
+      List<PointF> windings = FlattenCurves(ref vertices, numOfVerts, flatnessInPixels / scale, ref windingLengths, ref windingCount);
+
       // TOOD: continue
     }
 
