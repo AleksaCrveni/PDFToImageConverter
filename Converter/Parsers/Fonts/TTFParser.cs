@@ -1,6 +1,7 @@
 ﻿using Converter.FileStructures;
 using Converter.FileStructures.TIFF;
 using System.Buffers.Binary;
+using System.Diagnostics;
 
 namespace Converter.Parsers.Fonts
 {
@@ -18,7 +19,7 @@ namespace Converter.Parsers.Fonts
     // use endOfArr internally to know if you reached end of array or not
     private uint endOfArr;
     private uint beginOfSfnt;
-    
+    public RASTERIZER_VERSION RasterizerVersion = RASTERIZER_VERSION.V2;
     public void Init(ref byte[]buffer)
     {
       _buffer = buffer;
@@ -448,6 +449,76 @@ namespace Converter.Parsers.Fonts
       GetCodepointBitmapBoxSubpixel(unicodeCodepoint, scaleX, scaleY, 0, 0, ref ix0, ref iy0, ref ix1, ref iy1);
     }
     #endregion antialiasing software rasterizer
+    
+    private void SortEdges(ref List<TTFEdge> edges, int n)
+    {
+      // TODO: stbtt__sort_edges
+    }
+    private void InternalRasterize(ref BmpS result, ref List<PointF> points, ref List<int> wCount, int windings, float scaleX, float scaleY, float shiftX, float shiftY, int offX, int offY, bool invert)
+    {
+      float yScaleInv = invert ? -scaleY : scaleY;
+      List<TTFEdge> edges = new List<TTFEdge>();
+      int n, i, j, k, m;
+
+      int vSubSample;
+      if (RasterizerVersion == RASTERIZER_VERSION.V1)
+      {
+        vSubSample = result.H < 8 ? 15 : 5;
+      }
+      else
+      {
+        vSubSample = 1;
+      }
+
+      n = 0;
+      // TODO: optimize this
+      for (i = 0; i < windings; ++i)
+        n += wCount[i];
+
+      for (i = 0; i < n; i++)
+        edges.Add(new TTFEdge());
+
+      n = 0;
+      m = 0;
+      TTFEdge e;
+      for (i = 0; i < windings; ++i)
+      {
+        int pointsIndex = m;
+        m += wCount[i];
+        j = wCount[i] - 1;
+        for (k = 0; k < wCount[i]; j = k++)
+        {
+          int a = k;
+          int b = j;
+
+          // skip the edge if horizontal
+          if (points[pointsIndex + j].Y == points[pointsIndex + k].Y)
+            continue;
+          // add edge from j to k to the list
+          e = new TTFEdge();
+          e.Invert = false;
+          if (invert ? points[pointsIndex + j].Y > points[pointsIndex + k].Y : points[pointsIndex + j].Y < points[pointsIndex + k].Y)
+          {
+            e.Invert = true;
+            a = j,b = k;
+          }
+          e.x0 = p[a].x * scaleX + shiftX;
+          e.y0 = (p[a].y * yScaleInv + shiftY) * vSubSample;
+          e.x1 = p[b].x * scaleX + shiftX;
+          e.y1 = (p[b].y * yScaleInv + shiftY) * vSubSample;
+
+          edges[n] = e;
+          ++n;
+        }
+      }
+
+      // now sort the edges by their highest point (should snap to integer, and then by x)
+      //STBTT_sort(e, n, sizeof(e[0]), stbtt__edge_compare);
+      SortEdges(ref edges, n);
+      
+      // TODO:  scanelines
+      
+    }
 
     public void TesselateCubic(ref List<PointF> points, ref int numOfPoints, float x0, float y0, float x1, float y1, float x2, float y2, float x3, float y3, float objspaceFlatnessSquared, int n)
     {
@@ -605,8 +676,8 @@ namespace Converter.Parsers.Fonts
       int windingCount = 0;
       List<int> windingLengths = new List<int>();
       List<PointF> windings = FlattenCurves(ref vertices, numOfVerts, flatnessInPixels / scale, ref windingLengths, ref windingCount);
-
-      // TOOD: continue
+      if (windings.Count > 0)
+        InternalRasterize(ref result, ref windings, ref windingLengths, windingCount, scaleX, scaleY, shiftX, shiftY, xOff, yOff, invert);
     }
 
     public void SetVertex(ref TTFVertex vertex, byte type, int x, int y, int cx, int cy)

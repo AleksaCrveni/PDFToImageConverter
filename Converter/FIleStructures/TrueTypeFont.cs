@@ -20,6 +20,11 @@ namespace Converter.FileStructures
     public uint StartOffset;
   }
 
+  public enum RASTERIZER_VERSION
+  {
+    V1,
+    V2
+  }
   public struct TTFVertex
   {
     public short x, y, cx, cy, cx1, cy1;
@@ -65,6 +70,15 @@ namespace Converter.FileStructures
       X = x;
       Y = y;
     }
+    // TODO: Test these
+    public static bool operator ==(PointF a, PointF b)
+    {
+      return a.X == b.X && a.Y == b.Y;
+    }
+    public static bool operator !=(PointF a, PointF b)
+    {
+      return !(a.X == b.X && a.Y == b.Y);
+    }
   }
   // bitmap struct
   public struct BmpS
@@ -73,6 +87,12 @@ namespace Converter.FileStructures
     public int W, H, Stride = 0;
     public byte[] Pixels;
     public int Offset;
+  }
+
+  public struct TTFEdge
+  {
+    public float x0, y0, x1, y1;
+    public bool Invert;
   }
   public struct FontDirectory
   {
