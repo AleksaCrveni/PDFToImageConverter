@@ -449,11 +449,138 @@ namespace Converter.Parsers.Fonts
       GetCodepointBitmapBoxSubpixel(unicodeCodepoint, scaleX, scaleY, 0, 0, ref ix0, ref iy0, ref ix1, ref iy1);
     }
     #endregion antialiasing software rasterizer
-    
+    #region rasterizer
+
+    /// <summary>
+    /// returns true if y0 of first edge is smaller than y0 of second edge
+    /// </summary>
+    /// <returns>bool</returns>
+    private bool CompareEdge(TTFEdge a, TTFEdge b)
+    {
+      return a.y0 < b.y0;
+    }
+
+    private void SortEdgesInsSort(ref Span<TTFEdge> edges, int n)
+    {
+      int i, j;
+      TTFEdge tempEdge;
+      for (i = 0; i < n; i++)
+      {
+        tempEdge = edges[i];
+        Span<TTFEdge> a = edges;
+        j = i;
+        while (j > 0)
+        {
+          Span<TTFEdge> b = edges.Slice(j - 1);
+          bool c = CompareEdge(a[0], b[0]);
+          if (!c)
+            break;
+
+          edges[j] = edges[j - 1];
+          j--;
+        }
+
+        if (i != j)
+          edges[j] = a[0];
+      }
+    }
+
+    /// <summary>
+    /// 
+    /// </summary>
+    /// <param name="edges"></param>
+    /// <param name="sp">start position, to imitate pointer arithmetic, fix later</param>
+    /// <param name="n"></param>
+    private void SortEdgesQuickSort(ref Span<TTFEdge> oRefEdges, int n, bool startSecond = false)
+    {
+      Span<TTFEdge> edges;
+      if (startSecond == false)
+        edges = oRefEdges;
+      else
+        edges = oRefEdges.Slice(1);
+      TTFEdge tempEdge;
+      while (n > 12)
+      {
+        tempEdge = new TTFEdge();
+        int m, i, j;
+        bool c01, c12, c;
+        // compute median of three
+        m = n >> 1;
+        c01 = CompareEdge(edges[0], edges[m]);
+        c12 = CompareEdge(edges[m], edges[n-1]);
+        /* if 0 >= mid >= end, or 0 < mid < end, then use mid */
+        if (c01 != c12)
+        {
+          /* otherwise, we'll need to swap something else to middle */
+          int z;
+          c = CompareEdge(edges[0], edges[n - 1]);
+          /* 0>mid && mid<n:  0>n => n; 0<n => 0 */
+          /* 0<mid && mid>n:  0>n => 0; 0<n => n */
+          z = (c == c12) ? 0 : n - 1;
+          tempEdge = edges[z];
+          edges[z] = edges[m];
+          edges[m] = tempEdge;
+        }
+        /* now p[m] is the median-of-three */
+        /* swap it to the beginning so it won't move around */
+        tempEdge = edges[0];
+        edges[0] = edges[m];
+        edges[m] = tempEdge;
+
+        /* partition loop */
+        i = 1;
+        j = n - 1;
+        for (; ; )
+        {
+          /* handling of equality is crucial here */
+          /* for sentinels & efficiency with duplicates */
+          for (; ; ++i)
+          {
+            if (!CompareEdge(edges[i], edges[0])) break;
+          }
+          for (; ; --j)
+          {
+            if (!CompareEdge(edges[0], edges[j])) break;
+          }
+          /* make sure we haven't crossed */
+          if (i >= j) break;
+          tempEdge = edges[i];
+          edges[i] = edges[j];
+          edges[j] = tempEdge;
+
+          ++i;
+          --j;
+        }
+
+        /* recurse on smaller side, iterate on larger */
+        if (j < (n - i))
+        {
+          SortEdgesQuickSort(ref edges, j);
+          oRefEdges = edges.Slice(1);
+          n = n - i;
+        }
+        else
+        {
+          SortEdgesQuickSort(ref edges, n - i, true);
+          n = j;
+        }
+
+      }
+    }
+
+    // TODO: edges should be array
     private void SortEdges(ref List<TTFEdge> edges, int n)
     {
-      // TODO: stbtt__sort_edges
+      // TODO: Make edges array instead of list, so we don't have to copy
+      TTFEdge[] edgesArr = edges.ToArray();
+      Span<TTFEdge> edgesSpan = edgesArr.AsSpan();
+
+      SortEdgesQuickSort(ref edgesSpan, n);
+      // TODO: stbtt__sort_ins
+
+      edges = edgesArr.ToList();
     }
+
     private void InternalRasterize(ref BmpS result, ref List<PointF> points, ref List<int> wCount, int windings, float scaleX, float scaleY, float shiftX, float shiftY, int offX, int offY, bool invert)
     {
       float yScaleInv = invert ? -scaleY : scaleY;
@@ -500,12 +627,13 @@ namespace Converter.Parsers.Fonts
           if (invert ? points[pointsIndex + j].Y > points[pointsIndex + k].Y : points[pointsIndex + j].Y < points[pointsIndex + k].Y)
           {
             e.Invert = true;
-            a = j,b = k;
+            a = j;
+            b = k;
           }
-          e.x0 = p[a].x * scaleX + shiftX;
-          e.y0 = (p[a].y * yScaleInv + shiftY) * vSubSample;
-          e.x1 = p[b].x * scaleX + shiftX;
-          e.y1 = (p[b].y * yScaleInv + shiftY) * vSubSample;
+          e.x0 = points[pointsIndex + a].X * scaleX + shiftX;
+          e.y0 = (points[pointsIndex + a].Y * yScaleInv + shiftY) * vSubSample;
+          e.x1 = points[pointsIndex + b].X * scaleX + shiftX;
+          e.y1 = (points[pointsIndex + b].Y * yScaleInv + shiftY) * vSubSample;
 
           edges[n] = e;
           ++n;
@@ -516,7 +644,7 @@ namespace Converter.Parsers.Fonts
       //STBTT_sort(e, n, sizeof(e[0]), stbtt__edge_compare);
       SortEdges(ref edges, n);
       
-      // TODO:  scanelines
+      // TODO:  scanelines rasterization for both V1 and V2
       
     }
 
@@ -1082,7 +1210,7 @@ namespace Converter.Parsers.Fonts
     {
       MakeCodepointBitmapSubpixel(ref bitmapArr, byteOffset, glyphWidth, glyphHeight, glyphStride, scaleX, scaleY, 0, 0, unicodeCodepoint);
     }
-
+    #endregion rasterizer
     #region reader functions
     private uint ReadUInt32(ref ReadOnlySpan<byte> buffer, int pos)
     {
