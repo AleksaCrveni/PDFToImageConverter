@@ -72,6 +72,7 @@ namespace Converter.FileStructures
     public BmpS() { }
     public int W, H, Stride = 0;
     public byte[] Pixels;
+    public int Offset;
   }
   public struct FontDirectory
   {

@@ -242,6 +242,7 @@ namespace Converter.Parsers.Fonts
     // TODO: See if caching format data is better
     public int FindGlyphIndex(int unicodeCodepoint)
     {
+      ReadOnlySpan<byte> buffer = _buffer.AsSpan();
       if (_ttf.CmapFormat == 0)
       {
         throw new NotImplementedException();
@@ -250,10 +251,56 @@ namespace Converter.Parsers.Fonts
         throw new NotImplementedException();
       } else if (_ttf.CmapFormat == 4)
       {
-        throw new NotImplementedException();
+        // std mapping for windows fonts: binary search collection of ranges (indexes are not tight as in format 6)
+        // TODO: instead of >> 1, just /2 ??
+        ushort segCount = (ushort)(ReadUInt16(ref buffer, _ttf.IndexMapOffset + 6) >> 1); // >> 1 is basically / 2 
+        ushort searchRange = (ushort)(ReadUInt16(ref buffer, _ttf.IndexMapOffset + 8) >> 1);
+        ushort entrySelector = ReadUInt16(ref buffer, _ttf.IndexMapOffset + 10);
+        ushort rangeShift = (ushort)(ReadUInt16(ref buffer, _ttf.IndexMapOffset + 12) >> 1);
+
+        // do a binary search of the segments
+        uint endCount = (uint)_ttf.IndexMapOffset + 14;
+        uint search = endCount;
+
+        if (unicodeCodepoint > ushort.MaxValue)
+          return 0;
+
+        // they lie from endCount .. endCount + segCount
+        // but searchRange is the nearest power of two, so...
+        if (unicodeCodepoint >= ReadUInt16(ref buffer, (int)(_ttf.StartOffset + search + rangeShift * 2)))
+          search += (uint)rangeShift * 2;
+
+        // now decrement to bias correctly to find smaallest
+        search -= 2;
+        while (entrySelector > 0)
+        {
+          ushort end;
+          searchRange >>= 1;
+          end = ReadUInt16(ref buffer, (int)(_ttf.StartOffset + search + rangeShift * 2));
+          if (unicodeCodepoint > end)
+            search += (uint)searchRange * 2;
+          entrySelector--;
+        }
+        search += 2;
+
+        // do I really need separate scope?
+        {
+          ushort offset, start, last;
+          ushort item = (ushort)((search - endCount) >> 1);
+
+          start = ReadUInt16(ref buffer, (int)(_ttf.StartOffset + _ttf.IndexMapOffset + 14 + segCount * 2 + 2 + 2 * item));
+          last = ReadUInt16(ref buffer, (int)(_ttf.StartOffset + endCount + 2 * item));
+          if (unicodeCodepoint < start || unicodeCodepoint > last)
+            return 0;
+
+          offset = ReadUInt16(ref buffer, (int)(_ttf.StartOffset + _ttf.IndexMapOffset + segCount * 6 + 2 + 2 * item));
+          if (offset == 0)
+            return (ushort)(unicodeCodepoint + ReadUInt16(ref buffer, (int)(_ttf.StartOffset + _ttf.IndexMapOffset + 14 + segCount * 4 + 2 + 2 * item)));
+
+          return ReadUInt16(ref buffer, (int)(_ttf.StartOffset + offset + (unicodeCodepoint - start) * 2 + _ttf.IndexMapOffset + 14 + segCount * 6 + 2 + 2 * item));
+        }
       } else if (_ttf.CmapFormat == 6)
       {
-        ReadOnlySpan<byte> buffer = _buffer.AsSpan();
         ushort length = ReadUInt16(ref buffer, _ttf.IndexMapOffset + 2);
         ushort lang = ReadUInt16(ref buffer, _ttf.IndexMapOffset + 4);
         ushort firstCode = ReadUInt16(ref buffer, _ttf.IndexMapOffset + 6);
@@ -781,7 +828,7 @@ namespace Converter.Parsers.Fonts
       return GetGlyphShapeTT(glyphIndex, ref vertices);
     }
 
-    public void MakeGlyphBitmapSubpixel(ref byte[] bitmapArr, int glyphWidth, int glyphHeight, int glyphStride, float scaleX, float scaleY, float shiftX, float shiftY, int glyphIndex)
+    public void MakeGlyphBitmapSubpixel(ref byte[] bitmapArr, int byteOffset, int glyphWidth, int glyphHeight, int glyphStride, float scaleX, float scaleY, float shiftX, float shiftY, int glyphIndex)
     {
       int ix0 = 0;
       int iy0 = 0;
@@ -796,20 +843,21 @@ namespace Converter.Parsers.Fonts
       gbm.W = glyphWidth;
       gbm.H = glyphHeight;
       gbm.Stride = glyphStride;
+      gbm.Offset = byteOffset;
 
       if (gbm.W > 0 && gbm.H > 0)
         Rasterize(ref gbm, 0.35f, ref vertices, numOfVerts, scaleX, scaleY, shiftX, shiftY, ix0, iy0, true);
 
     }
-    public void MakeCodepointBitmapSubpixel(ref byte[] bitmapArr, int glyphWidth, int glyphHeight, int glyphStride, float scaleX, float scaleY, float shiftX, float shiftY, int unicodeCodepoint)
+    public void MakeCodepointBitmapSubpixel(ref byte[] bitmapArr, int byteOffset, int glyphWidth, int glyphHeight, int glyphStride, float scaleX, float scaleY, float shiftX, float shiftY, int unicodeCodepoint)
     {
       int glyphIndex = FindGlyphIndex(unicodeCodepoint);
-      MakeGlyphBitmapSubpixel(ref bitmapArr, glyphWidth, glyphHeight, glyphStride, scaleX, scaleY, shiftX, shiftY, glyphIndex);
+      MakeGlyphBitmapSubpixel(ref bitmapArr, byteOffset, glyphWidth, glyphHeight, glyphStride, scaleX, scaleY, shiftX, shiftY, glyphIndex);
     }
 
-    public void MakeCodepointBitmap(ref byte[] bitmapArr, int glyphWidth, int glyphHeight, int glyphStride, float scaleX, float scaleY, int unicodeCodepoint)
+    public void MakeCodepointBitmap(ref byte[] bitmapArr, int byteOffset, int glyphWidth, int glyphHeight, int glyphStride, float scaleX, float scaleY, int unicodeCodepoint)
     {
-      MakeCodepointBitmapSubpixel(ref bitmapArr, glyphWidth, glyphHeight, glyphStride, scaleX, scaleY, 0, 0, unicodeCodepoint);
+      MakeCodepointBitmapSubpixel(ref bitmapArr, byteOffset, glyphWidth, glyphHeight, glyphStride, scaleX, scaleY, 0, 0, unicodeCodepoint);
     }
 
     #region reader functions
