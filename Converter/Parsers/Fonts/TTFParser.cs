@@ -20,7 +20,7 @@ namespace Converter.Parsers.Fonts
     private uint endOfArr;
     private uint beginOfSfnt;
     public RASTERIZER_VERSION RasterizerVersion = RASTERIZER_VERSION.V2;
-    public void Init(ref byte[]buffer)
+    public void Init(ref byte[] buffer)
     {
       _buffer = buffer;
       _ttf = new TrueTypeFont();
@@ -235,8 +235,8 @@ namespace Converter.Parsers.Fonts
         leftSideBearing = ReadSignedInt16(ref buffer, _ttf.Offsets.hdmx.Position + 4 * glyphIndex + 2);
       } else
       {
-        advanceWidth = ReadSignedInt16(ref buffer, _ttf.Offsets.hdmx.Position + 4 * (numOfLongHorMetrics -1));
-        leftSideBearing = ReadSignedInt16(ref buffer, _ttf.Offsets.hdmx.Position + 4 * numOfLongHorMetrics + 2*(glyphIndex - numOfLongHorMetrics)) ;
+        advanceWidth = ReadSignedInt16(ref buffer, _ttf.Offsets.hdmx.Position + 4 * (numOfLongHorMetrics - 1));
+        leftSideBearing = ReadSignedInt16(ref buffer, _ttf.Offsets.hdmx.Position + 4 * numOfLongHorMetrics + 2 * (glyphIndex - numOfLongHorMetrics));
       }
     }
 
@@ -349,7 +349,7 @@ namespace Converter.Parsers.Fonts
     public void GetFontVMetrics(ref int ascent, ref int descent, ref int lineGap)
     {
       ReadOnlySpan<byte> buffer = _buffer.AsSpan();
-      ascent  = ReadSignedInt32(ref buffer, _ttf.Offsets.hhea.Position + 4);
+      ascent = ReadSignedInt32(ref buffer, _ttf.Offsets.hhea.Position + 4);
       descent = ReadSignedInt32(ref buffer, _ttf.Offsets.hhea.Position + 6);
       lineGap = ReadSignedInt32(ref buffer, _ttf.Offsets.hhea.Position + 8);
     }
@@ -378,7 +378,7 @@ namespace Converter.Parsers.Fonts
       {
         // not sure about this cast
         g1 = _ttf.Offsets.glyf.Position + (int)ReadUInt32(ref buffer, _ttf.Offsets.loca.Position + glyphIndex * 4);
-        g2 = _ttf.Offsets.glyf.Position + (int)ReadUInt32(ref buffer, _ttf.Offsets.loca.Position + glyphIndex * 4 +4);
+        g2 = _ttf.Offsets.glyf.Position + (int)ReadUInt32(ref buffer, _ttf.Offsets.loca.Position + glyphIndex * 4 + 4);
       }
 
       // if length is 0 return -1??
@@ -426,9 +426,9 @@ namespace Converter.Parsers.Fonts
       } else
       {
         // is this subpixel since we round it?
-        ix0 = (int)Math.Floor  ( x0 * scaleX + shiftX);
-        iy0 = (int)Math.Floor  (-y1 * scaleY + shiftY);
-        ix1 = (int)Math.Ceiling( x1 * scaleX + shiftX);
+        ix0 = (int)Math.Floor(x0 * scaleX + shiftX);
+        iy0 = (int)Math.Floor(-y1 * scaleY + shiftY);
+        ix1 = (int)Math.Ceiling(x1 * scaleX + shiftX);
         iy1 = (int)Math.Ceiling(-y0 * scaleY + shiftY);
       }
     }
@@ -451,9 +451,329 @@ namespace Converter.Parsers.Fonts
     #endregion antialiasing software rasterizer
     #region rasterizer
 
+    public float SizedTriangleArea(float height, float width)
+    {
+      return height * width / 2;
+    }
+    public float SizedTrapezoidArea(float height, float topWidth, float bottomWidth)
+    {
+      Debug.Assert(topWidth >= 0);
+      Debug.Assert(bottomWidth >= 0);
+      return (topWidth + bottomWidth) / 2.0f * height;
+    }
+    public float PositionTrapezoidArea(float height, float tx0, float tx1, float bx0, float bx1)
+    {
+      return SizedTrapezoidArea(height, tx1 - tx0, bx1 - bx0);
+    }
+
+    // the edge passed in here does not cross the vertical line at x or the vertical line at x+1
+    // (i.e. it has already been clipped to those)
+    public void HandleClippedEdgeV2(Span<float> scanline, int x, ref ActiveEdgeV2 edge, float x0, float y0, float x1, float y1)
+    {
+      if (y0 == y1)
+        return;
+      Debug.Assert(y0 < y1);
+      Debug.Assert(edge.sy <= edge.ey);
+      if (y0 > edge.ey)
+        return;
+      if (y1 < edge.sy)
+        return;
+      if (y0 < edge.sy)
+      {
+        x0 += (x1 - x0) * (edge.sy - y0) / (y1 - y0);
+        y0 = edge.sy;
+      }
+      if (y1 > edge.ey)
+      {
+        x1 += (x1 - x0) * (edge.ey - y1) / (y1 - y0);
+        y1 = edge.ey;
+      }
+
+      if (x0 == x)
+        Debug.Assert(x1 <= x + 1);
+      else if (x0 == x + 1)
+        Debug.Assert(x1 >= x);
+      else if (x0 <= x)
+        Debug.Assert(x1 <= x);
+      else if (x0 >= x + 1)
+        Debug.Assert(x1 >= x + 1);
+      else
+        Debug.Assert(x1 >= x && x1 <= x + 1);
+
+      if (x0 <= x && x1 <= x)
+        scanline[x] += edge.direction * (y1 - y0);
+      else if (x0 >= x + 1 && x1 >= x + 1)
+        ;
+      else
+      {
+        Debug.Assert(x0 >= x && x0 <= x + 1 && x1 >= x && x1 <= x + 1);
+        scanline[x] += edge.direction * (y1 - y0) * (1 - ((x0 - x) + (x1 - x)) / 2); // coverage = 1 - average x position
+      }
+    }
+
     public void FillActiveEdgesNewV2(Span<float> scanline, Span<float> scanline2, int len, ref List<ActiveEdgeV2> activeEdges, float yTop)
     {
+      float yBottom = yTop + 1;
+      int i;
+      ActiveEdgeV2 edge;
+      Span<float> scanlineFill = scanline2.Slice(1);
+      for (i =0; i < activeEdges.Count; i++)
+      {
+        // brute force every pixel
 
+        // compute intersection points with top & bottom
+        edge = activeEdges[i];
+        Debug.Assert(edge.ey >= yTop);
+
+        if (edge.fdx == 0)
+        {
+          float x0 = edge.fx;
+          if (x0 < len)
+          {
+            if (x0 >= 0)
+            {
+              HandleClippedEdgeV2(scanline, (int)x0, ref edge, x0, yTop, x0, yBottom);
+              HandleClippedEdgeV2(scanline2, (int)x0 + 1, ref edge, x0, yTop, x0, yBottom);
+            }
+            else
+            {
+              HandleClippedEdgeV2(scanline2, 0, ref edge, x0, yTop, x0, yBottom);
+            }
+          }
+        }
+        else
+        {
+          float x0 = edge.fx;
+          float dx = edge.fdx;
+          float xb = x0 + dx;
+          float xTop, xBottom;
+          float sy0, sy1;
+          float dy = edge.fdy;
+          Debug.Assert(edge.sy <= yBottom && edge.ey >= yTop);
+
+          // compute endpoints of line segment clipped to this scanline (if the
+          // line segment starts on this scanline. x0 is the intersection of the
+          // line with y_top, but that may be off the line segment.
+
+          if (edge.sy > yTop)
+          {
+            xTop = x0 + dx * (edge.sy - yTop);
+            sy0 = edge.sy;
+          }
+          else
+          {
+            xTop = x0;
+            sy0 = yTop;
+          }
+          if (edge.ey < yBottom)
+          {
+            xBottom = x0 + dx * (edge.ey - yTop);
+            sy1 = edge.ey;
+          }
+          else
+          {
+            xBottom = xb;
+            sy1 = yBottom;
+          }
+
+          if (xTop >= 0 && xBottom >= 0 && xTop < len && xBottom < len)
+          {
+            // from here on, we don't have to range check x values
+
+            if ((int)xTop == (int)xBottom)
+            {
+              float height;
+              // simple case, only spans one pixel
+              int x = (int)xTop;
+              height = (sy1 - sy0) * edge.direction;
+              Debug.Assert(x >= 0 && x < len);
+              scanline[x] += PositionTrapezoidArea(height, xTop, x + 1.0f, xBottom, x + 1.0f);
+              scanlineFill[x] += height; // everything right of this pixel is filled
+            }
+            else
+            {
+              int x, x1, x2;
+              float yCrossing, yFinal, step, sign, area;
+              // covers 2+ pixels
+              if (xTop > xBottom)
+              {
+                // flip scanline vertically; signed area is the same
+                float t;
+                sy0 = yBottom - (sy0 - yTop);
+                sy1 = yBottom - (sy1 - yTop);
+                t = sy0;
+                sy0 = sy1;
+                sy1 = t;
+
+                t = xBottom;
+                xBottom = xTop;
+                xTop = t;
+
+                dx = -dx;
+                dy = -dy;
+                t = x0;
+                x0 = xb;
+                xb = t;
+              }
+
+              Debug.Assert(dy >= 0);
+              Debug.Assert(dx >= 0);
+
+              x1 = (int)xTop;
+              x2 = (int)xBottom;
+
+              // compute intersection with y axis at x1+1
+              yCrossing = yTop + dy * (x1 + 1 - x0);
+
+              // compute intersection with y axis at x2
+              yFinal = yTop + dy * (x2 - x0);
+
+              //           x1    x_top                            x2    x_bottom
+              //     y_top  +------|-----+------------+------------+--------|---+------------+
+              //            |            |            |            |            |            |
+              //            |            |            |            |            |            |
+              //       sy0  |      Txxxxx|............|............|............|............|
+              // y_crossing |            *xxxxx.......|............|............|............|
+              //            |            |     xxxxx..|............|............|............|
+              //            |            |     /-   xx*xxxx........|............|............|
+              //            |            | dy <       |    xxxxxx..|............|............|
+              //   y_final  |            |     \-     |          xx*xxx.........|............|
+              //       sy1  |            |            |            |   xxxxxB...|............|
+              //            |            |            |            |            |            |
+              //            |            |            |            |            |            |
+              //  y_bottom  +------------+------------+------------+------------+------------+
+              //
+              // goal is to measure the area covered by '.' in each pixel
+
+              // if x2 is right at the right edge of x1, y_crossing can blow up, github #1057
+              // @TODO: maybe test against sy1 rather than y_bottom?
+              if (yCrossing > yBottom)
+                yCrossing = yBottom;
+
+              sign = edge.direction;
+
+              // area of the rectangle covered from sy0..yCrossing
+              area = sign * (yCrossing - sy0);
+
+              // area of the triangle (x_top,sy0), (x1+1,sy0), (x1+1,yCrossing)
+              scanline[x1] += SizedTriangleArea(area, x1 + 1 - xTop);
+
+              // check if final yCrossing is blown up; no test case for this
+              if (yFinal > yBottom)
+              {
+                yFinal = yBottom;
+                dy = (yFinal - yCrossing) / (x2 - (x1 + 1)); // if denom=0, y_final = y_crossing, so y_final <= y_bottom
+              }
+
+              // in second pixel, area covered by line segment found in first pixel
+              // is always a rectangle 1 wide * the height of that line segment; this
+              // is exactly what the variable 'area' stores. it also gets a contribution
+              // from the line segment within it. the THIRD pixel will get the first
+              // pixel's rectangle contribution, the second pixel's rectangle contribution,
+              // and its own contribution. the 'own contribution' is the same in every pixel except
+              // the leftmost and rightmost, a trapezoid that slides down in each pixel.
+              // the second pixel's contribution to the third pixel will be the
+              // rectangle 1 wide times the height change in the second pixel, which is dy.
+
+              step = sign * dy * 1; // dy is dy/dx, change in y for every 1 change in x,
+                                    // which multiplied by 1-pixel-width is how much pixel area changes for each step in x
+                                    // so the area advances by 'step' every time
+
+              for (x = x1 + 1; x < x2; ++x)
+              {
+                scanline[x] += area + step / 2; // area of trapezoid is 1*step/2
+                area += step;
+              }
+              Debug.Assert(MathF.Abs(area) <= 1.01f); // accumulated error from area += step unless we round step down
+              Debug.Assert(sy1 > yFinal - 0.01f);
+
+              // area covered in the last pixel is the rectangle from all the pixels to the left,
+              // plus the trapezoid filled by the line segment in this pixel all the way to the right edge
+              scanline[x2] += area + sign * PositionTrapezoidArea(sy1 - yFinal, (float)x2, x2 + 1.0f, xBottom, x2 + 1.0f);
+
+              // the rest of the line is filled based on the total height of the line segment in this pixel
+              scanlineFill[x2] += sign * (sy1 - sy0);
+            }
+          }
+          else
+          {
+            // if edge goes outside of box we're drawing, we require
+            // clipping logic. since this does not match the intended use
+            // of this library, we use a different, very slow brute
+            // force implementation
+            // note though that this does happen some of the time because
+            // x_top and x_bottom can be extrapolated at the top & bottom of
+            // the shape and actually lie outside the bounding box
+            int x;
+
+            for (x = 0; x < len; ++x)
+            {
+              // cases:
+              //
+              // there can be up to two intersections with the pixel. any intersection
+              // with left or right edges can be handled by splitting into two (or three)
+              // regions. intersections with top & bottom do not necessitate case-wise logic.
+              //
+              // the old way of doing this found the intersections with the left & right edges,
+              // then used some simple logic to produce up to three segments in sorted order
+              // from top-to-bottom. however, this had a problem: if an x edge was epsilon
+              // across the x border, then the corresponding y position might not be distinct
+              // from the other y segment, and it might ignored as an empty segment. to avoid
+              // that, we need to explicitly produce segments based on x positions.
+
+              // rename variables to clearly-defined pairs
+              float y0 = yTop;
+              float x1 = (float)(x);
+              float x2 = (float)(x + 1);
+              float x3 = xb;
+              float y3 = yBottom;
+
+              // x = e->x + e->dx * (y-yTop)
+              // (y-yTop) = (x - e->x) / e->dx
+              // y = (x - e->x) / e->dx + yTop
+              float y1 = (x - x0) / dx + yTop;
+              float y2 = (x + 1 - x0) / dx + yTop;
+
+              if (x0 < x1 && x3 > x2)
+              {         // three segments descending down-right
+                HandleClippedEdgeV2(scanline, x, ref edge, x0, y0, x1, y1);
+                HandleClippedEdgeV2(scanline, x, ref edge, x1, y1, x2, y2);
+                HandleClippedEdgeV2(scanline, x, ref edge, x2, y2, x3, y3);
+              }
+              else if (x3 < x1 && x0 > x2)
+              {  // three segments descending down-left
+                HandleClippedEdgeV2(scanline, x, ref edge, x0, y0, x2, y2);
+                HandleClippedEdgeV2(scanline, x, ref edge, x2, y2, x1, y1);
+                HandleClippedEdgeV2(scanline, x, ref edge, x1, y1, x3, y3);
+              }
+              else if (x0 < x1 && x3 > x1)
+              {  // two segments across x, down-right
+                HandleClippedEdgeV2(scanline, x, ref edge, x0, y0, x1, y1);
+                HandleClippedEdgeV2(scanline, x, ref edge, x1, y1, x3, y3);
+              }
+              else if (x3 < x1 && x0 > x1)
+              {  // two segments across x, down-left
+                HandleClippedEdgeV2(scanline, x, ref edge, x0, y0, x1, y1);
+                HandleClippedEdgeV2(scanline, x, ref edge, x1, y1, x3, y3);
+              }
+              else if (x0 < x2 && x3 > x2)
+              {  // two segments across x+1, down-right
+                HandleClippedEdgeV2(scanline, x, ref edge, x0, y0, x2, y2);
+                HandleClippedEdgeV2(scanline, x, ref edge, x2, y2, x3, y3);
+              }
+              else if (x3 < x2 && x0 > x2)
+              {  // two segments across x+1, down-left
+                HandleClippedEdgeV2(scanline, x, ref edge, x0, y0, x2, y2);
+                HandleClippedEdgeV2(scanline, x, ref edge, x2, y2, x3, y3);
+              }
+              else
+              {  // one segment
+                HandleClippedEdgeV2(scanline, x, ref edge, x0, y0, x3, y3);
+              }
+            }
+          }
+        }
+      }
     }
 
     public ActiveEdgeV2 NewActiveEdgeV2(ref TTFEdge edge, int offX, float startPoint)
@@ -540,7 +860,7 @@ namespace Converter.Parsers.Fonts
         }
 
         if (activeEdges.Count > 0)
-          FillActiveEdgesNewV2(scanline, scanline2.Slice(1), result.W, ref activeEdges, scanYTop);
+          FillActiveEdgesNewV2(scanline, scanline2, result.W, ref activeEdges, scanYTop);
 
         {
           float sum = 0;
