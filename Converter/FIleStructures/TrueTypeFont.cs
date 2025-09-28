@@ -89,6 +89,15 @@ namespace Converter.FileStructures
     public int Offset;
   }
 
+  // used for V2 rasterizer
+  public struct ActiveEdgeV2
+  {
+    public float fx, fdx, fdy;
+    public float direction;
+    public float sy;
+    public float ey;
+  }
+
   public struct TTFEdge
   {
     public float x0, y0, x1, y1;

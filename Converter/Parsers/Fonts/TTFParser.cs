@@ -451,6 +451,127 @@ namespace Converter.Parsers.Fonts
     #endregion antialiasing software rasterizer
     #region rasterizer
 
+    public void FillActiveEdgesNewV2(Span<float> scanline, Span<float> scanline2, int len, ref List<ActiveEdgeV2> activeEdges, float yTop)
+    {
+
+    }
+
+    public ActiveEdgeV2 NewActiveEdgeV2(ref TTFEdge edge, int offX, float startPoint)
+    {
+      ActiveEdgeV2 aEdges;
+      float dxdy = (edge.x1 - edge.x0) / (edge.y1 - edge.y0);
+      aEdges.fdx = dxdy;
+      aEdges.fdy = dxdy != 0.0f ? (1.0f / dxdy) : 0.0f;
+      aEdges.fx = edge.x0 + dxdy * (startPoint- edge.y0);
+      aEdges.fx -= offX;
+      aEdges.direction = edge.Invert ? 1.0f : -1.0f;
+      aEdges.sy = edge.y0;
+      aEdges.ey = edge.y1;
+      return aEdges;
+    }
+    // directly AA rasterize edges w/o supersampling
+    public void RasterizeSortedEdgesV2(ref BmpS result, List<TTFEdge> edges, int n, int vSubSample, int offX, int offY)
+    {
+      // List is just native implementation to get things going, its not most efficient because we are doing random removal of elements
+      // TODO: fix later
+      List<ActiveEdgeV2> activeEdges = new List<ActiveEdgeV2>();
+      int y, i;
+      int j = 0;
+      Span<float> scanlineData = new float[129]; // ? why 129
+      Span<float> scanline;
+      Span<float> scanline2;
+
+      // Why is vSubSample passed here???
+      if (result.W > 64)
+        scanline = new float[result.W * 2 + 1];
+      else
+        scanline = scanlineData; // ??
+      scanline2 = scanline.Slice(result.W);
+
+      y = offY;
+      TTFEdge edge = edges[n];
+      edge.y0 = (offY + result.H) + 1;
+      edges[n] = edge;
+      ActiveEdgeV2 z;
+      while (j < result.H)
+      {
+        float scanYTop = y;
+        float scanYBottom = y + 1;
+
+        // update active edges
+        // remove all active edges that terminate before the top of this scanline
+        i = 0;
+        while (i < activeEdges.Count)
+        {
+          z = activeEdges[i];
+          if (z.ey < scanYTop)
+          {
+            activeEdges.RemoveAt(i);
+          }
+          else
+          {
+            i++;
+          }
+        }
+
+        // insert all edges that start before the bottom of this scanline
+        i = 0;
+        
+        while (edge.y0 <= scanYBottom && i < edges.Count)
+        {
+          edge = edges[i];
+          if (edge.y0 != edge.y1)
+          {
+            z = NewActiveEdgeV2(ref edge, offX, scanYTop);
+            if (j == 0 && offY != 0)
+            {
+              if (z.ey >= scanYTop)
+              {
+                // this can happen due to subpixel positioning and some kind of fp rounding error i think
+                z.ey = scanYTop;
+              }
+            }
+            Debug.Assert(z.ey >= scanYTop, "z.ey is bigger than scanYTop");
+
+            activeEdges.Insert(0, z);
+            i++;// have to increment as well if we insert ahead 
+          }
+          i++;
+        }
+
+        if (activeEdges.Count > 0)
+          FillActiveEdgesNewV2(scanline, scanline2.Slice(1), result.W, ref activeEdges, scanYTop);
+
+        {
+          float sum = 0;
+          for (i = 0; i < result.W; i++)
+          {
+            float k;
+            int m;
+            sum += scanline2[i];
+            k = scanline[i] + sum;
+            k = MathF.Abs(k) * 255 * 0.5f;
+            m = (int) k;
+            if (m > 255)
+              m = 255;
+            result.Pixels[j * result.Stride + i] = (byte)m;
+          }
+        }
+
+        // advance all the edges
+        for (i = 0; i < activeEdges.Count; i++)
+        {
+          z = activeEdges[i];
+          z.fx += z.fdx;
+          activeEdges[i] = z;
+        }
+
+        y++;
+        j++;
+      }
+    }
+
+
     /// <summary>
     /// returns true if y0 of first edge is smaller than y0 of second edge
     /// </summary>
@@ -576,7 +697,7 @@ namespace Converter.Parsers.Fonts
       Span<TTFEdge> edgesSpan = edgesArr.AsSpan();
 
       SortEdgesQuickSort(ref edgesSpan, n);
-      // TODO: stbtt__sort_ins
+      SortEdgesInsSort(ref edgesSpan, n);
 
       edges = edgesArr.ToList();
     }
@@ -645,7 +766,14 @@ namespace Converter.Parsers.Fonts
       SortEdges(ref edges, n);
       
       // TODO:  scanelines rasterization for both V1 and V2
-      
+      if (RasterizerVersion == RASTERIZER_VERSION.V1)
+      {
+
+      }
+      else
+      {
+        //RasterizeSortedEdgesV2()
+      }
     }
 
     public void TesselateCubic(ref List<PointF> points, ref int numOfPoints, float x0, float y0, float x1, float y1, float x2, float y2, float x3, float y3, float objspaceFlatnessSquared, int n)
