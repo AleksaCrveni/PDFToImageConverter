@@ -53,9 +53,9 @@ namespace Tester
 
         // kerning
 
-        //int kern;
-        //kern = stbtt_GetCodepointKernAdvance(&info, textToTranslate[i], textToTranslate[i + 1]);
-        //x += (int)Math.Round(kern * scaleFactor);
+        int kern;
+        kern = parser.GetCodepointKernAdvance(textToTranslate[i], textToTranslate[i + 1]);
+        x += (int)Math.Round(kern * scaleFactor);
       }
     }
   }

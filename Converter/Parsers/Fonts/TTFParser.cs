@@ -449,6 +449,15 @@ namespace Converter.Parsers.Fonts
       GetCodepointBitmapBoxSubpixel(unicodeCodepoint, scaleX, scaleY, 0, 0, ref ix0, ref iy0, ref ix1, ref iy1);
     }
     #endregion antialiasing software rasterizer
+
+    #region kerning
+
+    public int GetCodepointKernAdvance(int ch1, int ch2)
+    {
+      return 0;
+    }
+    #endregion kerning
+
     #region rasterizer
 
     public float SizedTriangleArea(float height, float width)
