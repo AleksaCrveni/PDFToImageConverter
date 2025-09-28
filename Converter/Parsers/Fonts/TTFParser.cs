@@ -2,6 +2,7 @@
 using Converter.FileStructures.TIFF;
 using System.Buffers.Binary;
 using System.Diagnostics;
+using static System.Runtime.InteropServices.JavaScript.JSType;
 
 namespace Converter.Parsers.Fonts
 {
@@ -148,6 +149,10 @@ namespace Converter.Parsers.Fonts
           // prep 
           case 1886545264:
             tOff.prep = tableBuffer;
+            break;
+          // gpos
+          case 1196445523:
+            tOff.gpos = tableBuffer;
             break;
           default:
             // during development only!
@@ -452,9 +457,56 @@ namespace Converter.Parsers.Fonts
 
     #region kerning
 
+    public int GetGlyphKernInfoAdvance(int glyphIndex1, int glyphIndex2)
+    {
+      ReadOnlySpan<byte> buffer = _buffer.AsSpan(_ttf.Offsets.kern.Position, _ttf.Offsets.kern.Length);
+      uint needle, straw;
+
+      int l, r, m;
+
+      // we only look at the first table. it must be 'horizontal' and format 0.
+      if (ReadUInt16(ref buffer, 2) < 1) // number of tables, need at least 1
+        return 0;
+      if (ReadUInt16(ref buffer, 8) != 1) // horizontal flag must be set in format
+        return 0;
+
+      l = 0;
+      r = ReadUInt16(ref buffer, 10) - 1;
+      needle = (uint)glyphIndex1 << 16 | (uint)glyphIndex2;
+      while (l <= r)
+      {
+        m = (l + r) >> 1;
+        straw = ReadUInt32(ref buffer, 18 + (m * 6)); // note: unaligned read
+        if (needle < straw)
+          r = m - 1;
+        else if (needle > straw)
+          l = m + 1;
+        else
+          return ReadUInt16(ref buffer, 22 + (m * 6));
+      }
+      return 0;
+    }
+
+    public int GetGlyphGPOSInfoAdvance(int glyphIndex1, int glyphIndex2)
+    {
+      throw new NotImplementedException("Open type not supported yet");
+    }
+
+    public int GetGlyphKernAdvance(int glyphIndex1, int glyphIndex2)
+    {
+      int xAdvance = 0;
+      if (_ttf.Offsets.gpos.Length > 0)
+        xAdvance += GetGlyphGPOSInfoAdvance(glyphIndex1, glyphIndex2);
+      else if (_ttf.Offsets.kern.Length > 0)
+        xAdvance += GetGlyphKernInfoAdvance(glyphIndex1, glyphIndex2);
+      return xAdvance;
+    }
+
     public int GetCodepointKernAdvance(int ch1, int ch2)
     {
-      return 0;
+      if (_ttf.Offsets.kern.Length == 0 && _ttf.Offsets.gpos.Length == 0) // if no kerning table, don't waste time looking up both codepoint->glyphs
+        return 0;
+      return GetGlyphKernAdvance(FindGlyphIndex(ch1), FindGlyphIndex(ch2));
     }
     #endregion kerning
 

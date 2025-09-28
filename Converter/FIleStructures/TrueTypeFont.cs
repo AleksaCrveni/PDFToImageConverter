@@ -3,7 +3,6 @@
 namespace Converter.FileStructures
 {
   /// <summary>
-  /// R -> required, O -> optional, SD -> needed for some OSes, Offsets -> OF
   /// </summary>
   public struct TrueTypeFont
   {
@@ -45,12 +44,15 @@ namespace Converter.FileStructures
     public FakeSpan name = new FakeSpan(); // R
     public FakeSpan post = new FakeSpan(); // R
 
+    /// R -> required, O -> optional, SD -> needed for some OSes, Offsets -> OF
     public FakeSpan cvt  = new FakeSpan(); // SD
     public FakeSpan fpgm = new FakeSpan(); // SD
     public FakeSpan hdmx = new FakeSpan(); // SD
     public FakeSpan kern = new FakeSpan(); // SD
     public FakeSpan OS_2 = new FakeSpan(); // SD
     public FakeSpan prep = new FakeSpan(); // SD
+
+    public FakeSpan gpos = new FakeSpan(); // O
   }
   // Glyph shapes
   public enum VMove : byte
