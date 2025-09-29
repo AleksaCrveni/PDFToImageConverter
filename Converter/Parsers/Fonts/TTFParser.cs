@@ -1102,7 +1102,7 @@ namespace Converter.Parsers.Fonts
       for (i = 0; i < windings; ++i)
         n += wCount[i];
 
-      for (i = 0; i < n; i++)
+      for (i = 0; i < n + 1 ; i++)
         edges.Add(new TTFEdge());
 
       n = 0;
@@ -1136,12 +1136,13 @@ namespace Converter.Parsers.Fonts
           e.y1 = (points[pointsIndex + b].Y * yScaleInv + shiftY) * vSubSample;
 
           edges[n] = e;
-          ++n;
+          n++;
         }
       }
 
       // now sort the edges by their highest point (should snap to integer, and then by x)
       //STBTT_sort(e, n, sizeof(e[0]), stbtt__edge_compare);
+      // DEBUG: here actual count is 19
       SortEdges(ref edges, n);
       
       // TODO:  scanelines rasterization for both V1 and V2
@@ -1151,11 +1152,11 @@ namespace Converter.Parsers.Fonts
       }
       else
       {
-        //RasterizeSortedEdgesV2()
+        RasterizeSortedEdgesV2(ref result, edges, n, vSubSample, offX, offY);
       }
     }
 
-    public void TesselateCubic(ref List<PointF> points, ref int numOfPoints, float x0, float y0, float x1, float y1, float x2, float y2, float x3, float y3, float objspaceFlatnessSquared, int n)
+    public void TesselateCubic(List<PointF> points, ref int numOfPoints, float x0, float y0, float x1, float y1, float x2, float y2, float x3, float y3, float objspaceFlatnessSquared, int n)
     {
       // TODO: this "flatness" calculation is just made-up nonsense that seems to work well enough
       float dx0 = x1 - x0;
@@ -1187,19 +1188,19 @@ namespace Converter.Parsers.Fonts
         float mx = (xa + xb) / 2;
         float my = (ya + yb) / 2;
 
-        TesselateCubic(ref points, ref numOfPoints , x0, y0, x01, y01, xa, ya, mx, my, objspaceFlatnessSquared, n + 1);
-        TesselateCubic(ref points, ref numOfPoints , mx, my, xb, yb, x23, y23, x3, y3, objspaceFlatnessSquared, n + 1);
+        TesselateCubic(points, ref numOfPoints , x0, y0, x01, y01, xa, ya, mx, my, objspaceFlatnessSquared, n + 1);
+        TesselateCubic(points, ref numOfPoints , mx, my, xb, yb, x23, y23, x3, y3, objspaceFlatnessSquared, n + 1);
       }
       else
       {
-        AddPoint(ref points, numOfPoints, x3, y3);
+        AddPoint(points, numOfPoints, x3, y3);
         numOfPoints++;
       }
     }
 
     // tesselate until threshold p is happy
     // TODO: warped to compensate for non-linearn stretching (??)
-    public int TesselateCurve(ref List<PointF> points, ref int numOfPoints, float x0, float y0, float x1, float y1, float x2, float y2, float objspaceFlatnessSquared, int n)
+    public int TesselateCurve(List<PointF> points, ref int numOfPoints, float x0, float y0, float x1, float y1, float x2, float y2, float objspaceFlatnessSquared, int n)
     {
       // midpoint
       float mx = (x0 + 2 * x1 + x2) / 4;
@@ -1212,21 +1213,22 @@ namespace Converter.Parsers.Fonts
         return 1;
       if (dx * dx + dy * dy > objspaceFlatnessSquared) // half-pixel error allowed.... need to be smaller if AA
       {
-        TesselateCurve(ref points, ref numOfPoints, x0, y0, (x0 + x1) / 2.0f, (y0 + y1) / 2.0f, mx, my, objspaceFlatnessSquared, n + 1);
-        TesselateCurve(ref points, ref numOfPoints, mx, my, (x1 + x2) / 2.0f, (y1 + y2) / 2.0f, x2, y2, objspaceFlatnessSquared, n + 1);
+        TesselateCurve(points, ref numOfPoints, x0, y0, (x0 + x1) / 2.0f, (y0 + y1) / 2.0f, mx, my, objspaceFlatnessSquared, n + 1);
+        TesselateCurve(points, ref numOfPoints, mx, my, (x1 + x2) / 2.0f, (y1 + y2) / 2.0f, x2, y2, objspaceFlatnessSquared, n + 1);
       }
       else
       {
-        AddPoint(ref points, numOfPoints, x2, y2);
+        AddPoint(points, numOfPoints, x2, y2);
         numOfPoints++;
       }
       return 1;
     }
 
-    public void AddPoint(ref List<PointF> points, int n, float x, float y)
+    public void AddPoint(List<PointF>? points, int n, float x, float y)
     {
-      if (points.Count == 0)
+      if (points is null)
         return;
+
       PointF p = new PointF();
       p.X = x;
       p.Y = y;
@@ -1235,7 +1237,7 @@ namespace Converter.Parsers.Fonts
 
     public List<PointF> FlattenCurves(ref List<TTFVertex> vertices, int numOfVerts, float objspaceFlatness, ref List<int> windingLengths, ref int windingCount)
     {
-      List<PointF> points = new List<PointF>();
+      List<PointF>? points = null;
       int numOfPoints = 0;
 
       float objspaceFlatnessSquared = objspaceFlatness * objspaceFlatness;
@@ -1250,6 +1252,10 @@ namespace Converter.Parsers.Fonts
           n++;
       }
 
+      // TODO: optimize this
+      for (i = 0; i < n; i++)
+        windingLengths.Add(0);
+
       windingCount = n;
       if (n == 0)
         return new List<PointF>();
@@ -1260,7 +1266,12 @@ namespace Converter.Parsers.Fonts
         float x = 0;
         float y = 0;
         if (pass == 1)
-          points.Clear(); // redundant just for clarity that its used in second pass
+        {
+          // TODO: really should be using arrays....
+          points = new List<PointF>();
+          for (i = 0; i < numOfPoints; i++)
+            points.Add(new PointF());
+        }
 
         numOfPoints = 0;
         n = -1;
@@ -1278,20 +1289,20 @@ namespace Converter.Parsers.Fonts
               start = numOfPoints;
               x = vertex.x;
               y = vertex.y;
-              AddPoint(ref points, numOfPoints++, x, y);
+              AddPoint(points, numOfPoints++, x, y);
               break;
             case (byte)VMove.VLINE:
               x = vertex.x;
               y = vertex.y;
-              AddPoint(ref points, numOfPoints++, x, y);
+              AddPoint(points, numOfPoints++, x, y);
               break;
             case (byte)VMove.VCURVE:
-              TesselateCurve(ref points, ref numOfPoints, x, y, vertex.cx, vertex.cy, vertex.x, vertex.y, objspaceFlatnessSquared, 0);
+              TesselateCurve(points, ref numOfPoints, x, y, vertex.cx, vertex.cy, vertex.x, vertex.y, objspaceFlatnessSquared, 0);
               x = vertex.x;
               y = vertex.y;
               break;
             case (byte)VMove.VCUBIC:
-              TesselateCubic(ref points, ref numOfPoints, x, y, vertex.cx, vertex.cy, vertex.cx1, vertex.cy1, vertex.x, vertex.y, objspaceFlatness, 0);
+              TesselateCubic(points, ref numOfPoints, x, y, vertex.cx, vertex.cy, vertex.cx1, vertex.cy1, vertex.x, vertex.y, objspaceFlatness, 0);
               x = vertex.x;
               y = vertex.y;
               break;
@@ -1360,6 +1371,9 @@ namespace Converter.Parsers.Fonts
       TTFVertex vertex;
       ReadOnlySpan<byte> buffer = _buffer.AsSpan();
       int g = GetGlyphOffset(ref buffer, glyphIndex);
+
+      if (g < 0)
+        return 0;
 
       numOfContours = ReadSignedInt16(ref buffer, startOffset + g);
 
