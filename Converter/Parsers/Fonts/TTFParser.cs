@@ -964,15 +964,16 @@ namespace Converter.Parsers.Fonts
     {
       int i, j;
       TTFEdge tempEdge;
-      for (i = 0; i < n; i++)
+      TTFEdge a;
+      for (i = 1; i < n; i++)
       {
         tempEdge = edges[i];
-        Span<TTFEdge> a = edges;
+        a = tempEdge;
         j = i;
         while (j > 0)
         {
           Span<TTFEdge> b = edges.Slice(j - 1);
-          bool c = CompareEdge(a[0], b[0]);
+          bool c = CompareEdge(a, b[0]);
           if (!c)
             break;
 
@@ -981,7 +982,7 @@ namespace Converter.Parsers.Fonts
         }
 
         if (i != j)
-          edges[j] = a[0];
+          edges[j] = tempEdge;
       }
     }
 
