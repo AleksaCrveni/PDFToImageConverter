@@ -58,16 +58,15 @@ namespace Converter.Writers.TIFF
 
     public void WriteEmptyImageData(ref BufferWriter writer, ulong byteCount, ulong stripSize, int remainder)
     {
+      writer._buffer.Fill(0);
       for (ulong i = 0; i < byteCount; i += (ulong)stripSize)
       {
         // read random value into each buffer stuff and then write
-        writer._buffer.Fill(0);
         // do entire buffer because we know we are in range and no need to refresh
         _stream.Write(writer._buffer);
       }
 
       Span<byte> remainderSizeBuffer = writer._buffer.Slice(0, remainder);
-      remainderSizeBuffer.Fill(0);
       _stream.Write(remainderSizeBuffer);
     }
 
