@@ -352,9 +352,9 @@ namespace Converter.Parsers.Fonts
     public void GetFontVMetrics(ref int ascent, ref int descent, ref int lineGap)
     {
       ReadOnlySpan<byte> buffer = _buffer.AsSpan();
-      ascent = ReadSignedInt32(ref buffer, _ttf.Offsets.hhea.Position + 4);
-      descent = ReadSignedInt32(ref buffer, _ttf.Offsets.hhea.Position + 6);
-      lineGap = ReadSignedInt32(ref buffer, _ttf.Offsets.hhea.Position + 8);
+      ascent = ReadSignedInt16(ref buffer, _ttf.Offsets.hhea.Position + 4);
+      descent = ReadSignedInt16(ref buffer, _ttf.Offsets.hhea.Position + 6);
+      lineGap = ReadSignedInt16(ref buffer, _ttf.Offsets.hhea.Position + 8);
     }
 
     public float ScaleForPixelHeight(float lineHeight)
