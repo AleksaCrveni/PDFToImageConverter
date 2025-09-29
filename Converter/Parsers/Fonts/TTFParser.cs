@@ -404,10 +404,10 @@ namespace Converter.Parsers.Fonts
         if (g < 0)
           return false;
 
-        xMin = ReadUInt16(ref buffer, g + 2);
-        yMin = ReadUInt16(ref buffer, g + 4);
-        xMax = ReadUInt16(ref buffer, g + 6);
-        yMax = ReadUInt16(ref buffer, g + 8);
+        xMin = ReadSignedInt16(ref buffer, g + 2);
+        yMin = ReadSignedInt16(ref buffer, g + 4);
+        xMax = ReadSignedInt16(ref buffer, g + 6);
+        yMax = ReadSignedInt16(ref buffer, g + 8);
       }
       return true;
     }
