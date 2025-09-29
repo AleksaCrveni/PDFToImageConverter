@@ -560,7 +560,7 @@ namespace Converter.Parsers.Fonts
         Debug.Assert(x1 >= x && x1 <= x + 1);
 
       if (x0 <= x && x1 <= x)
-        scanline[x] += edge.direction * (y1 - y0);
+        scanline[x] += edge.direction * (float)(y1 - y0);
       else if (x0 >= x + 1 && x1 >= x + 1)
         ;
       else
@@ -895,16 +895,15 @@ namespace Converter.Parsers.Fonts
 
         // insert all edges that start before the bottom of this scanline
         i = 0;
-        
+        edge = edges[i];
         while (edge.y0 <= scanYBottom && i < edges.Count)
         {
-          edge = edges[i];
           if (edge.y0 != edge.y1)
           {
             z = NewActiveEdgeV2(ref edge, offX, scanYTop);
             if (j == 0 && offY != 0)
             {
-              if (z.ey >= scanYTop)
+              if (z.ey < scanYTop)
               {
                 // this can happen due to subpixel positioning and some kind of fp rounding error i think
                 z.ey = scanYTop;
@@ -913,9 +912,9 @@ namespace Converter.Parsers.Fonts
             Debug.Assert(z.ey >= scanYTop, "z.ey is bigger than scanYTop");
 
             activeEdges.Insert(0, z);
-            i++;// have to increment as well if we insert ahead 
           }
           i++;
+          edge = edges[i];
         }
 
         if (activeEdges.Count > 0)
@@ -929,7 +928,7 @@ namespace Converter.Parsers.Fonts
             int m;
             sum += scanline2[i];
             k = scanline[i] + sum;
-            k = MathF.Abs(k) * 255 * 0.5f;
+            k = MathF.Abs(k) * 255 + 0.5f;
             m = (int) k;
             if (m > 255)
               m = 255;
