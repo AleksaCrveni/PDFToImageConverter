@@ -30,7 +30,7 @@ namespace Converter.Parsers.Fonts
       beginOfSfnt = 0;
     }
 
-    public void ParseFontDirectory()
+    public void InitFont()
     {
       ReadOnlySpan<byte> buffer = _buffer.AsSpan();
       FontDirectory fd = new FontDirectory();
@@ -59,7 +59,7 @@ namespace Converter.Parsers.Fonts
       uint offset = 0;
       uint length;
       uint pad = 0;
-
+      uint computedCheckSum = 0;
       FakeSpan tableBuffer;
       // TODO: Optimize to do binary search?
       for (int i = 0; i < fd.NumTables; i++)
@@ -77,16 +77,18 @@ namespace Converter.Parsers.Fonts
 
         // case {num} where num is uint32 representation of 4 byte string that represent table tag
         // did this so I don't allocate string when comparing 
-
+        tableBuffer = new FakeSpan((int)offset, (int)length);
         // SPECIAL CASE FOR HEAD
         if (tag == 1751474532)
         {
           // do something special
         }
-        tableBuffer = new FakeSpan((int)offset, (int)length);
-
-        if (checkSum != 0 && checkSum != CalculateCheckSum(ref tableBuffer, length))
-          throw new InvalidDataException("Check sum failed!");
+        else
+        {
+          computedCheckSum = CalculateCheckSum(ref tableBuffer, length);
+          if (checkSum != 0 && checkSum != computedCheckSum)
+            throw new InvalidDataException($"Check sum failed! For tag {tag}. Expected: {checkSum}. Computed: {computedCheckSum}");
+        }
 
         switch (tag)
         {
@@ -155,10 +157,6 @@ namespace Converter.Parsers.Fonts
             tOff.gpos = tableBuffer;
             break;
           default:
-            // during development only!
-#if DEBUG
-            throw new Exception("Tag not implemented yet!");
-#endif
             break;
         }
       }
@@ -362,7 +360,7 @@ namespace Converter.Parsers.Fonts
     public float ScaleForPixelHeight(float lineHeight)
     {
       ReadOnlySpan<byte> buffer = _buffer.AsSpan();
-      int fHeight = ReadSignedInt32(ref buffer, _ttf.Offsets.hhea.Position + 4) - ReadSignedInt32(ref buffer, _ttf.Offsets.hhea.Position + 6);
+      int fHeight = ReadSignedInt16(ref buffer, _ttf.Offsets.hhea.Position + 4) - ReadSignedInt16(ref buffer, _ttf.Offsets.hhea.Position + 6);
       return lineHeight / fHeight;
     }
     public int GetGlyphOffset(ref ReadOnlySpan<byte> buffer, int glyphIndex)
@@ -1752,11 +1750,22 @@ namespace Converter.Parsers.Fonts
       uint sum = 0;
       uint nLongs = (numOfBytesInTable + 3) / 4;
       int i = 0;
-      while (nLongs-- > 0)
+      int remainder = dataPos.Length % 4;
+      while (nLongs-- > 0 & i < dataPos.Length - remainder)
       {
         sum += BinaryPrimitives.ReadUInt32BigEndian(tableBuffer.Slice(i, 4));
         i += 4;
       }
+
+      uint r = 0;
+      int n = 24;
+      while (i < dataPos.Length)
+      {
+        r = (r & tableBuffer[i]) << n;
+        n -= 8;
+        i++;
+      }
+      sum += r;
       return sum;
     }
   }
