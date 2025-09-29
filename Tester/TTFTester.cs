@@ -1,4 +1,5 @@
 ﻿using Converter.Parsers.Fonts;
+using Converter.Writers.TIFF;
 
 namespace Tester
 {
@@ -57,6 +58,15 @@ namespace Tester
         kern = parser.GetCodepointKernAdvance(textToTranslate[i], textToTranslate[i + 1]);
         x += (int)Math.Round(kern * scaleFactor);
       }
+
+
+      TIFFGrayscaleWriter writer = new TIFFGrayscaleWriter("grayscaletest.tiff");
+      var options = new TIFFWriterOptions()
+      {
+        Width = 1920,
+        Height = 1080
+      };
+      writer.WriteRandomImage(ref options);
     }
   }
 }

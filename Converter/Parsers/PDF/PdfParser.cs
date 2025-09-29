@@ -533,7 +533,7 @@ namespace Converter.Parsers.PDF
         fd.FontInfo = fontInfo;
 
         ttfParser.Init(ref fontInfo.FontDescriptor.FontFile.CommonStreamInfo.RawStreamData);
-        ttfParser.ParseFontDirectory();
+        ttfParser.InitFont();
         fd.Parser = ttfParser;
         fontData.Add(fd);
         helper.ReadUntilNonWhiteSpaceDelimiter();

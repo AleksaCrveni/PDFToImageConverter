@@ -69,7 +69,6 @@ namespace BenchAndSmallTests
 
 
     [Benchmark]
-    //slowest
     public int[] BinaryPrimitivesTest()
     {
       Span<byte> buffer = data.AsSpan();

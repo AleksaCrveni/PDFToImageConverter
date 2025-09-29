@@ -1327,7 +1327,7 @@ namespace Converter.Parsers.Fonts
     public int CloseShape(ref List<TTFVertex> vertices, int numOfVertices, bool wasOff, bool startOff, int sx, int sy, int scx, int scy, int cx, int cy)
     {
       TTFVertex vertex;
-      vertex = vertices[numOfVertices++];
+      vertex = vertices[numOfVertices];
       if (startOff)
       {
         if (wasOff)
@@ -1340,6 +1340,7 @@ namespace Converter.Parsers.Fonts
         else
           SetVertex(ref vertex, (byte)VMove.VLINE, sx, sy, 0, 0);
       }
+      vertices[numOfVertices++] = vertex;
       return numOfVertices;
     }
 
@@ -1357,7 +1358,7 @@ namespace Converter.Parsers.Fonts
       int startOffset = (int)_ttf.StartOffset;
       int numOfVertices = 0;
       TTFVertex vertex;
-      ReadOnlySpan<byte> buffer = new ReadOnlySpan<byte>();
+      ReadOnlySpan<byte> buffer = _buffer.AsSpan();
       int g = GetGlyphOffset(ref buffer, glyphIndex);
 
       numOfContours = ReadSignedInt16(ref buffer, startOffset + g);
@@ -1391,7 +1392,7 @@ namespace Converter.Parsers.Fonts
         // maybe because its point indice its + 1??
         numOfFlags = 1 + ReadUInt16(ref buffer, endPtsOfContoursOffset + numOfContours * 2 - 2);
 
-        m = numOfContours + 2 * numOfContours; // loose bound how many vertices we need
+        m = numOfFlags + 2 * numOfContours; // loose bound how many vertices we need
         if (vertices == null)
           vertices = new List<TTFVertex>();
         
@@ -1438,8 +1439,8 @@ namespace Converter.Parsers.Fonts
           {
             if ((flags & 16) != 16)
             {
-              short val = (short)(ReadByte(ref buffer, origPointsOffset) * 256);
-              val += ReadByte(ref buffer, origPointsOffset + 1);
+              short val = (short)(ReadByte(ref buffer, pointsOffset) * 256);
+              val += ReadByte(ref buffer, pointsOffset + 1);
               x = x + val;
               pointsOffset += 2;
             }
@@ -1464,8 +1465,8 @@ namespace Converter.Parsers.Fonts
           {
             if ((flags & 32) != 32)
             {
-              short val = (short)(ReadByte(ref buffer, origPointsOffset) * 256);
-              val += ReadByte(ref buffer, origPointsOffset + 1);
+              short val = (short)(ReadByte(ref buffer, pointsOffset) * 256);
+              val += ReadByte(ref buffer, pointsOffset + 1);
               y = y + val;
               pointsOffset += 2;
             }
@@ -1478,7 +1479,7 @@ namespace Converter.Parsers.Fonts
         // 4. Converert to familiar format
         numOfVertices = 0;
         cx = cy = sx = sy = scx = scy = 0;
-        for (i = 0; i < numOfVertices; i++)
+        for (i = 0; i < numOfFlags; i++)
         {
           // curr
           vertex = vertices[off + i];
@@ -1521,20 +1522,25 @@ namespace Converter.Parsers.Fonts
               sy = y;
             }
 
-            vertex = vertices[numOfVertices++];
+            vertex = vertices[numOfVertices];
             SetVertex(ref vertex, (byte)VMove.VMOVE, sx, sy, 0, 0);
+            vertices[numOfVertices++] = vertex;
             wasOff = false;
             nextMove = 1 + ReadUInt16(ref buffer, endPtsOfContoursOffset + j * 2);
             j++;
           } else
           {
-            vertex = vertices[numOfVertices++];
+            vertex = vertices[numOfVertices];
             // if its a currve
             if ((flags & 1) != 1)
             {
-              if (wasOff) // two off-curv control points in a row means interpolate an on-curve midpoint
+              // two off-curv control points in a row means interpolate an on-curve midpoint
+              if (wasOff)
+              {
                 SetVertex(ref vertex, (byte)VMove.VCURVE, (cx + x) >> 1, (cy + y) >> 1, cx, cy);
-              cx = x;
+                vertices[numOfVertices++] = vertex;
+              }
+                cx = x;
               cy = y;
               wasOff = true;
             }
@@ -1544,8 +1550,12 @@ namespace Converter.Parsers.Fonts
                 SetVertex(ref vertex, (byte)VMove.VCURVE, x, y, cx, cy);
               else
                 SetVertex(ref vertex, (byte)VMove.VLINE, x, y, 0, 0);
+
+              vertices[numOfVertices++] = vertex;
               wasOff = false;
             }
+
+            
           }
         }
         numOfVertices = CloseShape(ref vertices, numOfVertices, wasOff, startOff, sx, sy, scx, scy, cx, cy);

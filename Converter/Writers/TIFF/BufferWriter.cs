@@ -42,6 +42,7 @@
     /// <param name="pos">Position within buffer that we need to write to</param>
     /// <param name="value">16 byte value to write to buffer</param>
     /// <param name="isLittleEndian">Endianess</param>
+    /// TODO: can this be optmized/
     public void WriteUnsigned32ToBuffer(ref int pos, uint value)
     {
       // some files like TIFF can be either big or small endian so we have to write
