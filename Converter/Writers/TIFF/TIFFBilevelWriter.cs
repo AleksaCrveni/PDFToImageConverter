@@ -45,29 +45,34 @@ namespace Converter.Writers.TIFF
     {
       
     }
+    public void WriteImageWithBuffer(ref TIFFWriterOptions options, byte[] buffer)
+    {
+      if (options.Width * options.Height != buffer.Length)
+        throw new InvalidDataException("Width and Height don't match buffer supplied");
+      WriteImageMain(ref options, ImgDataMode.BUFFER_SUPPLIED, buffer);
+    }
 
-    private void WriteImageMain(ref TIFFWriterOptions options, ImgDataMode mode)
+    private void WriteImageMain(ref TIFFWriterOptions options, ImgDataMode mode, byte[]? suppliedBuffer = null)
     {
       Span<byte> writeBuffer = options.AllowStackAlloct ? stackalloc byte[8192] : new byte[8192];
       BufferWriter writer = new BufferWriter(ref writeBuffer, options.IsLittleEndian);
       TIFFInternals.WriteHeader(ref _stream, ref writeBuffer, options.IsLittleEndian);
-      WriteRandomImage(ref writer, ref options, mode);
+      WriteRandomImage(ref writer, ref options, mode, suppliedBuffer);
     }
 
     private void WriteEmptyImageData(ref BufferWriter writer, ulong byteCount, ulong stripSize, int remainder)
     {
+      writer._buffer.Fill(0);
       // TODO: Fill with 1 depending on isZero
       for (ulong i = 0; i < byteCount; i += (ulong)stripSize)
       {
         // read random value into each buffer stuff and then write
-        writer._buffer.Fill(0);
         // do entire buffer because we know we are in range and no need to refresh
         _stream.Write(writer._buffer);
       }
 
       // write remainder
       Span<byte> remainderSizeBuffer = writer._buffer.Slice(0, remainder);
-      Random.Shared.NextBytes(remainderSizeBuffer);
       _stream.Write(remainderSizeBuffer);
     }
 
@@ -86,7 +91,7 @@ namespace Converter.Writers.TIFF
       Random.Shared.NextBytes(remainderSizeBuffer);
       _stream.Write(remainderSizeBuffer);
     }
-    private void WriteRandomImage(ref BufferWriter writer, ref TIFFWriterOptions options, ImgDataMode mode)
+    private void WriteRandomImage(ref BufferWriter writer, ref TIFFWriterOptions options, ImgDataMode mode, byte[]? suppliedBuffer = null)
     {
       int pos = 0;
       // support later
@@ -114,6 +119,9 @@ namespace Converter.Writers.TIFF
           break;
         case ImgDataMode.RANDOM:
           WriteRandomImageData(ref writer, byteCount, (ulong)stripSize, remainder);
+          break;
+        case ImgDataMode.BUFFER_SUPPLIED:
+          _stream.Write(suppliedBuffer);
           break;
       }
 
