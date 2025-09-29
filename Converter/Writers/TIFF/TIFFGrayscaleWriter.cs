@@ -1,32 +1,32 @@
 ﻿using Converter.FileStructures.TIFF;
-
 namespace Converter.Writers.TIFF
 {
-  // Write empty and then save stream and be able to modify it
-  public class TIFFBilevelWriter : ITIFFWriter,  IDisposable
+  public class TIFFGrayscaleWriter : ITIFFWriter, IDisposable
   {
     Stream _stream;
     private bool disposedValue;
     private ulong imageDataLength;
-    private BilevelData data;
-    public TIFFBilevelWriter(string destination)
+    private GrayscaleData data;
+
+    public TIFFGrayscaleWriter(string destination)
     {
       _stream = File.Create(destination);
       if (_stream == null)
         throw new Exception("Unable to create file stream to destination!");
-      data = new BilevelData();
+      data = new GrayscaleData();
     }
 
-    public TIFFBilevelWriter(Stream destinationStream)
+    public TIFFGrayscaleWriter(Stream destinationStream)
     {
       _stream = destinationStream;
       _stream.Position = 0;
-      data = new BilevelData();
+      data = new GrayscaleData();
     }
     public void WriteEmptyImage(ref TIFFWriterOptions options)
     {
       WriteImageMain(ref options, ImgDataMode.EMPTY);
     }
+
     public void WriteRandomImage(ref TIFFWriterOptions options)
     {
       if (options.Width == 0)
@@ -35,28 +35,29 @@ namespace Converter.Writers.TIFF
         options.Height = Random.Shared.Next(options.MinRandomHeight, options.MaxRandomHeight + 1);
       WriteImageMain(ref options, ImgDataMode.RANDOM);
     }
-    /// <summary>
-    /// 
-    /// </summary>
-    /// <param name="x"></param>
-    /// <param name="y"></param>
-    /// <param name="bitmap">basically describes image data to paint, where 1 entry is 1 pixel</param>
+
     public void WriteIntoImageData(int x, int y, int[,] bitmap)
     {
-      
+      throw new NotImplementedException();
     }
 
-    private void WriteImageMain(ref TIFFWriterOptions options, ImgDataMode mode)
+    public void WriteImageWithBuffer(ref TIFFWriterOptions options, byte[] buffer)
+    {
+      if (options.Width * options.Height != buffer.Length)
+        throw new InvalidDataException("Width and Height don't match buffer supplied");
+
+    }
+
+    private void WriteImageMain(ref TIFFWriterOptions options, ImgDataMode mode, byte[]? suppliedBuffer = null)
     {
       Span<byte> writeBuffer = options.AllowStackAlloct ? stackalloc byte[8192] : new byte[8192];
       BufferWriter writer = new BufferWriter(ref writeBuffer, options.IsLittleEndian);
       TIFFInternals.WriteHeader(ref _stream, ref writeBuffer, options.IsLittleEndian);
-      WriteRandomImage(ref writer, ref options, mode);
+      WriteRandomImage(ref writer, ref options, mode, suppliedBuffer);
     }
 
-    private void WriteEmptyImageData(ref BufferWriter writer, ulong byteCount, ulong stripSize, int remainder)
+    public void WriteEmptyImageData(ref BufferWriter writer, ulong byteCount, ulong stripSize, int remainder)
     {
-      // TODO: Fill with 1 depending on isZero
       for (ulong i = 0; i < byteCount; i += (ulong)stripSize)
       {
         // read random value into each buffer stuff and then write
@@ -65,13 +66,12 @@ namespace Converter.Writers.TIFF
         _stream.Write(writer._buffer);
       }
 
-      // write remainder
       Span<byte> remainderSizeBuffer = writer._buffer.Slice(0, remainder);
-      Random.Shared.NextBytes(remainderSizeBuffer);
+      remainderSizeBuffer.Fill(0);
       _stream.Write(remainderSizeBuffer);
     }
 
-    private void WriteRandomImageData(ref BufferWriter writer, ulong byteCount, ulong stripSize, int remainder)
+    public void WriteRandomImageData(ref BufferWriter writer, ulong byteCount, ulong stripSize, int remainder)
     {
       for (ulong i = 0; i < byteCount; i += (ulong)stripSize)
       {
@@ -81,21 +81,23 @@ namespace Converter.Writers.TIFF
         _stream.Write(writer._buffer);
       }
 
-      // write remainder
       Span<byte> remainderSizeBuffer = writer._buffer.Slice(0, remainder);
       Random.Shared.NextBytes(remainderSizeBuffer);
       _stream.Write(remainderSizeBuffer);
     }
-    private void WriteRandomImage(ref BufferWriter writer, ref TIFFWriterOptions options, ImgDataMode mode)
+
+    public void WriteRandomImage(ref BufferWriter writer, ref TIFFWriterOptions options, ImgDataMode mode, byte[]? suppliedBuffer = null)
     {
+      // make this optionable
+      data.BitsPerSample = 8;
       int pos = 0;
       // support later
       if (options.Compression != Compression.NoCompression)
         throw new NotImplementedException("This Compression not suppported yet!");
 
       // divide by 8 because with no compression and bilevel values are either 0 or 1 and they are packed in bits
-      ulong byteCount = (uint)options.Width * (uint)options.Height / 8;
-      imageDataLength = byteCount;
+      ulong byteCount = (uint)options.Width * (uint)options.Height / (8 / (uint)data.BitsPerSample);
+
       // write in ~8k Strips
       // smallest stripsize that can be used where rowsPerStrip will be whole number
       // get closest number to 8192 that is dividable by 8192 / options.height
@@ -106,7 +108,7 @@ namespace Converter.Writers.TIFF
       data.RowsPerStrip = (int)rowsPerStrip;
       data.ImageDataOffset = (int)_stream.Position;
 
-      // Write image data
+      // write data
       switch (mode)
       {
         case ImgDataMode.EMPTY:
@@ -115,8 +117,12 @@ namespace Converter.Writers.TIFF
         case ImgDataMode.RANDOM:
           WriteRandomImageData(ref writer, byteCount, (ulong)stripSize, remainder);
           break;
+        case ImgDataMode.BUFFER_SUPPLIED:
+          _stream.Write(suppliedBuffer); // just write it all in one go because we already have buffer allocated
+          break;
+        
       }
-
+      // Write byte offsets
       data.StripOffsetsPointer = (int)_stream.Position;
       pos = 0;
       for (int i = 0; i < stripCount; i++)
@@ -127,19 +133,22 @@ namespace Converter.Writers.TIFF
       }
       _stream.Write(writer._buffer.Slice(0, pos));
 
-      data.StripByteCounterOffsets = (int)_stream.Position;
+      // write counts
+      data.StripByteCounterOffsets  = (int)_stream.Position;
       pos = 0;
       for (int i = 0; i < stripCount - 1; i++)
       {
         writer.WriteUnsigned32ToBuffer(ref pos, (uint)stripSize);
       }
 
+      // write remainder
       if (remainder == 0)
         remainder = stripSize;
       writer.WriteUnsigned32ToBuffer(ref pos, (uint)remainder);
 
       _stream.Write(writer._buffer.Slice(0, pos));
 
+      // IFD
       pos = 0;
       WriteIFD(ref writer, ref options, ref data, ref pos);
 
@@ -160,6 +169,7 @@ namespace Converter.Writers.TIFF
       _stream.Seek(0, SeekOrigin.End);
 
       pos = 0;
+      // XRes
       writer.WriteUnsigned32ToBuffer(ref pos, 72);
       writer.WriteUnsigned32ToBuffer(ref pos, 1);
 
@@ -169,9 +179,10 @@ namespace Converter.Writers.TIFF
 
       _stream.Write(writer._buffer.Slice(0, pos));
       _stream.Flush();
-        }
+    }
 
-    private void WriteIFD(ref BufferWriter writer,ref TIFFWriterOptions options, ref BilevelData data, ref int pos)
+
+    private void WriteIFD(ref BufferWriter writer, ref TIFFWriterOptions options, ref GrayscaleData data, ref int pos)
     {
       int tagCount = 11;
       // write IFD 'header' lenght
@@ -183,7 +194,7 @@ namespace Converter.Writers.TIFF
       TIFFInternals.WriteIFDEntryToBuffer(ref writer, ref pos, TagType.ImageLength, TagSize.SHORT, 1,
         (uint)options.Height);
       TIFFInternals.WriteIFDEntryToBuffer(ref writer, ref pos, TagType.BitsPerSample, TagSize.SHORT, 1,
-        1);
+        (uint)data.BitsPerSample);
       TIFFInternals.WriteIFDEntryToBuffer(ref writer, ref pos, TagType.Compression, TagSize.SHORT, 1,
         (uint)Compression.NoCompression);
       TIFFInternals.WriteIFDEntryToBuffer(ref writer, ref pos, TagType.PhotometricInterpretation, TagSize.SHORT, 1,

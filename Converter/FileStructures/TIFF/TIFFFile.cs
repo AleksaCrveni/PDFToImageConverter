@@ -122,4 +122,11 @@
     FLOAT = 11, 
     DOUBLE = 12
   }
+
+  public enum ImgDataMode
+  {
+    EMPTY,
+    RANDOM,
+    BUFFER_SUPPLIED
+  }
 }
