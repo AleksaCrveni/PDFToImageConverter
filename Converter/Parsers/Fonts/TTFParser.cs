@@ -234,12 +234,12 @@ namespace Converter.Parsers.Fonts
       if (glyphIndex < numOfLongHorMetrics)
       {
         // 4 * glyph index because each HorMetrics struct is 4 bytes (2 for advancedWidth and 2 for leftSideBearing)
-        advanceWidth = ReadSignedInt16(ref buffer, _ttf.Offsets.hdmx.Position + 4 * glyphIndex);
-        leftSideBearing = ReadSignedInt16(ref buffer, _ttf.Offsets.hdmx.Position + 4 * glyphIndex + 2);
+        advanceWidth = ReadSignedInt16(ref buffer, _ttf.Offsets.hmtx.Position + 4 * glyphIndex);
+        leftSideBearing = ReadSignedInt16(ref buffer, _ttf.Offsets.hmtx.Position + 4 * glyphIndex + 2);
       } else
       {
-        advanceWidth = ReadSignedInt16(ref buffer, _ttf.Offsets.hdmx.Position + 4 * (numOfLongHorMetrics - 1));
-        leftSideBearing = ReadSignedInt16(ref buffer, _ttf.Offsets.hdmx.Position + 4 * numOfLongHorMetrics + 2 * (glyphIndex - numOfLongHorMetrics));
+        advanceWidth = ReadSignedInt16(ref buffer, _ttf.Offsets.hmtx.Position + 4 * (numOfLongHorMetrics - 1));
+        leftSideBearing = ReadSignedInt16(ref buffer, _ttf.Offsets.hmtx.Position + 4 * numOfLongHorMetrics + 2 * (glyphIndex - numOfLongHorMetrics));
       }
     }
 
@@ -280,7 +280,7 @@ namespace Converter.Parsers.Fonts
         {
           ushort end;
           searchRange >>= 1;
-          end = ReadUInt16(ref buffer, (int)(_ttf.StartOffset + search + rangeShift * 2));
+          end = ReadUInt16(ref buffer, (int)(_ttf.StartOffset + search + searchRange * 2));
           if (unicodeCodepoint > end)
             search += (uint)searchRange * 2;
           entrySelector--;
