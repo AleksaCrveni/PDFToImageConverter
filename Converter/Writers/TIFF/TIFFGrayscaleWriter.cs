@@ -45,7 +45,7 @@ namespace Converter.Writers.TIFF
     {
       if (options.Width * options.Height != buffer.Length)
         throw new InvalidDataException("Width and Height don't match buffer supplied");
-
+      WriteImageMain(ref options, ImgDataMode.BUFFER_SUPPLIED, buffer);
     }
 
     private void WriteImageMain(ref TIFFWriterOptions options, ImgDataMode mode, byte[]? suppliedBuffer = null)
