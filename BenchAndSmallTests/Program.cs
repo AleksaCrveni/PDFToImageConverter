@@ -6,6 +6,7 @@ using Converter.Parsers.Fonts;
 using Converter.Parsers.PDF;
 using Converter.Writers;
 using Converter.Writers.TIFF;
+using Microsoft.Diagnostics.Tracing.Parsers.MicrosoftWindowsWPF;
 //int count1 = 0b_0000_0001;
 //int count2 = 0b_1110_0010;
 
@@ -88,6 +89,8 @@ using Converter.Writers.TIFF;
 //}
 
 
+// TODO: SEE WHY ASSERTS GET TRIGGERED SOMETIMES
+
 TTFParser parser = new TTFParser();
 byte[] arr = File.ReadAllBytes("C:/Windows/Fonts/arial.ttf");
 parser.Init(ref arr);
@@ -97,7 +100,7 @@ int lineHeight = 64;
 parser.InitFont(); // required
 byte[] bitmap = new byte[bitmapHeight * bitmapWidth];
 float scaleFactor = parser.ScaleForPixelHeight(lineHeight);
-string textToTranslate = "this is text";
+string textToTranslate = "t";
 int x = 0;
 // ascent and descent are defined in font descriptor, use those I think over getting i from  the font
 int ascent = 0;
@@ -126,6 +129,7 @@ for (int i = 0; i < textToTranslate.Length; i++)
   int y = ascent + c_y0 + baseline;
 
   int byteOffset = x + (int)MathF.Round(lsb * scaleFactor) + (y * bitmapWidth);
+  // BUG IS THAT I AM NOT ACCOUNTI)NG BYTE OFFSET??
   parser.MakeCodepointBitmap(ref bitmap, byteOffset, c_x1 - c_x0, c_y1 - c_y0, bitmapWidth, scaleFactor, scaleFactor, textToTranslate[i]);
 
   // advance x
@@ -133,11 +137,19 @@ for (int i = 0; i < textToTranslate.Length; i++)
 
   // kerning
 
-  int kern;
-  kern = parser.GetCodepointKernAdvance(textToTranslate[i], textToTranslate[i + 1]);
-  x += (int)Math.Round(kern * scaleFactor);
+  //int kern;
+  //kern = parser.GetCodepointKernAdvance(textToTranslate[i], textToTranslate[i + 1]);
+  //x += (int)Math.Round(kern * scaleFactor);
 }
 
+List<string> ints = new();
+for (int i = 0; i < bitmap.Length; i++)
+{
+  if (bitmap[i] > 0)
+    ints.Add($"{i.ToString()} ");
+}
+
+File.WriteAllLines("myByteOutput_letter_T.txt", ints.ToArray());
 
 TIFFGrayscaleWriter writer = new TIFFGrayscaleWriter("RasterizationTest.tiff");
 var options = new TIFFWriterOptions()
@@ -145,7 +157,17 @@ var options = new TIFFWriterOptions()
   Width = bitmapWidth,
   Height = bitmapHeight
 };
-writer.WriteRandomImage(ref options);
+bool hasOne = false;
+for (int i = 0; i < bitmap.Length; i++)
+  if (bitmap[i] == 1)
+    hasOne = true;
+
+if (!hasOne)
+  throw new Exception("Something went wrong, bitmap empty!");
+
+//bitmap = new byte[bitmapWidth * bitmapHeight];
+//Array.Fill<byte>(bitmap, 255);
+writer.WriteImageWithBuffer(ref options, bitmap);
 
 //PdfParser pdfParser = new PdfParser();
 //pdfParser.Parse(Files.BaseDocFilePath);

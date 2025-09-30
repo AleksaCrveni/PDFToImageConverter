@@ -51,7 +51,7 @@ int main(int argc, char const *argv[])
   // I think we should use this for scale?? or just value from Text line matrix or something similar
   float scaleFactor = stbtt_ScaleForPixelHeight(&info, lineHeight);
 
-  char* textToTranslate = "this is text";
+  char* textToTranslate = "t";
   char* textToTranslate2nd = "Second Row";
 
   int x = 0;
@@ -91,17 +91,24 @@ int main(int argc, char const *argv[])
 
     int charOffset = x + roundf(lsb * scaleFactor) + (y * bitmapWidth);
     stbtt_MakeCodepointBitmap(&info, bitmap + charOffset, c_x1 - c_x0, c_y1 - c_y0, bitmapWidth, scaleFactor, scaleFactor, textToTranslate[i]);
-
+    
     // advance x
     x += roundf(ax * scaleFactor);
 
     // kerning
 
-    int kern;
+   /* int kern;
     kern = stbtt_GetCodepointKernAdvance(&info, textToTranslate[i], textToTranslate[i + 1]);
-    x += roundf(kern * scaleFactor);
+    x += roundf(kern * scaleFactor);*/
+  }
+  FILE *fptr = fopen("stdByteOutput_letter_T.txt", "w");
+  for (int i = 0; i < bitmapHeight * bitmapWidth; i++){
+    if (bitmap[i] > 0)
+      fprintf(fptr, "%d \n", i);
   }
 
+  fclose(fptr);
+  
   stbi_write_png("outMine.png", bitmapWidth, bitmapHeight, 1, bitmap, bitmapWidth);
   free(fontBuffer);
   free(bitmap);

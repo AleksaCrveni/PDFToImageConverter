@@ -2,6 +2,8 @@
 using Converter.FileStructures.TIFF;
 using System.Buffers.Binary;
 using System.Diagnostics;
+using System.Numerics;
+using static System.Net.Mime.MediaTypeNames;
 using static System.Runtime.InteropServices.JavaScript.JSType;
 
 namespace Converter.Parsers.Fonts
@@ -872,6 +874,8 @@ namespace Converter.Parsers.Fonts
       edge.y0 = (offY + result.H) + 1;
       edges[n] = edge;
       ActiveEdgeV2 z;
+      i = 0;
+      int eIndex = 0;
       while (j < result.H)
       {
         float scanYTop = y;
@@ -883,8 +887,9 @@ namespace Converter.Parsers.Fonts
         while (i < activeEdges.Count)
         {
           z = activeEdges[i];
-          if (z.ey < scanYTop)
+          if (z.ey <= scanYTop)
           {
+            Debug.Assert(z.direction != 0);
             activeEdges.RemoveAt(i);
           }
           else
@@ -893,9 +898,8 @@ namespace Converter.Parsers.Fonts
           }
         }
 
-        // insert all edges that start before the bottom of this scanline
-        i = 0;
-        edge = edges[i];
+        // insert all edges that start before the bottom of this scanline 
+        edge = edges[eIndex];
         while (edge.y0 <= scanYBottom && i < edges.Count)
         {
           if (edge.y0 != edge.y1)
@@ -913,10 +917,11 @@ namespace Converter.Parsers.Fonts
 
             activeEdges.Insert(0, z);
           }
-          i++;
-          edge = edges[i];
+          eIndex++;
+          edge = edges[eIndex];
         }
 
+        // Fix bug here, scanlines aren't filled properly
         if (activeEdges.Count > 0)
           FillActiveEdgesNewV2(scanline, scanline2, result.W, ref activeEdges, scanYTop);
 
@@ -932,7 +937,7 @@ namespace Converter.Parsers.Fonts
             m = (int) k;
             if (m > 255)
               m = 255;
-            result.Pixels[j * result.Stride + i] = (byte)m;
+            result.Pixels[result.Offset + j * result.Stride + i] = (byte)m;
           }
         }
 
@@ -1729,7 +1734,6 @@ namespace Converter.Parsers.Fonts
 
       if (gbm.W > 0 && gbm.H > 0)
         Rasterize(ref gbm, 0.35f, ref vertices, numOfVerts, scaleX, scaleY, shiftX, shiftY, ix0, iy0, true);
-
     }
     public void MakeCodepointBitmapSubpixel(ref byte[] bitmapArr, int byteOffset, int glyphWidth, int glyphHeight, int glyphStride, float scaleX, float scaleY, float shiftX, float shiftY, int unicodeCodepoint)
     {

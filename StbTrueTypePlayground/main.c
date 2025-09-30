@@ -1,4 +1,12 @@
+#include <stdio.h>
+void Test(int x)
+{
+  printf("%d", x);
+}
+
 int main(int argc, char const *argv[])
 {
-  return 0;
+  float f = 8.56f;
+  Test((int)f);
 }
+
