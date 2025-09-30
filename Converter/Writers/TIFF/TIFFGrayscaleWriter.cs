@@ -85,6 +85,20 @@ namespace Converter.Writers.TIFF
       _stream.Write(remainderSizeBuffer);
     }
 
+    public void WriteSuppliedBufferData(byte[] suppliedBuffer, ulong byteCount, ulong stripSize, int remainder)
+    {
+      Span<byte> buffer = suppliedBuffer.AsSpan();
+      BufferWriter writer = new BufferWriter(ref buffer);
+      for (ulong i = 0; i < byteCount; i += (ulong)stripSize)
+      {
+        // read random value into each buffer stuff and then write
+        // do entire buffer because we know we are in range and no need to refresh
+        _stream.Write(writer._buffer);
+      }
+
+      Span<byte> remainderSizeBuffer = writer._buffer.Slice(0, remainder);
+      _stream.Write(remainderSizeBuffer);
+    }
     public void WriteRandomImage(ref BufferWriter writer, ref TIFFWriterOptions options, ImgDataMode mode, byte[]? suppliedBuffer = null)
     {
       // make this optionable
@@ -117,7 +131,7 @@ namespace Converter.Writers.TIFF
           WriteRandomImageData(ref writer, byteCount, (ulong)stripSize, remainder);
           break;
         case ImgDataMode.BUFFER_SUPPLIED:
-          _stream.Write(suppliedBuffer); // just write it all in one go because we already have buffer allocated
+          WriteSuppliedBufferData(suppliedBuffer, byteCount, (ulong)stripSize, remainder);
           break;
         
       }
