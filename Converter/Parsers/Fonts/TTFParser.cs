@@ -998,13 +998,11 @@ namespace Converter.Parsers.Fonts
     /// <param name="edges"></param>
     /// <param name="sp">start position, to imitate pointer arithmetic, fix later</param>
     /// <param name="n"></param>
-    private void SortEdgesQuickSort(ref Span<TTFEdge> oRefEdges, int n, bool startSecond = false)
+    private void SortEdgesQuickSort(ref Span<TTFEdge> oRefEdges, int n, int prevIndex = 0)
     {
-      Span<TTFEdge> edges;
-      if (startSecond == false)
-        edges = oRefEdges;
-      else
-        edges = oRefEdges.Slice(1);
+      Span<TTFEdge> edges = oRefEdges; // redundant?
+      if (prevIndex > 0)
+        edges = oRefEdges.Slice(prevIndex);
       TTFEdge tempEdge;
       while (n > 12)
       {
@@ -1063,12 +1061,12 @@ namespace Converter.Parsers.Fonts
         if (j < (n - i))
         {
           SortEdgesQuickSort(ref edges, j);
-          oRefEdges = edges.Slice(1);
+          edges = edges.Slice(i);
           n = n - i;
         }
         else
         {
-          SortEdgesQuickSort(ref edges, n - i, true);
+          SortEdgesQuickSort(ref edges, n - i, i);
           n = j;
         }
 

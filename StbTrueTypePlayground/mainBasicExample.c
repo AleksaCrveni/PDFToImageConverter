@@ -51,7 +51,7 @@ int main(int argc, char const *argv[])
   // I think we should use this for scale?? or just value from Text line matrix or something similar
   float scaleFactor = stbtt_ScaleForPixelHeight(&info, lineHeight);
 
-  char* textToTranslate = "t";
+  char* textToTranslate = "o";
   char* textToTranslate2nd = "Second Row";
 
   int x = 0;

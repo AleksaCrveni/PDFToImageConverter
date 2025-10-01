@@ -100,7 +100,7 @@ int lineHeight = 64;
 parser.InitFont(); // required
 byte[] bitmap = new byte[bitmapHeight * bitmapWidth];
 float scaleFactor = parser.ScaleForPixelHeight(lineHeight);
-string textToTranslate = "t";
+string textToTranslate = "desinger nije cava";
 int x = 0;
 // ascent and descent are defined in font descriptor, use those I think over getting i from  the font
 int ascent = 0;
