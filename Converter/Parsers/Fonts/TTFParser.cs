@@ -578,7 +578,7 @@ namespace Converter.Parsers.Fonts
       int i;
       ActiveEdgeV2 edge;
       Span<float> scanlineFill = scanline2.Slice(1);
-      for (i =0; i < activeEdges.Count; i++)
+      for (i = 0; i < activeEdges.Count; i++)
       {
         // brute force every pixel
 
@@ -881,6 +881,8 @@ namespace Converter.Parsers.Fonts
         float scanYTop = y;
         float scanYBottom = y + 1;
 
+        scanline.Fill(0);
+        scanline2.Fill(0);
         // update active edges
         // remove all active edges that terminate before the top of this scanline
         i = 0;
