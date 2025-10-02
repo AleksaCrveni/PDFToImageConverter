@@ -80,17 +80,6 @@ namespace Converter.Parsers.Fonts
         // case {num} where num is uint32 representation of 4 byte string that represent table tag
         // did this so I don't allocate string when comparing 
         tableBuffer = new FakeSpan((int)offset, (int)length);
-        // SPECIAL CASE FOR HEAD
-        if (tag == 1751474532)
-        {
-          // do something special
-        }
-        else
-        {
-          computedCheckSum = CalculateCheckSum(ref tableBuffer, length);
-          if (checkSum != 0 && checkSum != computedCheckSum)
-            throw new InvalidDataException($"Check sum failed! For tag {tag}. Expected: {checkSum}. Computed: {computedCheckSum}");
-        }
 
         switch (tag)
         {
@@ -134,7 +123,7 @@ namespace Converter.Parsers.Fonts
           case 1668707360:
             tOff.cvt = tableBuffer;
             break;
-          // fpgm 
+          // fpgm - don't need this for now i Think
           case 1718642541:
             tOff.fpgm = tableBuffer;
             break;
