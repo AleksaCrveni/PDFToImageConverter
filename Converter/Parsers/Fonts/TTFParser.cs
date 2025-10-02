@@ -288,7 +288,7 @@ namespace Converter.Parsers.Fonts
           if (unicodeCodepoint < start || unicodeCodepoint > last)
             return 0;
 
-          offset = ReadUInt16(ref buffer, (int)(_ttf.StartOffset + _ttf.IndexMapOffset + segCount * 6 + 2 + 2 * item));
+          offset = ReadUInt16(ref buffer, (int)(_ttf.StartOffset + _ttf.IndexMapOffset + 14 + segCount * 6 + 2 + 2 * item));
           if (offset == 0)
             return (ushort)(unicodeCodepoint + ReadUInt16(ref buffer, (int)(_ttf.StartOffset + _ttf.IndexMapOffset + 14 + segCount * 4 + 2 + 2 * item)));
 
