@@ -561,7 +561,13 @@ namespace Converter.Parsers.PDF
         if (helper._char == '<')
           dictStartFound = helper.IsCurrentCharacterSameAsNext();
       }
-
+      // TODO: I really don't think i should do nesting IR parsing
+      // I should parse IRs and then after function si done check if there are any IRs to be parsed
+      // because it seems that data at IR can depend on that that comes after indirect refernce in parent dictionary
+      // i.e first and last char can come after Widths arr
+      long widthsOffset = 0;
+      int widthsIndex = -1;
+      int[] widthsArr;
       string tokenString = helper.GetNextToken();
       while (tokenString != "")
       {
@@ -585,9 +591,10 @@ namespace Converter.Parsers.PDF
           case "Widths":
             helper.SkipWhiteSpace();
             // can be direct array or IR
-            int[] widthsArr = new int[fontInfo.LastChar - fontInfo.FirstChar + 1];
+            
             if (helper._char == '[')
             {
+              widthsArr = new int[fontInfo.LastChar - fontInfo.FirstChar + 1];
               helper.ReadChar();
               for (int i = 0; i < widthsArr.Length; i++)
               {
@@ -597,46 +604,18 @@ namespace Converter.Parsers.PDF
               if (helper._char != ']')
                 throw new InvalidDataException("Invalid end of widths array!");
               helper.ReadChar();
+              fontInfo.Widths = widthsArr;
             } else if (char.IsDigit((char)helper._char))
             {
-              int objectIndex = helper.GetNextInt32();
-              long objectByteOffset = file.CrossReferenceEntries[objectIndex].TenDigitValue;
-              long objectLength = GetDistanceToNextObject(objectIndex, objectByteOffset, file);
-              Span<byte> irBuffer = new byte[objectLength];
-
-              long currPos = file.Stream.Position;
-              file.Stream.Position = objectByteOffset;
-              int bytesRead = file.Stream.Read(irBuffer);
-              if (bytesRead != objectLength)
-                throw new InvalidDataException("Invalid array for Widths field!");
-              file.Stream.Position = currPos;
-              SpanParseHelper irHelper = new SpanParseHelper(ref irBuffer);
-
-              irHelper.SkipNextToken(); // object id
-              irHelper.SkipNextToken(); // seocnd number
-              irHelper.SkipNextToken(); // 'obj'
-              irHelper.ReadUntilNonWhiteSpaceDelimiter();
-              while (irHelper._char != '[')
-              {
-                irHelper.ReadChar();
-                irHelper.ReadUntilNonWhiteSpaceDelimiter();
-              }
-
-              for (int i = 0; i < widthsArr.Length; i++)
-              {
-                widthsArr[i] = irHelper.GetNextInt32();
-              }
-
-              irHelper.ReadUntilNonWhiteSpaceDelimiter();
-              if (irHelper._char != ']')
-                throw new InvalidDataException("Invalid end of widths array!");
+              widthsIndex = helper.GetNextInt32();
+              widthsOffset = file.CrossReferenceEntries[widthsIndex].TenDigitValue;
             }
             else
             {
               throw new InvalidDataException("Invalid Widths value in Font Dictionary!");
             }
 
-            fontInfo.Widths = widthsArr;
+            
             break;
           case "FontDescriptor":
             (int objectIndex, int _) ir = helper.GetNextIndirectReference();
@@ -665,6 +644,44 @@ namespace Converter.Parsers.PDF
         tokenString = helper.GetNextToken();
       }
 
+      //parse width if its IR
+      if (widthsOffset > 0)
+      {
+        long objectLength = GetDistanceToNextObject(widthsIndex, widthsOffset, file);
+        Span<byte> irBuffer = new byte[objectLength];
+        widthsArr = new int[fontInfo.LastChar - fontInfo.FirstChar + 1];
+        long currPos = file.Stream.Position;
+        file.Stream.Position = widthsOffset;
+        int bytesRead = file.Stream.Read(irBuffer);
+        if (bytesRead != objectLength)
+          throw new InvalidDataException("Invalid array for Widths field!");
+        file.Stream.Position = currPos;
+        SpanParseHelper irHelper = new SpanParseHelper(ref irBuffer);
+
+        irHelper.SkipNextToken(); // object id
+        irHelper.SkipNextToken(); // seocnd number
+        irHelper.SkipNextToken(); // 'obj'
+        irHelper.ReadUntilNonWhiteSpaceDelimiter();
+        while (irHelper._char != '[')
+        {
+          irHelper.ReadChar();
+          irHelper.ReadUntilNonWhiteSpaceDelimiter();
+        }
+
+        for (int i = 0; i < widthsArr.Length; i++)
+        {
+          widthsArr[i] = irHelper.GetNextInt32();
+        }
+
+        irHelper.ReadUntilNonWhiteSpaceDelimiter();
+        if (irHelper._char != ']')
+          throw new InvalidDataException("Invalid end of widths array!");
+
+        fontInfo.Widths = widthsArr;
+      }
+
+
+      
       if (tokenString == "")
         throw new InvalidDataException("Invalid dictionary");
     }
@@ -676,6 +693,7 @@ namespace Converter.Parsers.PDF
       long objectLength = GetDistanceToNextObject(objectIndex, objectByteOffset, file);
       Span<byte> buffer = new byte[objectLength];
       SpanParseHelper helper = new SpanParseHelper(ref buffer);
+      file.Stream.Position = objectByteOffset;
       int readBytes = file.Stream.Read(buffer);
       if (readBytes != objectLength)
         throw new InvalidDataException("Invalid font descriptor dictionary.");
