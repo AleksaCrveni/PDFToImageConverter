@@ -281,9 +281,27 @@ namespace Converter.Parsers.PDF
           #endregion textPositioning;
           #region textShowing
           case 0x6a54: // Tj
-            literal = GetNextStackValAsString();
+            // placeholder
+            if (operandTypes.Peek() == OperandType.ARRAY)
+            {
+              operandTypes.Pop();
+              int arrLen = arrayLengths.Pop();
+              for (int i = 0; i < arrLen; i++)
+                GetNextStackValAsString();
+            } else
+              literal = GetNextStackValAsString();
             break;
           case 0x4a54: // TJ
+            // placeholder
+            if (operandTypes.Peek() == OperandType.ARRAY)
+            {
+              operandTypes.Pop();
+              int arrLen = arrayLengths.Pop();
+              for (int i = 0; i < arrLen; i++)
+                GetNextStackValAsString();
+            }
+            else
+              literal = GetNextStackValAsString();
             break;
           case 0x27:   // '
           case 0x22:   // "
@@ -301,6 +319,10 @@ namespace Converter.Parsers.PDF
           case 0x4353: // SC
           case 0x4e4353: // SCN
           case 0x6373: // sc
+            GetNextStackValAsInt();
+            GetNextStackValAsInt();
+            GetNextStackValAsInt();
+            break;
           case 0x6e6373: // scn
           case 0x47: // G
           case 0x67: // g
@@ -390,11 +412,11 @@ namespace Converter.Parsers.PDF
       // array
       if (_char == '[')
       {
+        ReadChar();
         int count = 0;
+        SkipWhiteSpace();
         while (_char != ']' && _char != PDFConstants.NULL)
         {
-          SkipWhiteSpace();
-
           if (IsCurrentCharDigit() || _char == '-')
             GetNumber();
 
@@ -407,7 +429,9 @@ namespace Converter.Parsers.PDF
             GetStringLiteral();
 
           count++;
+          SkipWhiteSpace();
         }
+        ReadChar(); // move off ']'
         operandTypes.Push(OperandType.ARRAY);
         arrayLengths.Push(count);
         return 0;
