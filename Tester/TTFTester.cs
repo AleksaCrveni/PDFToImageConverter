@@ -19,8 +19,8 @@ namespace Tester
       // for now i run tests only locally
       bool isLocal = Directory.Exists("C:\\FakeFolder");
 
-      WriteImageOutput = isLocal ? WriteImageOutput : false;
-      WriteBitmapIndex = isLocal ? WriteBitmapIndex : false;
+      WriteImageOutput = isLocal ? false : WriteImageOutput;
+      WriteBitmapIndex = isLocal ? false : WriteBitmapIndex;
     }
     public void Write(byte[] arr, int bitmapWidth, int bitmapHeight, int lineHeight, string textToTranslate, string imageName)
     {

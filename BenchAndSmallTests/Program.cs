@@ -92,8 +92,7 @@ using Microsoft.Diagnostics.Tracing.Parsers.MicrosoftWindowsWPF;
 // TODO: SEE WHY ASSERTS GET TRIGGERED SOMETIMES
 
 TTFParser parser = new TTFParser();
-//byte[] arr = File.ReadAllBytes("C:/Windows/Fonts/arial.ttf");
-byte[] arr = File.ReadAllBytes("W:/PDFToImageConverter/Files/TT1FontInfo.txt");
+byte[] arr = File.ReadAllBytes("C:/Windows/Fonts/arial.ttf");
 parser.Init(ref arr);
 int bitmapWidth = 1024;
 int bitmapHeight = 256;
@@ -101,7 +100,7 @@ int lineHeight = 64;
 parser.InitFont(); // required
 byte[] bitmap = new byte[bitmapHeight * bitmapWidth];
 float scaleFactor = parser.ScaleForPixelHeight(lineHeight);
-string textToTranslate = "Nova Dusk PDF";
+string textToTranslate = "desinger nije cava";
 int x = 0;
 // ascent and descent are defined in font descriptor, use those I think over getting i from  the font
 int ascent = 0;

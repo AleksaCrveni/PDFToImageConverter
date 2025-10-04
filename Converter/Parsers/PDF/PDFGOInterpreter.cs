@@ -45,12 +45,26 @@ namespace Converter.Parsers.PDF
       realOperands = new Stack<double>(100);
       operandTypes = new Stack<OperandType>();
       arrayLengths = new Stack<int>();
-      stringOperands = new Stack<string>();
       GSS = new Stack<GraphicsState>();
       currentGS = new GraphicsState();
       currentPC = new PathConstruction();
       _fontInfo = fontInfo;
       _writer = tiffWriter;
+    }
+
+    public PDFGOInterpreter(Span<byte> buffer, List<FontData> fontInfo, ITIFFWriter tiffWriter)
+    {
+      _buffer = buffer;
+      intOperands = new Stack<int>(100);
+      realOperands = new Stack<double>(100);
+      operandTypes = new Stack<OperandType>();
+      arrayLengths = new Stack<int>();
+      GSS = new Stack<GraphicsState>();
+      currentGS = new GraphicsState();
+      currentPC = new PathConstruction();
+      _fontInfo = fontInfo;
+      _writer = tiffWriter;
+      fourByteSlice = new byte[4];
     }
 
     public void ParseAll()
