@@ -599,7 +599,7 @@ namespace Converter.Parsers.PDF
               helper.ReadChar();
             } else if (char.IsDigit((char)helper._char))
             {
-              int objectIndex = helper._char;
+              int objectIndex = helper.GetNextInt32();
               long objectByteOffset = file.CrossReferenceEntries[objectIndex].TenDigitValue;
               long objectLength = GetDistanceToNextObject(objectIndex, objectByteOffset, file);
               Span<byte> irBuffer = new byte[objectLength];
@@ -616,7 +616,7 @@ namespace Converter.Parsers.PDF
               irHelper.SkipNextToken(); // seocnd number
               irHelper.SkipNextToken(); // 'obj'
               irHelper.ReadUntilNonWhiteSpaceDelimiter();
-              while (helper._char != '[')
+              while (irHelper._char != '[')
               {
                 irHelper.ReadChar();
                 irHelper.ReadUntilNonWhiteSpaceDelimiter();
@@ -628,7 +628,7 @@ namespace Converter.Parsers.PDF
               }
 
               irHelper.ReadUntilNonWhiteSpaceDelimiter();
-              if (helper._char != ']')
+              if (irHelper._char != ']')
                 throw new InvalidDataException("Invalid end of widths array!");
             }
             else
