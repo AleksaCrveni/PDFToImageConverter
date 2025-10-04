@@ -88,8 +88,8 @@ namespace Converter.Parsers.PDF
         Height = (int)file.PageInformation[0].MediaBox.urY,
       };
       writer.WriteEmptyImage(ref tiffOptions);
-
-      PDFGOInterpreter pdfGo = new PDFGOInterpreter(rawContent.AsSpan(), file.PageInformation[0].ResourceDict.Font, writer);
+      Span<byte> fourByteSlice = stackalloc byte[4];
+      PDFGOInterpreter pdfGo = new PDFGOInterpreter(rawContent.AsSpan(), file.PageInformation[0].ResourceDict.Font, writer, ref fourByteSlice);
       pdfGo.ParseAll();
     }
 
