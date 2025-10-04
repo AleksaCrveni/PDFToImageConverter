@@ -17,7 +17,7 @@ int main(int argc, char const *argv[])
 {
   long size;
   unsigned char* fontBuffer;
-  FILE* fontFile = fopen("C:/Windows/Fonts/arial.ttf", "rb");
+  FILE* fontFile = fopen("C:/Windows/Fonts/ariali.ttf", "rb");
   fseek(fontFile, 0, SEEK_END);
   size = ftell(fontFile);
   fseek(fontFile, 0, SEEK_SET);
