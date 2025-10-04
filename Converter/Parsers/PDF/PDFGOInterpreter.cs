@@ -36,9 +36,9 @@ namespace Converter.Parsers.PDF
     private TextObject currentTextObject;
     private List<FontData> _fontInfo;
     private ITIFFWriter _writer;
-    private Span<byte> fourByteSlice;
+    private Span<byte> _fourByteSlice;
     // TODO: maybe NULL check is redundant if we let it throw to end?
-    public PDFGOInterpreter(ReadOnlySpan<byte> buffer, List<FontData> fontInfo, ITIFFWriter tiffWriter)
+    public PDFGOInterpreter(ReadOnlySpan<byte> buffer, List<FontData> fontInfo, ITIFFWriter tiffWriter, ref Span<byte> fourByteSlice)
     {
       _buffer = buffer;
       intOperands = new Stack<int>(100);
@@ -51,11 +51,16 @@ namespace Converter.Parsers.PDF
       currentPC = new PathConstruction();
       _fontInfo = fontInfo;
       _writer = tiffWriter;
+      // should be always 4 bytes
+      if (fourByteSlice.Length != 4)
+        throw new Exception("Four byte slice must be 4 in length!");
+      _fourByteSlice = fourByteSlice;
     }
 
     public void ParseAll()
     {
       currentGS = new GraphicsState();
+
       uint val = ReadNext();
       // TODO: instead of string, we can return hexadecimals or numbers
       // since they are all less than 4char strings
@@ -93,7 +98,7 @@ namespace Converter.Parsers.PDF
 
             currentGS.DashPattern = dashPattern;
             break;
-          case 0x7269: // ri
+          case 0x6972: // ri
             operandTypes.Pop();
             string renderingIntentString = stringOperands.Pop();
 
@@ -106,7 +111,7 @@ namespace Converter.Parsers.PDF
           case 0x69: // i
             currentGS.Flatness = GetNextStackValAsDouble();
             break;
-          case 0x7173: // qs
+          case 0x7371: // qs
                        // Name of gs paramter dict that is in ExtGState subdict in current resorouceDict
                        // do it later
             throw new Exception("Implement dictname (gs)");
@@ -119,7 +124,7 @@ namespace Converter.Parsers.PDF
           case 0x51: // Q
             currentGS = GSS.Pop();
             break;
-          case 0x636d: // cm
+          case 0x6d63: // cm
                        // a b c e d f - real numbers but can be saved as ints
             CTM newCtm = new CTM();
             // get it as reverse since its stack
@@ -178,7 +183,7 @@ namespace Converter.Parsers.PDF
             mp = new MyPoint();
             currentPC.PathConstructs.Add((PathConstructOperator.h, mp));
             break;
-          case 0x7265: // re
+          case 0x6572: // re
             mp = new MyPoint();
 
             // use this as width
@@ -200,11 +205,11 @@ namespace Converter.Parsers.PDF
             currentPC.NonZeroClippingPath = false;
             break;
           case 0x46: // F
-          case 0x662a: // f*
+          case 0x2a66: // f*
           case 0x42: // B
-          case 0x422a: // B*
+          case 0x2a42: // B*
           case 0x62: // b
-          case 0x622a: // b*
+          case 0x2a62: // b*
           case 0x6e: // n
                      // CHECK CLIPPING PATH SECTION
                      // path painting
@@ -214,37 +219,37 @@ namespace Converter.Parsers.PDF
           case 0x57: // W
             currentPC.NonZeroClippingPath = true;
             break;
-          case 0x572a: // W*
+          case 0x2a57: // W*
             currentPC.EvenOddClippingPath = true;
             // clipping paths
             break;
           #endregion clippingPath
           #region textObjects
-          case 0x4254: // BT
+          case 0x5442: // BT
             currentTextObject.Active = false;
             currentTextObject.InitMatrixes();
             break;
-          case 0x4554: // ET
+          case 0x5445: // ET
             currentTextObject.Active = true;
             break;
           #endregion textObjects
           #region textState
-          case 0x5463: // Tc
-          case 0x5477: // Tw
-          case 0x547a: // Tz
-          case 0x544c: // TL
-          case 0x5466: // Tf
+          case 0x6354: // Tc
+          case 0x7754: // Tw
+          case 0x7a54: // Tz
+          case 0x4c54: // TL
+          case 0x6654: // Tf
             currentTextObject.FontScaleFactor = GetNextStackValAsDouble();
             currentTextObject.FontRef = GetNextStackValAsString();
             break;
-          case 0x5472: // Tr
-          case 0x5473: // Ts
+          case 0x7254: // Tr
+          case 0x7354: // Ts
             break;
           #endregion textState
           #region textPositioning;
-          case 0x5464: // Td
-          case 0x5444: // TD
-          case 0x546d: // Tm
+          case 0x6454: // Td
+          case 0x4454: // TD
+          case 0x6d54: // Tm
             double tmOp = GetNextStackValAsDouble();
             currentTextObject.TextMatrix[2, 1] = tmOp;
             currentTextObject.TextLineMatrix[2, 1] = tmOp;
@@ -269,59 +274,61 @@ namespace Converter.Parsers.PDF
             currentTextObject.TextMatrix[0, 0] = tmOp;
             currentTextObject.TextLineMatrix[0, 0] = tmOp;
             break;
-          case 0x542a: // T*
+          case 0x2a54: // T*
                        // text positioning
             break;
           #endregion textPositioning;
           #region textShowing
-          case 0x546a: // Tj
+          case 0x6a54: // Tj
             literal = GetNextStackValAsString();
             break;
-          case 0x544a: // TJ
+          case 0x4a54: // TJ
             break;
           case 0x27:   // '
           case 0x22:   // "
                        // text showing
             break;
           #endregion textShowing
-          case 0x6430: // d0
-          case 0x6431: // d1
+          case 0x3064: // d0
+          case 0x3164: // d1
                        // type 3 fonts
             break;
-          case 0x4353: // CS
-          case 0x6373: // cs
-          case 0x5343: // SC
-          case 0x53434e: // SCN
-          case 0x7363: // sc
-          case 0x73636e: // scn
+          case 0x5343: // CS
+          case 0x7363: // cs
+            GetNextStackValAsString();
+            break;
+          case 0x4353: // SC
+          case 0x4e4353: // SCN
+          case 0x6373: // sc
+          case 0x6e6373: // scn
           case 0x47: // G
           case 0x67: // g
-          case 0x5247: // RG
-          case 0x7267: // rg
+          case 0x4752: // RG
+          case 0x6772: // rg
           case 0x4b: // K
           case 0x6b: // k
                      // color
             break;
-          case 0x7368: // sh
+          case 0x6873: // sh
                        // shading patterns
             break;
-          case 0x7249: // BI
-          case 0x4944: // ID
-          case 0x4549: // EI
+          case 0x4972: // BI
+          case 0x4449: // ID
+          case 0x4945: // EI
                        // inline images
             break;
-          case 0x446f: // Do
+          case 0x6f44: // Do
                        // XObject
             break;
-          case 0x4d50: // MP
-          case 0x4450: // DP
-          case 0x424d43: // BMC
-          case 0x424443: // BDC
-          case 0x454d43: // EMC
+          case 0x504d: // MP
+          case 0x5044: // DP
+          case 0x434d42: // BMC
+          case 0x434442: // BDC
+          case 0x434d45: // EMC
                          // Marked content
             break;
-          case 0x4258: // BX
-          case 0x4558: // EX
+          case 0x5842: // BX
+          case 0x5845: // EX
                        // Compatibility
             break;
           default:
@@ -352,10 +359,10 @@ namespace Converter.Parsers.PDF
         int startPos = _pos;
         while (!IsCurrentCharPDFWhitespaceOrNewLine())
           ReadChar();
-        fourByteSlice.Fill(0);
+        _fourByteSlice.Fill(0);
         for (int i = 0; i < _pos - startPos; i++)
-          fourByteSlice[i] = _buffer[startPos + i];
-        return BitConverter.ToUInt32(fourByteSlice);
+          _fourByteSlice[i] = _buffer[startPos + i];
+        return BitConverter.ToUInt32(_fourByteSlice);
       }
 
       // is a number, either real or int
