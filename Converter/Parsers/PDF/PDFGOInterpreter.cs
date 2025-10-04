@@ -46,6 +46,7 @@ namespace Converter.Parsers.PDF
       operandTypes = new Stack<OperandType>();
       arrayLengths = new Stack<int>();
       stringOperands = new Stack<string>();
+      currentTextObject = new TextObject();
       GSS = new Stack<GraphicsState>();
       currentGS = new GraphicsState();
       currentPC = new PathConstruction();
