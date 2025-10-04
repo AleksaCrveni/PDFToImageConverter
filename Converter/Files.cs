@@ -18,7 +18,7 @@
       F2_0_2020 = Path.Combine(RootFolder, "PDF2.0.2020.pdf");
       Report = Path.Combine(RootFolder, "Report.pdf");
       SmallTest = Path.Combine(RootFolder, "SmallTest.txt");
-      Sample = Path.Combine(RootFolder, "sample.pdf");
+      Sample = Path.Combine(RootFolder, "file-sample_150kB.pdf");
       HelloTiff = Path.Combine(RootFolder, "HelloTiff.tif");
       BilevelTiff = Path.Combine(RootFolder, "BilevelTiff.tif");
       CreateTestTiff = Path.Combine(RootFolder, "testCreateTIFF.tif");
