@@ -1,4 +1,5 @@
-﻿using System;
+﻿using Converter.FIleStructures;
+using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Linq;
@@ -24,7 +25,7 @@ namespace Converter.FileStructures
     // Device Independent
     public CTM CTM;
     public object ClippingPath;
-    public List<ColorSpace> ColorSpace;
+    public ColorSpaceInfo ColorSpaceInfo;
     public object Color;
     public object TextState;
     public double LineWidth;
@@ -78,11 +79,6 @@ namespace Converter.FileStructures
     // lengths of the units along each axis
     public double XxLen;
     public double YLen;
-  }
-
-  public enum ColorSpace
-  {
-    DeviceGray
   }
 
   public enum RenderingIntent

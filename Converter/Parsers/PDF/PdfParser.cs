@@ -3,6 +3,7 @@ using Converter.FIleStructures;
 using Converter.Parsers.Fonts;
 using Converter.Writers.TIFF;
 using System.Globalization;
+using System.IO;
 using System.IO.Compression;
 using System.Runtime.CompilerServices;
 using System.Text;
@@ -89,7 +90,8 @@ namespace Converter.Parsers.PDF
       };
       writer.WriteEmptyImage(ref tiffOptions);
       Span<byte> fourByteSlice = stackalloc byte[4];
-      PDFGOInterpreter pdfGo = new PDFGOInterpreter(rawContent.AsSpan(), file.PageInformation[0].ResourceDict.Font, writer, ref fourByteSlice);
+      ResourceDict rDict = file.PageInformation[0].ResourceDict;
+      PDFGOInterpreter pdfGo = new PDFGOInterpreter(ref rDict, rawContent.AsSpan(), file.PageInformation[0].ResourceDict.Font, writer, ref fourByteSlice);
       pdfGo.ParseAll();
     }
 
@@ -390,6 +392,9 @@ namespace Converter.Parsers.PDF
 
       return decoded;
     }
+
+  
+
     private void ParseResourceDictionary(PDFFile file, (int objIndex, int) objectPosition, ref ResourceDict resourceDict)
     {
       int objectIndex = objectPosition.objIndex;
@@ -421,7 +426,37 @@ namespace Converter.Parsers.PDF
             resourceDict.ExtGState = helper.GetNextDict();
             break;
           case "ColorSpace":
-            resourceDict.ColorSpace = helper.GetNextDict();
+            List<ColorSpaceData> csData = new List<ColorSpaceData>();
+            helper.SkipWhiteSpace();
+            int bytesRead = 0;
+
+            if (helper._char == '<' && helper.IsCurrentCharacterSameAsNext())
+            {
+              helper.ReadChar();
+              // use this because we dont know when dict ends so we can just skip those and not read again on main buffer
+              ParseColorSpaceIRDictionary(file, helper._buffer.Slice(helper._position), true, ref csData);
+
+            }
+            else
+            {
+              (int objectIndex, int b) IR = helper.GetNextIndirectReference();
+              objectByteOffset = file.CrossReferenceEntries[IR.objectIndex].TenDigitValue;
+              objectLength = GetDistanceToNextObject(IR.objectIndex, objectByteOffset, file);
+
+              // use array pool
+              Span<byte> irBuffer = new byte[objectLength];
+
+              long prevPos = file.Stream.Position;
+              file.Stream.Position = objectByteOffset;
+              readBytes = file.Stream.Read(irBuffer);
+              // do i need this...?
+              if (irBuffer.Length != readBytes)
+                throw new InvalidDataException("Invalid data");
+              ParseColorSpaceIRDictionary(file, irBuffer, false, ref csData);
+              file.Stream.Position = prevPos;
+            }
+
+            resourceDict.ColorSpace = csData;
             break;
           case "Pattern":
             resourceDict.Pattern = helper.GetNextDict();
@@ -435,14 +470,14 @@ namespace Converter.Parsers.PDF
           case "Font":
             // not specified in documentation, but i've seen files where Font is just IR and not dict of IRs
             helper.SkipWhiteSpace();
-            FontInfo fontInfo = new FontInfo();
-            int bytesRead = 0;
+            bytesRead = 0;
             List<FontData> fontData = new List<FontData>();
             if (helper._char == '<' && helper.IsCurrentCharacterSameAsNext())
             {
               helper.ReadChar();
               // use this because we dont know when dict ends so we can just skip those and not read again on main buffer
               ParseFontIRDictionary(file, helper._buffer.Slice(helper._position), true, ref fontData);
+
             }
             else
             {
@@ -484,6 +519,171 @@ namespace Converter.Parsers.PDF
 
       if (tokenString == "")
         throw new InvalidDataException("Invalid dictionary");
+    }
+
+    private void ParseColorSpaceStreamAndDictionary(PDFFile file, (int objectIndex, int _) objPosition, ref ColorSpaceDictionary dict)
+    {
+      long objectByteOffset = file.CrossReferenceEntries[objPosition.objectIndex].TenDigitValue;
+      long objectLength = GetDistanceToNextObject(objPosition.objectIndex, objectByteOffset, file);
+      file.Stream.Position = objectByteOffset;
+
+      Span<byte> buffer = new byte[objectLength];
+      int readBytes = file.Stream.Read(buffer);
+      if (readBytes != buffer.Length)
+        throw new InvalidDataException("Invalid ColorSpace dict and stream length!");
+
+      SpanParseHelper helper = new SpanParseHelper(ref buffer);
+      bool startDictFound = false;
+      while (!startDictFound)
+      {
+        helper.ReadUntilNonWhiteSpaceDelimiter();
+        if (helper._char == '<')
+          startDictFound = helper.IsCurrentCharacterSameAsNext();
+      }
+
+
+      string tokenString = helper.GetNextToken();
+      // TODO: do better validation here
+      CommonStreamDict commonStreamDict = new CommonStreamDict();
+      while (tokenString != "")
+      {
+        switch (tokenString)
+        {
+          case "N":
+            dict.N = helper.GetNextInt32();
+            break;
+          case "Alternate":
+            ColorSpace cs = helper.GetNextName<ColorSpace>();
+            if (cs == ColorSpace.NULL)
+              throw new InvalidDataException("Alternate color space invalid!");
+
+            dict.Alternate = cs;
+            break;
+          case "Range":
+            throw new NotImplementedException();
+            break;
+          case "Metadata":
+            throw new NotImplementedException();
+            break;
+          default:
+            ParseCommonStreamDictAsExtension(file, ref helper, tokenString, ref commonStreamDict);
+            break;
+        }
+        helper.ReadUntilNonWhiteSpaceDelimiter();
+        if (helper._char == '>' && helper.IsCurrentCharacterSameAsNext())
+          break;
+        tokenString = helper.GetNextToken();
+      }
+
+      if (tokenString == "")
+        throw new InvalidDataException("Invalid dictionary");
+
+
+      //// Parse stream
+      //// do some checking to know entire stream is already loaded in buffer
+      //long encodedStreamLen = commonStreamDict.Length;
+      //if (encodedStreamLen + helper._position > buffer.Length)
+      //{
+      //  // full stream isn't loaded in the buffer so we have to load it
+      //  if (encodedStreamLen > buffer.Length)
+      //  {
+      //    // heap alloc if we can't reuse existing buffer
+      //    buffer = new byte[encodedStreamLen];
+      //  }
+      //  // set position after stream dict
+      //  file.Stream.Position = objectByteOffset + helper._position;
+      //  readBytes = file.Stream.Read(buffer);
+      //  if (readBytes == 0)
+      //    throw new InvalidDataException("Unexpected EOS!");
+      //  helper._position = 0;
+      //}
+      // go to next line
+      helper.SkipNextToken(); // skip stream
+      helper.SkipWhiteSpace(); // skip LF
+      Span<byte> encodedSpan = buffer.Slice(helper._position, (int)commonStreamDict.Length);
+      commonStreamDict.RawStreamData = DecodeFilter(ref encodedSpan, commonStreamDict.Filters);
+      File.WriteAllBytes("W:\\PDFToImageConverter\\Files\\ColorSpaceDecodedSample.txt", commonStreamDict.RawStreamData);
+      dict.CommonStreamDict = commonStreamDict;
+    }
+
+    // array of IRs with keys 
+    // i.e [ /ICCBased 7 0 R]
+    private void ParseColorSpaceIRArray(PDFFile file, ReadOnlySpan<byte> buffer, ref List<ColorSpaceInfo> info)
+    {
+      SpanParseHelper helper = new SpanParseHelper(ref buffer);
+      helper.ReadUntilNonWhiteSpaceDelimiter();
+      if (helper._char != '[')
+        throw new InvalidDataException("Invalid ColorSpace Family array!");
+      ColorSpaceInfo csi;
+      while (helper._char != ']' && helper._char != PDFConstants.NULL)
+      {
+        csi = new ColorSpaceInfo();
+        ColorSpace csf = helper.GetNextName<ColorSpace>();
+        if (csf == ColorSpace.NULL)
+          throw new InvalidDataException("Invalid Color Space Family!");
+        
+        (int objectIndex, int _) objPosition = helper.GetNextIndirectReference();
+        ColorSpaceDictionary csd = new ColorSpaceDictionary();
+        ParseColorSpaceStreamAndDictionary(file, objPosition, ref csd);
+
+        csi.ColorSpaceFamily = csf;
+        csi.Dict = csd;
+        info.Add(csi);
+        helper.ReadUntilNonWhiteSpaceDelimiter();
+      }
+
+    }
+
+    private void ParseColorSpaceIRDictionary(PDFFile file, ReadOnlySpan<byte> buffer, bool dictOpen, ref List<ColorSpaceData> csData)
+    {
+      SpanParseHelper helper = new SpanParseHelper(ref buffer);
+
+      bool dictStartFound = dictOpen;
+      while (!dictStartFound)
+      {
+        helper.ReadUntilNonWhiteSpaceDelimiter();
+        if (helper._char == '<')
+          dictStartFound = helper.IsCurrentCharacterSameAsNext();
+      }
+
+      string key;
+      long objectByteOffset = 0;
+      long objectLength = 0;
+
+      // make this larger in size so it can be reused, otherwise make new one
+      // or maybe new one could be come main buffer since its bigger..??
+      // can also calcualte lenght or largest dict and then alloc but its a bit more complicated
+      // but i think these should always be under 8k
+      Span<byte> mainBuffer = new byte[KB * 8];
+      long origPos = file.Stream.Position;
+      
+      while (helper._char != '>' && !helper.IsCurrentCharacterSameAsNext())
+      {
+        // /Cs1 i.e  its not color space family or similar
+        key = helper.GetNextToken();
+        if (key == "")
+          break;
+
+        ColorSpaceData cs = new ColorSpaceData();
+        List<ColorSpaceInfo> csInfo = new List<ColorSpaceInfo>();
+        (int objectIndex, int _) IR = helper.GetNextIndirectReference();
+        objectByteOffset = file.CrossReferenceEntries[IR.objectIndex].TenDigitValue;
+        objectLength = GetDistanceToNextObject(IR.objectIndex, objectByteOffset, file);
+        Span<byte> irBuffer = objectLength <= mainBuffer.Length ? mainBuffer.Slice(0, (int)objectLength) : new byte[objectLength];
+        file.Stream.Position = objectByteOffset;
+
+        int bytesRead = file.Stream.Read(irBuffer);
+        if (bytesRead != irBuffer.Length)
+          throw new InvalidDataException("Invalid font dict lenght!");
+
+      
+        ParseColorSpaceIRArray(file, irBuffer, ref csInfo);
+        cs.Key = key;
+        cs.ColorSpaceInfo = csInfo;
+        csData.Add(cs);
+        helper.ReadUntilNonWhiteSpaceDelimiter();
+      }
+      file.Stream.Position = origPos;
     }
 
     // TODO: fix this as well, after you add array pooling of some kind

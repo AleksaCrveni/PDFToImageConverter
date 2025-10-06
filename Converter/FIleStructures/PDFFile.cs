@@ -1,4 +1,5 @@
-﻿using Converter.Parsers.Fonts;
+﻿using Converter.FileStructures;
+using Converter.Parsers.Fonts;
 using System.Security.AccessControl;
 
 namespace Converter.FIleStructures
@@ -199,7 +200,7 @@ namespace Converter.FIleStructures
   public struct ResourceDict()
   {
     public Dictionary<object, object> ExtGState;
-    public Dictionary<object, object> ColorSpace;
+    public List<ColorSpaceData> ColorSpace;
     public Dictionary<object, object> Pattern;
     public Dictionary<object, object> Shading;
     public Dictionary<object, object> XObject;
@@ -207,6 +208,47 @@ namespace Converter.FIleStructures
     public List<FontData> Font;
     public List<string> ProcSet;
     public Dictionary<object, object> Properties;
+  }
+
+  public struct ColorSpaceDictionary
+  {
+    public CommonStreamDict CommonStreamDict;
+    public int N;
+    public ColorSpace Alternate; // Alternate colour space in case one specified in color space is not supported
+    public object[] Range;
+    public object Metadata;
+  }
+
+  public enum ColorSpace
+  {
+    NULL = 0,
+    // device based
+    DeviceGray,
+    DeviceRGB,
+    DeviceCMYK,
+
+    // CIE based
+    CalGray,
+    CalRGB,
+    Lab,
+    ICCBased,
+
+    // special
+    Indexed,
+    Pattern,
+    Separation,
+    DeviceN
+  }
+  public struct ColorSpaceData
+  {
+    public string Key;
+    public List<ColorSpaceInfo> ColorSpaceInfo;
+  }
+
+  public struct ColorSpaceInfo
+  {
+    public ColorSpace ColorSpaceFamily;
+    public ColorSpaceDictionary Dict;
   }
 
   public struct FontData
