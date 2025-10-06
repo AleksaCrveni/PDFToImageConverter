@@ -37,8 +37,10 @@ namespace Converter.Parsers.PDF
     private List<FontData> _fontInfo;
     private ITIFFWriter _writer;
     private Span<byte> _fourByteSlice;
+    private ResourceDict _resourceDict;
+    private long tokensParsed = 0; // for debugging
     // TODO: maybe NULL check is redundant if we let it throw to end?
-    public PDFGOInterpreter(ReadOnlySpan<byte> buffer, List<FontData> fontInfo, ITIFFWriter tiffWriter, ref Span<byte> fourByteSlice)
+    public PDFGOInterpreter(ref ResourceDict resourceDict, ReadOnlySpan<byte> buffer, List<FontData> fontInfo, ITIFFWriter tiffWriter, ref Span<byte> fourByteSlice)
     {
       _buffer = buffer;
       intOperands = new Stack<int>(100);
@@ -52,6 +54,8 @@ namespace Converter.Parsers.PDF
       currentPC = new PathConstruction();
       _fontInfo = fontInfo;
       _writer = tiffWriter;
+      _resourceDict = resourceDict;
+
       // should be always 4 bytes
       if (fourByteSlice.Length != 4)
         throw new Exception("Four byte slice must be 4 in length!");
@@ -69,6 +73,7 @@ namespace Converter.Parsers.PDF
       // TODO: load all as double or float and then cast to int if needed?
       MyPoint mp;
       string literal;
+      tokensParsed++;
       while (_char != PDFConstants.NULL)
       {
         switch (val)
@@ -314,14 +319,31 @@ namespace Converter.Parsers.PDF
             break;
           case 0x5343: // CS
           case 0x7363: // cs
-            GetNextStackValAsString();
+            ColorSpaceInfo info = new ColorSpaceInfo();
+            bool found = false;
+            string key = GetNextStackValAsString();
+            for (int i =0; i < _resourceDict.ColorSpace.Count; i++)
+            {
+              if (key == _resourceDict.ColorSpace[i].Key)
+              {
+                // DO 0 for now, but check if there can be multiple and which to choose then!
+                info = _resourceDict.ColorSpace[i].ColorSpaceInfo[0];
+                found = true;
+                break;
+              }
+            }
+            if (!found)
+              throw new InvalidDataException("Missing color space information!");
+            currentGS.ColorSpaceInfo = info;
             break;
           case 0x4353: // SC
           case 0x4e4353: // SCN
           case 0x6373: // sc
-            GetNextStackValAsInt();
-            GetNextStackValAsInt();
-            GetNextStackValAsInt();
+            int N = currentGS.ColorSpaceInfo.Dict.N;
+            for (int i =0; i < N; i++)
+            {
+              GetNextStackValAsInt();
+            }
             break;
           case 0x6e6373: // scn
           case 0x47: // G
@@ -359,6 +381,7 @@ namespace Converter.Parsers.PDF
         }
 
         val = ReadNext();
+        tokensParsed++;
       }
     }
     /// <summary>
@@ -494,6 +517,11 @@ namespace Converter.Parsers.PDF
 
     private int GetNextStackValAsInt()
     {
+      if (operandTypes.Count == 0)
+      {
+        int x = 0;
+      }
+        
       if (operandTypes.Pop() == OperandType.INT)
         return intOperands.Pop();
       else
