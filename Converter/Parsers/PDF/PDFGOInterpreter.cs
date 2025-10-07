@@ -1,7 +1,6 @@
-﻿using Converter.FileStructures;
-using Converter.FileStructures.PDF;
+﻿using Converter.FileStructures.PDF;
+using Converter.FileStructures.PDF.GraphicsInterpreter;
 using Converter.Parsers.Fonts;
-using Converter.Writers.TIFF;
 using System.Globalization;
 using System.Text;
 
@@ -32,8 +31,8 @@ namespace Converter.Parsers.PDF
     private Stack<int> arrayLengths;
     private Stack<GraphicsState> GSS;
     private GraphicsState currentGS;
-    private PathConstruction currentPC;
-    private TextObject currentTextObject;
+    private PDFGI_PathConstruction currentPC;
+    private PDFGI_TextObject currentTextObject;
     private List<PDF_FontData> _fontInfo;
     private Span<byte> _fourByteSlice;
     private PDF_ResourceDict _resourceDict;
@@ -48,10 +47,10 @@ namespace Converter.Parsers.PDF
       operandTypes = new Stack<OperandType>();
       arrayLengths = new Stack<int>();
       stringOperands = new Stack<string>();
-      currentTextObject = new TextObject();
+      currentTextObject = new PDFGI_TextObject();
       GSS = new Stack<GraphicsState>();
       currentGS = new GraphicsState();
-      currentPC = new PathConstruction();
+      currentPC = new PDFGI_PathConstruction();
       _fontInfo = fontInfo;
       _resourceDict = resourceDict;
       outputBuffer = outputBuffer;
@@ -70,7 +69,7 @@ namespace Converter.Parsers.PDF
       // since they are all less than 4char strings
       // TODO: move these to constants file
       // TODO: load all as double or float and then cast to int if needed?
-      MyPoint mp;
+      PDFGI_Point mp;
       string literal;
       tokensParsed++;
       while (_char != PDFConstants.NULL)
@@ -93,7 +92,7 @@ namespace Converter.Parsers.PDF
             currentGS.MiterLimit = GetNextStackValAsDouble();
             break;
           case 0x64: // d
-            DashPattern dashPattern = new DashPattern();
+            PDFGI_DashPattern dashPattern = new PDFGI_DashPattern();
             int phase = GetNextStackValAsInt();
             int[] dashArr = new int[arrayLengths.Pop()];
             for (int dpIndex = dashArr.Length; dpIndex >= 0; dpIndex--)
@@ -107,9 +106,9 @@ namespace Converter.Parsers.PDF
             operandTypes.Pop();
             string renderingIntentString = stringOperands.Pop();
 
-            bool valid = Enum.TryParse(renderingIntentString, out RenderingIntent ri);
+            bool valid = Enum.TryParse(renderingIntentString, out PDFGI_RenderingIntent ri);
             if (!valid)
-              ri = RenderingIntent.Null;
+              ri = PDFGI_RenderingIntent.Null;
 
             currentGS.RenderingIntent = ri;
             break;
@@ -131,7 +130,7 @@ namespace Converter.Parsers.PDF
             break;
           case 0x6d63: // cm
                        // a b c e d f - real numbers but can be saved as ints
-            CTM newCtm = new CTM();
+            PDFGI_CTM newCtm = new PDFGI_CTM();
             // get it as reverse since its stack
 
             newCtm.YLen = GetNextStackValAsDouble();
@@ -147,49 +146,49 @@ namespace Converter.Parsers.PDF
           #region pathConstruction
           case 0x6d: // m
             currentPC.PathConstructs.Clear();
-            mp = new MyPoint();
+            mp = new PDFGI_Point();
             mp.Y1 = GetNextStackValAsInt();
             mp.X1 = GetNextStackValAsInt();
-            currentPC.PathConstructs.Add((PathConstructOperator.m, mp));
+            currentPC.PathConstructs.Add((PDFGI_PathConstructOperator.m, mp));
             break;
           case 0x6c: // l
-            mp = new MyPoint();
+            mp = new PDFGI_Point();
             mp.Y1 = GetNextStackValAsInt();
             mp.X1 = GetNextStackValAsInt();
-            currentPC.PathConstructs.Add((PathConstructOperator.l, mp));
+            currentPC.PathConstructs.Add((PDFGI_PathConstructOperator.l, mp));
             break;
           case 0x63: // c
-            mp = new MyPoint();
+            mp = new PDFGI_Point();
             mp.Y3 = GetNextStackValAsInt();
             mp.X3 = GetNextStackValAsInt();
             mp.Y2 = GetNextStackValAsInt();
             mp.X2 = GetNextStackValAsInt();
             mp.Y1 = GetNextStackValAsInt();
             mp.X1 = GetNextStackValAsInt();
-            currentPC.PathConstructs.Add((PathConstructOperator.c, mp));
+            currentPC.PathConstructs.Add((PDFGI_PathConstructOperator.c, mp));
             break;
           case 0x76: // v
-            mp = new MyPoint();
+            mp = new PDFGI_Point();
             mp.Y3 = GetNextStackValAsInt();
             mp.X3 = GetNextStackValAsInt();
             mp.Y2 = GetNextStackValAsInt();
             mp.X2 = GetNextStackValAsInt();
-            currentPC.PathConstructs.Add((PathConstructOperator.v, mp));
+            currentPC.PathConstructs.Add((PDFGI_PathConstructOperator.v, mp));
             break;
           case 0x79: // y
-            mp = new MyPoint();
+            mp = new PDFGI_Point();
             mp.Y3 = GetNextStackValAsInt();
             mp.X3 = GetNextStackValAsInt();
             mp.Y1 = GetNextStackValAsInt();
             mp.X1 = GetNextStackValAsInt();
-            currentPC.PathConstructs.Add((PathConstructOperator.y, mp));
+            currentPC.PathConstructs.Add((PDFGI_PathConstructOperator.y, mp));
             break;
           case 0x68: // h
-            mp = new MyPoint();
-            currentPC.PathConstructs.Add((PathConstructOperator.h, mp));
+            mp = new PDFGI_Point();
+            currentPC.PathConstructs.Add((PDFGI_PathConstructOperator.h, mp));
             break;
           case 0x6572: // re
-            mp = new MyPoint();
+            mp = new PDFGI_Point();
 
             // use this as width
             mp.X3 = GetNextStackValAsInt();
@@ -197,7 +196,7 @@ namespace Converter.Parsers.PDF
             mp.Y3 = GetNextStackValAsInt();
             mp.Y1 = GetNextStackValAsInt();
             mp.X1 = GetNextStackValAsInt();
-            currentPC.PathConstructs.Add((PathConstructOperator.re, mp));
+            currentPC.PathConstructs.Add((PDFGI_PathConstructOperator.re, mp));
             break;
           #endregion pathConstruction
           #region pathPainting
