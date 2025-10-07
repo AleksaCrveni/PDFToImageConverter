@@ -1,68 +1,24 @@
-﻿using Converter.FileStructures;
-using Converter.Parsers.Fonts;
-using System.Security.AccessControl;
+﻿using Converter.Parsers.Fonts;
 
-namespace Converter.FIleStructures
+namespace Converter.FileStructures.PDF
 {
   public class PDFFile
   {
-    public PDFVersion PdfVersion { get; set; } = PDFVersion.Null;
+    public PDF_Version PdfVersion { get; set; } = PDF_Version.Null;
     public long LastCrossReferenceOffset { get; set; }
-    public Trailer Trailer { get; set; }
-    public List<CRefEntry> CrossReferenceEntries { get; set; }
-    public Catalog Catalog { get; set; }
+    public PDF_Trailer Trailer { get; set; }
+    public List<PDF_CRefEntry> CrossReferenceEntries { get; set; }
+    public PDF_Catalog Catalog { get; set; }
     // 0 will be root
-    public List<PageTree> PageTrees { get; set; }
-    public List<PageInfo> PageInformation { get; set; }
+    public List<PDF_PageTree> PageTrees { get; set; }
+    public List<PDF_PageInfo> PageInformation { get; set; }
     public Stream Stream { get; set; }
   }
 
-  public enum PDFVersion
-  {
-    Null = 0,
-    V1_0,
-    V1_1,
-    V1_2,
-    V1_3,
-    V1_4,
-    V1_5,
-    V1_6,
-    V1_7,
-    V1_7_2008,
-    V2_0,
-    V2_0_2020
-  }
-
-  public enum PageLayout
-  {
-    SinglePage,
-    OneColumn,
-    TwoColumnLeft,
-    TwoColumnRight,
-    TwoPageLeft,
-    TwoPageRight,
-  }
-
-  public enum PageMode
-  {
-    UserNone,
-    UseOutlines,
-    FullScreen,
-    UseOC,
-    UseAttachments
-  }
-
-  public enum Tabs
-  {
-    Null = 0,
-    R,
-    C,
-    S
-  }
-
+ 
   // Spec reference on page 51
   // Table 15
-  public struct Trailer
+  public struct PDF_Trailer
   {
 
     public int Size;
@@ -79,13 +35,13 @@ namespace Converter.FIleStructures
 
   // Cross reference entry
   // This should maybe be ref struct
-  public struct CRefEntry
+  public struct PDF_CRefEntry
   {
     public long TenDigitValue;
     public ushort GenerationNumber;
     public byte EntryType;
 
-    public static bool operator ==(CRefEntry a, CRefEntry b)
+    public static bool operator ==(PDF_CRefEntry a, PDF_CRefEntry b)
     {
       if (a.TenDigitValue != b.TenDigitValue)
         return false;
@@ -96,7 +52,7 @@ namespace Converter.FIleStructures
 
       return true;
     }
-    public static bool operator !=(CRefEntry a, CRefEntry b)
+    public static bool operator !=(PDF_CRefEntry a, PDF_CRefEntry b)
     {
       if (a.TenDigitValue == b.TenDigitValue)
         return false;
@@ -112,10 +68,10 @@ namespace Converter.FIleStructures
   // TODO: Implement Extenions, PageLabels, Names,ViewerPreferences, OpenAction, AA, AcroForm, URI, StructTreeRoot
   // MarkInfo, SpiderInfo, PieceInfo, OCProperties, Perms, Legal, Collection, Requirements, OutputIntent parsing
   // Note: Docs on Page 81 - Table 28
-  public struct Catalog
+  public struct PDF_Catalog
   {
-    public Catalog() { }
-    public PDFVersion Version = PDFVersion.Null;
+    public PDF_Catalog() { }
+    public PDF_Version Version = PDF_Version.Null;
     public Dictionary<object, object> Extensions;
     public (int, int) PagesIR;
     public object PageLabels;
@@ -123,9 +79,9 @@ namespace Converter.FIleStructures
     public (int, int) DestsIR;
     public Dictionary<object, object> ViewerPreferences;
     // this actually name type
-    public PageLayout PageLayout = PageLayout.SinglePage;
+    public PDF_PageLayout PageLayout = PDF_PageLayout.SinglePage;
     // this actually name type
-    public PageMode PageMode = PageMode.UserNone;
+    public PDF_PageMode PageMode = PDF_PageMode.UserNone;
     public (int, int) OutlinesIR;
     public (int, int) ThreadsIR;
     public object OpenAction;
@@ -149,27 +105,27 @@ namespace Converter.FIleStructures
 
   // Table 29
   // TODO: Add page atrributes
-  public struct PageTree
+  public struct PDF_PageTree
   {
     public List<(int, int)> KidsIRs;
     public (int, int) ParentIR;
     public (int, int) ResourcesIR;
     public int Count;
-    public Rect MediaBox;
+    public PDF_Rect MediaBox;
   }
   // Table 30
   // Resources - 
-  public struct PageInfo
+  public struct PDF_PageInfo
   {
-    public PageInfo() { }
+    public PDF_PageInfo() { }
     public (int, int) ParentIR;
     public DateTime LastModified;
     public (int, int) ResourcesIR; // use generic dict but later implement it right Table 33
-    public Rect MediaBox; // 7.9.5
-    public Rect CropBox; // defualt value is media box also check 14.11.2
-    public Rect BleedBox;
-    public Rect TrimBox;
-    public Rect ArtBox;
+    public PDF_Rect MediaBox; // 7.9.5
+    public PDF_Rect CropBox; // defualt value is media box also check 14.11.2
+    public PDF_Rect BleedBox;
+    public PDF_Rect TrimBox;
+    public PDF_Rect ArtBox;
     public Dictionary<object, object> BoxColorInfo;
     public (int, int) ContentsIR; // I don't know if this can be array of IR, docs aren't clear, search more samples
     public int Rotate;
@@ -186,82 +142,62 @@ namespace Converter.FIleStructures
     public List<string> ID;
     public int PZ;
     public Dictionary<object, object> SeparationInfo;
-    public Tabs Tabs;
+    public PDF_Tabs Tabs;
     public object TemplateInstantiated; // not sure about this one 
     public Dictionary<object, object> PresSteps;
     public double UserUnit = 1.0; // multiplies of 1/72 inch  
     public Dictionary<object, object> VP;
     // This is actual data from ResourcesIR dictionary
-    public ResourceDict ResourceDict;
-    public CommonStreamDict ContentDict;
+    public PDF_ResourceDict ResourceDict;
+    public PDF_CommonStreamDict ContentDict;
   }
 
   // Table 33
-  public struct ResourceDict()
+  public struct PDF_ResourceDict()
   {
     public Dictionary<object, object> ExtGState;
-    public List<ColorSpaceData> ColorSpace;
+    public List<PDF_ColorSpaceData> ColorSpace;
     public Dictionary<object, object> Pattern;
     public Dictionary<object, object> Shading;
     public Dictionary<object, object> XObject;
     // key is arbitary so it has to be a string and its used to reference this fonts
-    public List<FontData> Font;
+    public List<PDF_FontData> Font;
     public List<string> ProcSet;
     public Dictionary<object, object> Properties;
   }
 
-  public struct ColorSpaceDictionary
+  public struct PDF_ColorSpaceDictionary
   {
-    public CommonStreamDict CommonStreamDict;
+    public PDF_CommonStreamDict CommonStreamDict;
     public int N;
-    public ColorSpace Alternate; // Alternate colour space in case one specified in color space is not supported
+    public PDF_ColorSpace Alternate; // Alternate colour space in case one specified in color space is not supported
     public object[] Range;
     public object Metadata;
   }
 
-  public enum ColorSpace
-  {
-    NULL = 0,
-    // device based
-    DeviceGray,
-    DeviceRGB,
-    DeviceCMYK,
-
-    // CIE based
-    CalGray,
-    CalRGB,
-    Lab,
-    ICCBased,
-
-    // special
-    Indexed,
-    Pattern,
-    Separation,
-    DeviceN
-  }
-  public struct ColorSpaceData
+  public struct PDF_ColorSpaceData
   {
     public string Key;
-    public List<ColorSpaceInfo> ColorSpaceInfo;
+    public List<PDF_ColorSpaceInfo> ColorSpaceInfo;
   }
 
-  public struct ColorSpaceInfo
+  public struct PDF_ColorSpaceInfo
   {
-    public ColorSpace ColorSpaceFamily;
-    public ColorSpaceDictionary Dict;
+    public PDF_ColorSpace ColorSpaceFamily;
+    public PDF_ColorSpaceDictionary Dict;
   }
 
-  public struct FontData
+  public struct PDF_FontData
   {
     public string Key;
-    public FontInfo FontInfo;
+    public PDF_FontInfo FontInfo;
     public TTFParser Parser;
   }
 
   // Table 111
-  public struct FontInfo()
+  public struct PDF_FontInfo()
   {
-    public FontType SubType;
+    public PDF_FontType SubType;
     public string Name;
     // postscript name of the font, can be parsed later if needed
     // this is actually enum??
@@ -271,22 +207,14 @@ namespace Converter.FIleStructures
     // can be indirect val
     public int[] Widths;
     // is IR
-    public FontDescriptor FontDescriptor;
+    public PDF_FontDescriptor FontDescriptor;
     // can be name of dict, but just do enum for now
-    public EncodingInf Encoding;
+    public PDF_EncodingInf Encoding;
     public byte[] ToUnicode;
   }
-  
-  public enum EncodingInf
-  {
-    Custom,
-    MacRomanEncoding,
-    MacExpertEncoding,
-    WinAnsiEncoding,
-  }
-
-    // Table 122
-  public struct FontDescriptor
+ 
+  // Table 122
+  public struct PDF_FontDescriptor
   {
     // should be same as FontInfo.BaseFont
     public string FontName;
@@ -294,11 +222,11 @@ namespace Converter.FIleStructures
     // Used for type 3 fonts in tagged documnts
     public string FontFamily;
     // Used for type 3 fonts in tagged documnts
-    public FontStretch FontStretch;
+    public PDF_FontStretch FontStretch;
     // valid values are 100,200,300,400,500,600,700,800,900
     public int FontWeight;
-    public FontFlags Flags;
-    public Rect FontBBox;
+    public PDF_FontFlags Flags;
+    public PDF_Rect FontBBox;
     public int ItalicAngle;
     public int Ascent;
     public int Descent;
@@ -310,124 +238,46 @@ namespace Converter.FIleStructures
     public int AvgWidth;
     public int MaxWidth;
     public int MissingWidth;
-    public FontFileInfo FontFile;
-    public FontType FontType;
+    public PDF_FontFileInfo FontFile;
+    public PDF_FontType FontType;
     // byte string
     public string CharSet;
   }
 
   // Table5  + Table 127
   // Length + Filter  + Table 127
-  public struct FontFileInfo
+  public struct PDF_FontFileInfo
   {
-    public CommonStreamDict CommonStreamInfo;
-    public FontFileInfo()
+    public PDF_CommonStreamDict CommonStreamInfo;
+    public PDF_FontFileInfo()
     {
 
     }
     public int Length1;
     public int Length2;
     public int Length3;
-    public FontFileSubtype Subtype;
+    public PDF_FontFileSubtype Subtype;
     public byte[] Metadata;
-  }
-
-  // make function to parse common stream dict and then have action as paratmere
-
-  public struct FontFileMetadata
-  {
-    
-
-  }
-
-  // Table 122
-  public enum FontFileType
-  {
-    FontFile,
-    FontFil2,
-    FontFile3
-  }
-
-  // Table 123
-  [Flags]
-  public enum FontFlags : UInt16
-  {
-    FixedPitch = 1,
-    Serif = 2,
-    Symbolic = 4,
-    Script = 8,
-    Nonsymbolic = 16,
-    Italic = 32,
-    AllCap = 64,
-    SmallCap = 128,
-    ForceBold = 256
-  }
-
-  public enum FontStretch
-  {
-    Null = 0,
-    UltraCondensed,
-    ExtraCondensed,
-    Condensed,
-    SemiCondensed,
-    Normal,
-    SemiExpanded,
-    Expanded,
-    ExtraExpanded,
-    UltraExpanded
   }
 
   // 7.4.1 & Table 5
   // TODO: Expand this
-  public struct CommonStreamDict 
+  public struct PDF_CommonStreamDict 
   {
-    public CommonStreamDict()
+    public PDF_CommonStreamDict()
     {
 
     }
     // for some reason some pdf files have this as IR instead of direct value
     // so just in case i will support both for length
     public long Length;
-    public List<Filter> Filters = new List<Filter>() { Filter.Null };
+    public List<PDF_Filter> Filters = new List<PDF_Filter>() { PDF_Filter.Null };
     public byte[] RawStreamData;
   }
 
-
-  public enum Filter
-  {
-    Null = 0,
-    ASCIIHexDecode,
-    ASCII85Decode,
-    LZWDecode,
-    FlateDecode,
-    RunLengthDecode,
-    CCITTFaxDecode,
-    JBIG2Decode,
-    DCTDecode,
-    JPXDecode,
-    Crypt
-  }
-
-  public enum FontType
-  {
-    Null = 0,
-    Type0,
-    Type1,
-    MMType1,
-    Type3,
-    TrueType,
-    CIDFontType0,
-    CIDFontType2,
-    OpenType,
-  }
-
-  public enum BaseFont
-  { }
-
-
   // 7.9.5
   // TODO: check if we can use 16 bit ints
-  public struct Rect()
+  public struct PDF_Rect()
   {
     public void FillRect(double a, double b, double c, double d)
     {
@@ -437,7 +287,7 @@ namespace Converter.FIleStructures
       urY = d;
     }
 
-    public static bool operator ==(Rect a, Rect b)
+    public static bool operator ==(PDF_Rect a, PDF_Rect b)
     {
       if (a.urX != b.urX)
         return false;
@@ -450,7 +300,7 @@ namespace Converter.FIleStructures
 
       return true;
     }
-    public static bool operator !=(Rect a, Rect b)
+    public static bool operator !=(PDF_Rect a, PDF_Rect b)
     {
       if (a.urX == b.urX)
         return false;
@@ -470,14 +320,4 @@ namespace Converter.FIleStructures
     public double urX;
     public double urY;
   }
-
-  public enum FontFileSubtype
-  { 
-    Null = 0,
-    Type1C,
-    CIDFontType0C,
-    OpenType
-  }
-
-
 }

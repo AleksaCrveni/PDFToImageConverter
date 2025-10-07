@@ -1,5 +1,5 @@
 ﻿using Converter.FileStructures;
-using Converter.FIleStructures;
+using Converter.FileStructures.PDF;
 using Converter.Parsers.Fonts;
 using Converter.Writers.TIFF;
 using System.Globalization;
@@ -34,13 +34,13 @@ namespace Converter.Parsers.PDF
     private GraphicsState currentGS;
     private PathConstruction currentPC;
     private TextObject currentTextObject;
-    private List<FontData> _fontInfo;
+    private List<PDF_FontData> _fontInfo;
     private Span<byte> _fourByteSlice;
-    private ResourceDict _resourceDict;
+    private PDF_ResourceDict _resourceDict;
     private long tokensParsed = 0; // for debugging
     private Span<byte> outputBuffer;
     // TODO: maybe NULL check is redundant if we let it throw to end?
-    public PDFGOInterpreter(ReadOnlySpan<byte> contentBuffer, Span<byte> outputBuffer, ref ResourceDict resourceDict, List<FontData> fontInfo, ref Span<byte> fourByteSlice)
+    public PDFGOInterpreter(ReadOnlySpan<byte> contentBuffer, Span<byte> outputBuffer, ref PDF_ResourceDict resourceDict, List<PDF_FontData> fontInfo, ref Span<byte> fourByteSlice)
     {
       _buffer = contentBuffer;
       intOperands = new Stack<int>(100);
@@ -318,7 +318,7 @@ namespace Converter.Parsers.PDF
             break;
           case 0x5343: // CS
           case 0x7363: // cs
-            ColorSpaceInfo info = new ColorSpaceInfo();
+            PDF_ColorSpaceInfo info = new PDF_ColorSpaceInfo();
             bool found = false;
             string key = GetNextStackValAsString();
             for (int i =0; i < _resourceDict.ColorSpace.Count; i++)

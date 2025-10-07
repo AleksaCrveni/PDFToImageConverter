@@ -1,7 +1,6 @@
 ﻿using BenchAndSmallTests;
 using BenchmarkDotNet.Running;
 using Converter;
-using Converter.FIleStructures;
 using Converter.Parsers.Fonts;
 using Converter.Parsers.PDF;
 using Converter.Writers;

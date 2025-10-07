@@ -1,4 +1,4 @@
-﻿using Converter.FIleStructures;
+﻿using Converter.FileStructures.PDF;
 using Converter.Parsers;
 
 namespace Tester
@@ -148,8 +148,8 @@ namespace Tester
         buffer[i] = (byte)input[i];
       SpanParseHelper helper = new SpanParseHelper(ref buffer);
 
-      Filter f = helper.GetNextName<Filter>();
-      Assert.IsTrue(f == Filter.LZWDecode);
+      PDF_Filter f = helper.GetNextName<PDF_Filter>();
+      Assert.IsTrue(f == PDF_Filter.LZWDecode);
 }
 
     [TestMethod]
@@ -161,8 +161,8 @@ namespace Tester
         buffer[i] = (byte)input[i];
       SpanParseHelper helper = new SpanParseHelper(ref buffer);
 
-      Rect r = helper.GetNextRectangle();
-      Rect testR = new Rect();
+      PDF_Rect r = helper.GetNextRectangle();
+      PDF_Rect testR = new PDF_Rect();
       testR.FillRect(92, 355.7, 189.9, 371.4);
       Assert.IsTrue(r == testR);
     }

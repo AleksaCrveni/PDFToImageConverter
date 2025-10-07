@@ -1,4 +1,4 @@
-﻿using Converter.FIleStructures;
+﻿using Converter.FileStructures.PDF;
 using Converter.Parsers.PDF;
 using System.Globalization;
 using System.Text;
@@ -373,9 +373,9 @@ namespace Converter.Parsers
         throw new InvalidDataException("Invalid trailer data. Expected digit");
       return _char;
     }
-    public Rect GetNextRectangle()
+    public PDF_Rect GetNextRectangle()
     {
-      Rect rect = new Rect();
+      PDF_Rect rect = new PDF_Rect();
       ReadUntilNonWhiteSpaceDelimiter();
       if (_char != '[')
         throw new InvalidDataException("Invalid Rectangle data. Expected [");

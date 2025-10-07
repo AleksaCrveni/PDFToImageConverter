@@ -1,4 +1,4 @@
-﻿using Converter.FIleStructures;
+﻿using Converter.FileStructures.PDF;
 using System;
 using System.Collections.Generic;
 using System.Drawing;
@@ -25,7 +25,7 @@ namespace Converter.FileStructures
     // Device Independent
     public CTM CTM;
     public object ClippingPath;
-    public ColorSpaceInfo ColorSpaceInfo;
+    public PDF_ColorSpaceInfo ColorSpaceInfo;
     public object Color;
     public object TextState;
     public double LineWidth;

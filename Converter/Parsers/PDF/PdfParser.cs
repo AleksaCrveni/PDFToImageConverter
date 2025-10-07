@@ -1,5 +1,5 @@
 ﻿using Converter.FileStructures;
-using Converter.FIleStructures;
+using Converter.FileStructures.PDF;
 using Converter.Parsers.Fonts;
 using Converter.Writers.TIFF;
 using System.Globalization;
@@ -92,7 +92,7 @@ namespace Converter.Parsers.PDF
       };
       writer.WriteEmptyImage(ref tiffOptions);
       Span<byte> fourByteSlice = stackalloc byte[4];
-      ResourceDict rDict = file.PageInformation[0].ResourceDict;
+      PDF_ResourceDict rDict = file.PageInformation[0].ResourceDict;
 
       byte[] outputBytes = new byte[width * height];
       Span<byte> outSpan = outputBytes.AsSpan();
@@ -104,17 +104,17 @@ namespace Converter.Parsers.PDF
     // TODO: process resource and content in parallel?
     private void ParsePagesData(PDFFile file)
     {
-      PageInfo pInfo;
+      PDF_PageInfo pInfo;
       for (int i = 0; i < file.PageInformation.Count; i++)
       {
         // Process Resources
-        ResourceDict resourceDict = new ResourceDict();
+        PDF_ResourceDict resourceDict = new PDF_ResourceDict();
         ParseResourceDictionary(file, file.PageInformation[i].ResourcesIR, ref resourceDict);
         pInfo = file.PageInformation[i];
         pInfo.ResourceDict = resourceDict;
 
         // Process Contents
-        CommonStreamDict contentDict = new CommonStreamDict();
+        PDF_CommonStreamDict contentDict = new PDF_CommonStreamDict();
         ParsePageContents(file, file.PageInformation[i].ContentsIR, ref contentDict);
         pInfo.ContentDict = contentDict;
         file.PageInformation[i] = pInfo;
@@ -124,7 +124,7 @@ namespace Converter.Parsers.PDF
     }
 
     // TODO: for later, see we can decode withoutloading it all
-    private void ParsePageContents(PDFFile file, (int objectIndex, int) objectPosition, ref CommonStreamDict contentDict)
+    private void ParsePageContents(PDFFile file, (int objectIndex, int) objectPosition, ref PDF_CommonStreamDict contentDict)
     {
       int objectIndex = objectPosition.objectIndex;
       long objectByteOffset = file.CrossReferenceEntries[objectIndex].TenDigitValue;
@@ -190,7 +190,7 @@ namespace Converter.Parsers.PDF
       contentDict.RawStreamData = DecodeFilter(ref encodedSpan, contentDict.Filters);
     }
 
-    private void ParseFontFileDictAndStream(PDFFile file, (int objectIndex, int) objectPosition, ref FontFileInfo fontFileInfo, ref CommonStreamDict commonStreamDict)
+    private void ParseFontFileDictAndStream(PDFFile file, (int objectIndex, int) objectPosition, ref PDF_FontFileInfo fontFileInfo, ref PDF_CommonStreamDict commonStreamDict)
     {
       int objectIndex = objectPosition.objectIndex;
       long objectByteOffset = file.CrossReferenceEntries[objectIndex].TenDigitValue;
@@ -231,7 +231,7 @@ namespace Converter.Parsers.PDF
             fontFileInfo.Length3 = helper.GetNextInt32();
             break;
           case "Subtype":
-            fontFileInfo.Subtype = helper.GetNextName<FontFileSubtype>();
+            fontFileInfo.Subtype = helper.GetNextName<PDF_FontFileSubtype>();
             break;
           case "Metadata":
             // IR, has XMP syntax, 
@@ -278,7 +278,7 @@ namespace Converter.Parsers.PDF
       fontFileInfo.CommonStreamInfo = commonStreamDict;
     }
 
-    private void ParseCommonStreamDictAsExtension(PDFFile file, ref SpanParseHelper helper, string tokenString, ref CommonStreamDict dict)
+    private void ParseCommonStreamDictAsExtension(PDFFile file, ref SpanParseHelper helper, string tokenString, ref PDF_CommonStreamDict dict)
     {
       switch (tokenString)
       {
@@ -310,35 +310,35 @@ namespace Converter.Parsers.PDF
           break;
         case "Filter":
           // this will work even if there is one filter and its not date
-          dict.Filters = helper.GetListOfNames<Filter>();
+          dict.Filters = helper.GetListOfNames<PDF_Filter>();
           break;
         default:
           break;
       }
     }
-    private byte[] DecodeFilter(ref Span<byte> inputSpan, List<Filter> filters)
+    private byte[] DecodeFilter(ref Span<byte> inputSpan, List<PDF_Filter> filters)
     {
       // first just do single filter
-      Filter f = filters[0];
-      if (f == Filter.Null)
+      PDF_Filter f = filters[0];
+      if (f == PDF_Filter.Null)
         return new byte[1];
 
       byte[] decoded;
       switch (f)
       {
-        case Filter.Null:
+        case PDF_Filter.Null:
           decoded = Array.Empty<byte>();
           break;
-        case Filter.ASCIIHexDecode:
+        case PDF_Filter.ASCIIHexDecode:
           decoded = Array.Empty<byte>();
           break;
-        case Filter.ASCII85Decode:
+        case PDF_Filter.ASCII85Decode:
           decoded = Array.Empty<byte>();
           break;
-        case Filter.LZWDecode:
+        case PDF_Filter.LZWDecode:
           decoded = Array.Empty<byte>();
           break;
-        case Filter.FlateDecode:
+        case PDF_Filter.FlateDecode:
           // figure out if its gzip, base deflate or zlib decompression
           Stream decompressor;
 
@@ -373,22 +373,22 @@ namespace Converter.Parsers.PDF
           decoded = stream.ToArray();
           stream.Dispose();
           break;
-        case Filter.RunLengthDecode:
+        case PDF_Filter.RunLengthDecode:
           decoded = Array.Empty<byte>();
           break;
-        case Filter.CCITTFaxDecode:
+        case PDF_Filter.CCITTFaxDecode:
           decoded = Array.Empty<byte>();
           break;
-        case Filter.JBIG2Decode:
+        case PDF_Filter.JBIG2Decode:
           decoded = Array.Empty<byte>();
           break;
-        case Filter.DCTDecode:
+        case PDF_Filter.DCTDecode:
           decoded = Array.Empty<byte>();
           break;
-        case Filter.JPXDecode:
+        case PDF_Filter.JPXDecode:
           decoded = Array.Empty<byte>();
           break;
-        case Filter.Crypt:
+        case PDF_Filter.Crypt:
           decoded = Array.Empty<byte>();
           break;
         default:
@@ -401,7 +401,7 @@ namespace Converter.Parsers.PDF
 
   
 
-    private void ParseResourceDictionary(PDFFile file, (int objIndex, int) objectPosition, ref ResourceDict resourceDict)
+    private void ParseResourceDictionary(PDFFile file, (int objIndex, int) objectPosition, ref PDF_ResourceDict resourceDict)
     {
       int objectIndex = objectPosition.objIndex;
       long objectByteOffset = file.CrossReferenceEntries[objectIndex].TenDigitValue;
@@ -432,7 +432,7 @@ namespace Converter.Parsers.PDF
             resourceDict.ExtGState = helper.GetNextDict();
             break;
           case "ColorSpace":
-            List<ColorSpaceData> csData = new List<ColorSpaceData>();
+            List<PDF_ColorSpaceData> csData = new List<PDF_ColorSpaceData>();
             helper.SkipWhiteSpace();
             int bytesRead = 0;
 
@@ -477,7 +477,7 @@ namespace Converter.Parsers.PDF
             // not specified in documentation, but i've seen files where Font is just IR and not dict of IRs
             helper.SkipWhiteSpace();
             bytesRead = 0;
-            List<FontData> fontData = new List<FontData>();
+            List<PDF_FontData> fontData = new List<PDF_FontData>();
             if (helper._char == '<' && helper.IsCurrentCharacterSameAsNext())
             {
               helper.ReadChar();
@@ -527,7 +527,7 @@ namespace Converter.Parsers.PDF
         throw new InvalidDataException("Invalid dictionary");
     }
 
-    private void ParseColorSpaceStreamAndDictionary(PDFFile file, (int objectIndex, int _) objPosition, ref ColorSpaceDictionary dict)
+    private void ParseColorSpaceStreamAndDictionary(PDFFile file, (int objectIndex, int _) objPosition, ref PDF_ColorSpaceDictionary dict)
     {
       long objectByteOffset = file.CrossReferenceEntries[objPosition.objectIndex].TenDigitValue;
       long objectLength = GetDistanceToNextObject(objPosition.objectIndex, objectByteOffset, file);
@@ -550,7 +550,7 @@ namespace Converter.Parsers.PDF
 
       string tokenString = helper.GetNextToken();
       // TODO: do better validation here
-      CommonStreamDict commonStreamDict = new CommonStreamDict();
+      PDF_CommonStreamDict commonStreamDict = new PDF_CommonStreamDict();
       while (tokenString != "")
       {
         switch (tokenString)
@@ -559,8 +559,8 @@ namespace Converter.Parsers.PDF
             dict.N = helper.GetNextInt32();
             break;
           case "Alternate":
-            ColorSpace cs = helper.GetNextName<ColorSpace>();
-            if (cs == ColorSpace.NULL)
+            PDF_ColorSpace cs = helper.GetNextName<PDF_ColorSpace>();
+            if (cs == PDF_ColorSpace.NULL)
               throw new InvalidDataException("Alternate color space invalid!");
 
             dict.Alternate = cs;
@@ -614,22 +614,22 @@ namespace Converter.Parsers.PDF
 
     // array of IRs with keys 
     // i.e [ /ICCBased 7 0 R]
-    private void ParseColorSpaceIRArray(PDFFile file, ReadOnlySpan<byte> buffer, ref List<ColorSpaceInfo> info)
+    private void ParseColorSpaceIRArray(PDFFile file, ReadOnlySpan<byte> buffer, ref List<PDF_ColorSpaceInfo> info)
     {
       SpanParseHelper helper = new SpanParseHelper(ref buffer);
       helper.ReadUntilNonWhiteSpaceDelimiter();
       if (helper._char != '[')
         throw new InvalidDataException("Invalid ColorSpace Family array!");
-      ColorSpaceInfo csi;
+      PDF_ColorSpaceInfo csi;
       while (helper._char != ']' && helper._char != PDFConstants.NULL)
       {
-        csi = new ColorSpaceInfo();
-        ColorSpace csf = helper.GetNextName<ColorSpace>();
-        if (csf == ColorSpace.NULL)
+        csi = new PDF_ColorSpaceInfo();
+        PDF_ColorSpace csf = helper.GetNextName<PDF_ColorSpace>();
+        if (csf == PDF_ColorSpace.NULL)
           throw new InvalidDataException("Invalid Color Space Family!");
         
         (int objectIndex, int _) objPosition = helper.GetNextIndirectReference();
-        ColorSpaceDictionary csd = new ColorSpaceDictionary();
+        PDF_ColorSpaceDictionary csd = new PDF_ColorSpaceDictionary();
         ParseColorSpaceStreamAndDictionary(file, objPosition, ref csd);
 
         csi.ColorSpaceFamily = csf;
@@ -640,7 +640,7 @@ namespace Converter.Parsers.PDF
 
     }
 
-    private void ParseColorSpaceIRDictionary(PDFFile file, ReadOnlySpan<byte> buffer, bool dictOpen, ref List<ColorSpaceData> csData)
+    private void ParseColorSpaceIRDictionary(PDFFile file, ReadOnlySpan<byte> buffer, bool dictOpen, ref List<PDF_ColorSpaceData> csData)
     {
       SpanParseHelper helper = new SpanParseHelper(ref buffer);
 
@@ -670,8 +670,8 @@ namespace Converter.Parsers.PDF
         if (key == "")
           break;
 
-        ColorSpaceData cs = new ColorSpaceData();
-        List<ColorSpaceInfo> csInfo = new List<ColorSpaceInfo>();
+        PDF_ColorSpaceData cs = new PDF_ColorSpaceData();
+        List<PDF_ColorSpaceInfo> csInfo = new List<PDF_ColorSpaceInfo>();
         (int objectIndex, int _) IR = helper.GetNextIndirectReference();
         objectByteOffset = file.CrossReferenceEntries[IR.objectIndex].TenDigitValue;
         objectLength = GetDistanceToNextObject(IR.objectIndex, objectByteOffset, file);
@@ -693,7 +693,7 @@ namespace Converter.Parsers.PDF
     }
 
     // TODO: fix this as well, after you add array pooling of some kind
-    private void ParseFontIRDictionary(PDFFile file, ReadOnlySpan<byte> buffer, bool dictOpen, ref List<FontData> fontData)
+    private void ParseFontIRDictionary(PDFFile file, ReadOnlySpan<byte> buffer, bool dictOpen, ref List<PDF_FontData> fontData)
     {
       SpanParseHelper helper = new SpanParseHelper(ref buffer);
 
@@ -706,10 +706,10 @@ namespace Converter.Parsers.PDF
       }
 
       string key;
-      FontInfo fontInfo;
+      PDF_FontInfo fontInfo;
       long objectByteOffset = 0;
       long objectLength = 0;
-      FontData fd;
+      PDF_FontData fd;
       TTFParser ttfParser;
 
       // make this larger in size so it can be reused, otherwise make new one
@@ -723,8 +723,8 @@ namespace Converter.Parsers.PDF
         key = helper.GetNextToken();
         if (key == "")
           break;
-        fontInfo = new FontInfo();
-        fd = new FontData();
+        fontInfo = new PDF_FontInfo();
+        fd = new PDF_FontData();
         ttfParser = new TTFParser();
         (int objectIndex, int _) IR = helper.GetNextIndirectReference();
         objectByteOffset = file.CrossReferenceEntries[IR.objectIndex].TenDigitValue;
@@ -757,7 +757,7 @@ namespace Converter.Parsers.PDF
     /// <param name="dictOpen">True if we read into dict already because we aren't sure if its IR or dict in first place</param>
     /// <param name="fontInfo"></param>
     /// <returns>Number of bytes moved inside small buffer</returns>
-    private void ParseFontDictionary(PDFFile file, ReadOnlySpan<byte> buffer, ref FontInfo fontInfo)
+    private void ParseFontDictionary(PDFFile file, ReadOnlySpan<byte> buffer, ref PDF_FontInfo fontInfo)
     {
       SpanParseHelper helper = new SpanParseHelper(ref buffer);
       bool dictStartFound = false;
@@ -780,7 +780,7 @@ namespace Converter.Parsers.PDF
         switch (tokenString)
         {
           case "Subtype":
-            fontInfo.SubType = helper.GetNextName<FontType>();
+            fontInfo.SubType = helper.GetNextName<PDF_FontType>();
             break;
           case "Name":
             fontInfo.Name = helper.GetNextToken();
@@ -825,14 +825,14 @@ namespace Converter.Parsers.PDF
             break;
           case "FontDescriptor":
             (int objectIndex, int _) ir = helper.GetNextIndirectReference();
-            FontDescriptor fontDescriptor = new FontDescriptor();
+            PDF_FontDescriptor fontDescriptor = new PDF_FontDescriptor();
             // prob should rename
             ParseFontDescriptor(file, ir, ref fontDescriptor);
             fontInfo.FontDescriptor = fontDescriptor;
             break;
           case "Encoding":
             //TODO: Fix later to support dictionaries as welll
-            fontInfo.Encoding = helper.GetNextName<EncodingInf>();
+            fontInfo.Encoding = helper.GetNextName<PDF_EncodingInf>();
             break;
           case "ToUnicode":
             //TODO: fix, this is actually IR to stream
@@ -892,7 +892,7 @@ namespace Converter.Parsers.PDF
         throw new InvalidDataException("Invalid dictionary");
     }
 
-    private void ParseFontDescriptor(PDFFile file, (int objectIndex, int _) objectPosition, ref FontDescriptor fontDescriptor)
+    private void ParseFontDescriptor(PDFFile file, (int objectIndex, int _) objectPosition, ref PDF_FontDescriptor fontDescriptor)
     {
       int objectIndex = objectPosition.objectIndex;
       long objectByteOffset = file.CrossReferenceEntries[objectIndex].TenDigitValue;
@@ -924,7 +924,7 @@ namespace Converter.Parsers.PDF
             fontDescriptor.FontFamily = helper.GetNextByteString();
             break;
           case "FontStretch":
-            fontDescriptor.FontStretch = helper.GetNextName<FontStretch>();
+            fontDescriptor.FontStretch = helper.GetNextName<PDF_FontStretch>();
             break;
           case "FontWeight":
             int fw = helper.GetNextInt32();
@@ -935,25 +935,25 @@ namespace Converter.Parsers.PDF
             break;
           case "Flags":
             uint i = helper.GetNextUnsignedInt32();
-            FontFlags flags = new FontFlags();
+            PDF_FontFlags flags = new PDF_FontFlags();
             if ((i & 1) == 1)
-              flags |= FontFlags.FixedPitch;
+              flags |= PDF_FontFlags.FixedPitch;
             if ((i & 2) == 2)
-              flags |= FontFlags.Serif;
+              flags |= PDF_FontFlags.Serif;
             if ((i & 4) == 4)
-              flags |= FontFlags.Symbolic;
+              flags |= PDF_FontFlags.Symbolic;
             if ((i & 8) == 8)
-              flags |= FontFlags.Script;
+              flags |= PDF_FontFlags.Script;
             if ((i & 32) == 32)
-              flags |= FontFlags.Nonsymbolic;
+              flags |= PDF_FontFlags.Nonsymbolic;
             if ((i & 64) == 64)
-              flags |= FontFlags.Italic;
+              flags |= PDF_FontFlags.Italic;
             if ((i & 65536) == 65536) // 17th bit (indexed from 1)
-              flags |= FontFlags.AllCap;
+              flags |= PDF_FontFlags.AllCap;
             if ((i & 131072) == 131072) // 18th bit (indexed from 1)
-              flags |= FontFlags.SmallCap;
+              flags |= PDF_FontFlags.SmallCap;
             if ((i & 262144) == 262144) // 19th bit (indexed from 1)
-              flags |= FontFlags.ForceBold;
+              flags |= PDF_FontFlags.ForceBold;
             fontDescriptor.Flags = flags;
             break;
           case "FontBBox":
@@ -996,8 +996,8 @@ namespace Converter.Parsers.PDF
           case "FontFile2":
           case "FontFile3":
             (int objectIndex, int _) fontFileIR = helper.GetNextIndirectReference();
-            FontFileInfo fontFileInfo = new FontFileInfo();
-            CommonStreamDict commonStreamDict = new CommonStreamDict();
+            PDF_FontFileInfo fontFileInfo = new PDF_FontFileInfo();
+            PDF_CommonStreamDict commonStreamDict = new PDF_CommonStreamDict();
             ParseFontFileDictAndStream(file, fontFileIR, ref fontFileInfo, ref commonStreamDict);
             fontFileInfo.CommonStreamInfo = commonStreamDict;
             fontDescriptor.FontFile = fontFileInfo;
@@ -1020,7 +1020,7 @@ namespace Converter.Parsers.PDF
       int objectIndex = file.Catalog.PagesIR.Item1;
       long objectByteOffset = file.CrossReferenceEntries[objectIndex].TenDigitValue;
       long objectLength = GetDistanceToNextObject(objectIndex, objectByteOffset, file);
-      PageTree rootPageTree = new PageTree();
+      PDF_PageTree rootPageTree = new PDF_PageTree();
 
       Span<byte> buffer = objectLength <= KB * 8 ? stackalloc byte[(int)objectLength] : new byte[objectLength];
 
@@ -1036,12 +1036,12 @@ namespace Converter.Parsers.PDF
       FillRootPageTreeFrom(file, ref helper, ref rootPageTree);
     }
 
-    private void FillRootPageTreeFrom(PDFFile file, ref SpanParseHelper helper, ref PageTree root)
+    private void FillRootPageTreeFrom(PDFFile file, ref SpanParseHelper helper, ref PDF_PageTree root)
     {
       //
       FillRootPageTreeInfo(ref helper, ref root);
-      List<PageTree> pageTrees = new List<PageTree>();
-      List<PageInfo> pages = new List<PageInfo>();
+      List<PDF_PageTree> pageTrees = new List<PDF_PageTree>();
+      List<PDF_PageInfo> pages = new List<PDF_PageInfo>();
       pageTrees.Add(root);
       for (int i = 0; i < root.KidsIRs.Count; i++)
       {
@@ -1053,7 +1053,7 @@ namespace Converter.Parsers.PDF
       file.PageInformation = pages;
     }
 
-    private void FillRootPageTreeInfo(ref SpanParseHelper helper, ref PageTree pageTree)
+    private void FillRootPageTreeInfo(ref SpanParseHelper helper, ref PDF_PageTree pageTree)
     {
       bool dictStartFound = false;
       while (!dictStartFound)
@@ -1098,7 +1098,7 @@ namespace Converter.Parsers.PDF
         throw new InvalidDataException("Invalid dictionary");
     }
     // THIS FILLS UP BOTH PAGEINFO AND PAGE TREE INFO
-    private void FillAllPageTreeAndInformation((int, int) kidPositionIR, List<PageTree> pageTrees, List<PageInfo> pages, PDFFile file)
+    private void FillAllPageTreeAndInformation((int, int) kidPositionIR, List<PDF_PageTree> pageTrees, List<PDF_PageInfo> pages, PDFFile file)
     {
       long objectByteOffset = file.CrossReferenceEntries[kidPositionIR.Item1].TenDigitValue;
       long objectLength = GetDistanceToNextObject(kidPositionIR.Item1, objectByteOffset, file);
@@ -1129,7 +1129,7 @@ namespace Converter.Parsers.PDF
       tokenString = helper.GetNextToken();
       if (tokenString == "Pages")
       {
-        PageTree pageTree = new PageTree();
+        PDF_PageTree pageTree = new PDF_PageTree();
         while (tokenString != "")
         {
           switch (tokenString)
@@ -1163,7 +1163,7 @@ namespace Converter.Parsers.PDF
       }
       else if (tokenString == "Page")
       {
-        PageInfo pageInfo = new PageInfo();
+        PDF_PageInfo pageInfo = new PDF_PageInfo();
         while (tokenString != "")
         {
           switch (tokenString)
@@ -1241,7 +1241,7 @@ namespace Converter.Parsers.PDF
               pageInfo.SeparationInfo = helper.GetNextDict();
               break;
             case "Tabs" :
-              pageInfo.Tabs = helper.GetNextName<Tabs>();
+              pageInfo.Tabs = helper.GetNextName<PDF_Tabs>();
               break;
             case "TemplateInstantiated" :
               pageInfo.TemplateInstantiated = helper.GetNextToken();
@@ -1277,7 +1277,7 @@ namespace Converter.Parsers.PDF
       long objectLength = GetDistanceToNextObject(objectIndex, objectByteOffset, file);
       // if this is bigger 4096 or double that then do see to do some kind of different processing
       // I think that reading in bulk should be faster than reading 1 char by 1 from stream
-      Catalog catalog = new Catalog();
+      PDF_Catalog catalog = new PDF_Catalog();
       file.Stream.Position = objectByteOffset;
       Span<byte> buffer = objectLength <= KB * 8 ? stackalloc byte[(int)objectLength] : new byte[objectLength];
 
@@ -1291,12 +1291,12 @@ namespace Converter.Parsers.PDF
       file.Stream.Position = helper._position + 1;
 
       // Starting from PDF 1.4 version can be in catalog and it has advantage over header one if its bigger
-      if (catalog.Version > PDFVersion.Null)
+      if (catalog.Version > PDF_Version.Null)
         file.PdfVersion = catalog.Version;
       file.Catalog = catalog;
     }
 
-    private void FillCatalog(ref SpanParseHelper helper, ref Catalog catalog)
+    private void FillCatalog(ref SpanParseHelper helper, ref PDF_Catalog catalog)
     {
       bool startOfDictFound = false;
       while (!startOfDictFound)
@@ -1333,10 +1333,10 @@ namespace Converter.Parsers.PDF
             catalog.ViewerPreferences = helper.GetNextDict();
             break;
           case "PageLayout":
-            catalog.PageLayout = helper.GetNextName<PageLayout>();
+            catalog.PageLayout = helper.GetNextName<PDF_PageLayout>();
             break;
           case "PageMode":
-            catalog.PageMode = helper.GetNextName<PageMode>();
+            catalog.PageMode = helper.GetNextName<PDF_PageMode>();
             break;
           case "Outlines":
             catalog.OutlinesIR = helper.GetNextIndirectReference();
@@ -1433,12 +1433,12 @@ namespace Converter.Parsers.PDF
       int sectionLen = endObj - startObj;
 
       // TODO: Think if you want list or array and fix this later
-      CRefEntry[] entryArr = new CRefEntry[sectionLen];
-      Array.Fill(entryArr, new CRefEntry());
-      List<CRefEntry> cRefEntries = entryArr.ToList();
+      PDF_CRefEntry[] entryArr = new PDF_CRefEntry[sectionLen];
+      Array.Fill(entryArr, new PDF_CRefEntry());
+      List<PDF_CRefEntry> cRefEntries = entryArr.ToList();
       Span<byte> cRefEntryBuffer = stackalloc byte[20];
       readBytes = 0;
-      CRefEntry entry;
+      PDF_CRefEntry entry;
       for (int i = startObj; i < endObj; i++)
       {
         readBytes = file.Stream.Read(cRefEntryBuffer);
@@ -1460,7 +1460,7 @@ namespace Converter.Parsers.PDF
     // TODO: test case when trailer is not complete ">>" can't be found after opening brackets
     private void ParseTrailer(PDFFile file, ref SpanParseHelper helper)
     {
-      Trailer trailer = new Trailer();
+      PDF_Trailer trailer = new PDF_Trailer();
 
       string tokenString = "-";
       while (tokenString != string.Empty)
@@ -1524,7 +1524,7 @@ namespace Converter.Parsers.PDF
     // TODO: I really should have just compared and parsed the string instead of trying to act smart
     // because i will have to parse entire file and heapallock anyways
     // maybe later move this to be ref paramter
-    private PDFVersion ParsePdfVersionFromHeader(Stream stream)
+    private PDF_Version ParsePdfVersionFromHeader(Stream stream)
     {
       // We parse this first so we should already be at 0
       // stream.Seek(0, SeekOrigin.Begin);
@@ -1555,21 +1555,21 @@ namespace Converter.Parsers.PDF
         switch (minorVersion)
         {
           case 0x30:
-            return PDFVersion.V1_0;
+            return PDF_Version.V1_0;
           case 0x31:
-            return PDFVersion.V1_1;
+            return PDF_Version.V1_1;
           case 0x32:
-            return PDFVersion.V1_2;
+            return PDF_Version.V1_2;
           case 0x33:
-            return PDFVersion.V1_3;
+            return PDF_Version.V1_3;
           case 0x34:
-            return PDFVersion.V1_4;
+            return PDF_Version.V1_4;
           case 0x35:
-            return PDFVersion.V1_5;
+            return PDF_Version.V1_5;
           case 0x36:
-            return PDFVersion.V1_6;
+            return PDF_Version.V1_6;
           case 0x37:
-            return PDFVersion.V1_7;
+            return PDF_Version.V1_7;
           default:
             throw new InvalidDataException("Invalid data");
         }
@@ -1579,14 +1579,14 @@ namespace Converter.Parsers.PDF
         switch (minorVersion)
         {
           case 0x30:
-            return PDFVersion.V2_0;
+            return PDF_Version.V2_0;
           default:
             throw new InvalidDataException("Invalid data");
         }
       }
     }
 
-    private PDFVersion ParsePdfVersionFromCatalog(ref SpanParseHelper helper)
+    private PDF_Version ParsePdfVersionFromCatalog(ref SpanParseHelper helper)
     {
       ReadOnlySpan<byte> buffer = new ReadOnlySpan<byte>();
       helper.GetNextStringAsReadOnlySpan(ref buffer);
@@ -1604,21 +1604,21 @@ namespace Converter.Parsers.PDF
         switch (minorVersion)
         {
           case 0x30:
-            return PDFVersion.V1_0;
+            return PDF_Version.V1_0;
           case 0x31:
-            return PDFVersion.V1_1;
+            return PDF_Version.V1_1;
           case 0x32:
-            return PDFVersion.V1_2;
+            return PDF_Version.V1_2;
           case 0x33:
-            return PDFVersion.V1_3;
+            return PDF_Version.V1_3;
           case 0x34:
-            return PDFVersion.V1_4;
+            return PDF_Version.V1_4;
           case 0x35:
-            return PDFVersion.V1_5;
+            return PDF_Version.V1_5;
           case 0x36:
-            return PDFVersion.V1_6;
+            return PDF_Version.V1_6;
           case 0x37:
-            return PDFVersion.V1_7;
+            return PDF_Version.V1_7;
           default:
             throw new InvalidDataException("Invalid data");
         }
@@ -1628,7 +1628,7 @@ namespace Converter.Parsers.PDF
         switch (minorVersion)
         {
           case 0x30:
-            return PDFVersion.V2_0;
+            return PDF_Version.V2_0;
             break;
           default:
             throw new InvalidDataException("Invalid data");
