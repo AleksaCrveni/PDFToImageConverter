@@ -8,24 +8,24 @@ namespace Converter.Writers.TIFF
     Stream _stream;
     private bool disposedValue;
     private ulong imageDataLength;
-    private BilevelData data;
+    private TIFF_BilevelData data;
     public TIFFBilevelWriter(string destination)
     {
       _stream = File.Create(destination);
       if (_stream == null)
         throw new Exception("Unable to create file stream to destination!");
-      data = new BilevelData();
+      data = new TIFF_BilevelData();
     }
 
     public TIFFBilevelWriter(Stream destinationStream)
     {
       _stream = destinationStream;
       _stream.Position = 0;
-      data = new BilevelData();
+      data = new TIFF_BilevelData();
     }
     public void WriteEmptyImage(ref TIFFWriterOptions options)
     {
-      WriteImageMain(ref options, ImgDataMode.EMPTY);
+      WriteImageMain(ref options, TIFF_ImgDataMode.EMPTY);
     }
     public void WriteRandomImage(ref TIFFWriterOptions options)
     {
@@ -33,7 +33,7 @@ namespace Converter.Writers.TIFF
         options.Width = Random.Shared.Next(options.MinRandomWidth, options.MaxRandomWidth + 1);
       if (options.Height == 0)
         options.Height = Random.Shared.Next(options.MinRandomHeight, options.MaxRandomHeight + 1);
-      WriteImageMain(ref options, ImgDataMode.RANDOM);
+      WriteImageMain(ref options, TIFF_ImgDataMode.RANDOM);
     }
     /// <summary>
     /// 
@@ -49,10 +49,10 @@ namespace Converter.Writers.TIFF
     {
       if (options.Width * options.Height != buffer.Length)
         throw new InvalidDataException("Width and Height don't match buffer supplied");
-      WriteImageMain(ref options, ImgDataMode.BUFFER_SUPPLIED, buffer);
+      WriteImageMain(ref options, TIFF_ImgDataMode.BUFFER_SUPPLIED, buffer);
     }
 
-    private void WriteImageMain(ref TIFFWriterOptions options, ImgDataMode mode, byte[]? suppliedBuffer = null)
+    private void WriteImageMain(ref TIFFWriterOptions options, TIFF_ImgDataMode mode, byte[]? suppliedBuffer = null)
     {
       Span<byte> writeBuffer = options.AllowStackAlloct ? stackalloc byte[8192] : new byte[8192];
       BufferWriter writer = new BufferWriter(ref writeBuffer, options.IsLittleEndian);
@@ -91,11 +91,11 @@ namespace Converter.Writers.TIFF
       Random.Shared.NextBytes(remainderSizeBuffer);
       _stream.Write(remainderSizeBuffer);
     }
-    private void WriteRandomImage(ref BufferWriter writer, ref TIFFWriterOptions options, ImgDataMode mode, byte[]? suppliedBuffer = null)
+    private void WriteRandomImage(ref BufferWriter writer, ref TIFFWriterOptions options, TIFF_ImgDataMode mode, byte[]? suppliedBuffer = null)
     {
       int pos = 0;
       // support later
-      if (options.Compression != Compression.NoCompression)
+      if (options.Compression != TIFF_Compression.NoCompression)
         throw new NotImplementedException("This Compression not suppported yet!");
 
       // divide by 8 because with no compression and bilevel values are either 0 or 1 and they are packed in bits
@@ -114,13 +114,13 @@ namespace Converter.Writers.TIFF
       // Write image data
       switch (mode)
       {
-        case ImgDataMode.EMPTY:
+        case TIFF_ImgDataMode.EMPTY:
           WriteEmptyImageData(ref writer, byteCount, (ulong)stripSize, remainder);
           break;
-        case ImgDataMode.RANDOM:
+        case TIFF_ImgDataMode.RANDOM:
           WriteRandomImageData(ref writer, byteCount, (ulong)stripSize, remainder);
           break;
-        case ImgDataMode.BUFFER_SUPPLIED:
+        case TIFF_ImgDataMode.BUFFER_SUPPLIED:
           _stream.Write(suppliedBuffer);
           break;
       }
@@ -179,36 +179,36 @@ namespace Converter.Writers.TIFF
       _stream.Flush();
         }
 
-    private void WriteIFD(ref BufferWriter writer,ref TIFFWriterOptions options, ref BilevelData data, ref int pos)
+    private void WriteIFD(ref BufferWriter writer,ref TIFFWriterOptions options, ref TIFF_BilevelData data, ref int pos)
     {
       int tagCount = 11;
       // write IFD 'header' lenght
       writer.WriteUnsigned16ToBuffer(ref pos, (ushort)tagCount);
       // These tags should be in sequence according to JHOVE validator
       // this means that they should be written from smallest to largest enum values
-      TIFFInternals.WriteIFDEntryToBuffer(ref writer, ref pos, TagType.ImageWidth, TagSize.SHORT, 1,
+      TIFFInternals.WriteIFDEntryToBuffer(ref writer, ref pos, TIFF_TagType.ImageWidth, TIFF_TagSize.SHORT, 1,
         (uint)options.Width);
-      TIFFInternals.WriteIFDEntryToBuffer(ref writer, ref pos, TagType.ImageLength, TagSize.SHORT, 1,
+      TIFFInternals.WriteIFDEntryToBuffer(ref writer, ref pos, TIFF_TagType.ImageLength, TIFF_TagSize.SHORT, 1,
         (uint)options.Height);
-      TIFFInternals.WriteIFDEntryToBuffer(ref writer, ref pos, TagType.BitsPerSample, TagSize.SHORT, 1,
+      TIFFInternals.WriteIFDEntryToBuffer(ref writer, ref pos, TIFF_TagType.BitsPerSample, TIFF_TagSize.SHORT, 1,
         1);
-      TIFFInternals.WriteIFDEntryToBuffer(ref writer, ref pos, TagType.Compression, TagSize.SHORT, 1,
-        (uint)Compression.NoCompression);
-      TIFFInternals.WriteIFDEntryToBuffer(ref writer, ref pos, TagType.PhotometricInterpretation, TagSize.SHORT, 1,
-        (uint)PhotometricInterpretation.WhiteIsZero);
-      TIFFInternals.WriteIFDEntryToBuffer(ref writer, ref pos, TagType.StripOffsetsPointer, TagSize.LONG, (uint)data.StripCount,
+      TIFFInternals.WriteIFDEntryToBuffer(ref writer, ref pos, TIFF_TagType.Compression, TIFF_TagSize.SHORT, 1,
+        (uint)TIFF_Compression.NoCompression);
+      TIFFInternals.WriteIFDEntryToBuffer(ref writer, ref pos, TIFF_TagType.PhotometricInterpretation, TIFF_TagSize.SHORT, 1,
+        (uint)TIFF_PhotometricInterpretation.WhiteIsZero);
+      TIFFInternals.WriteIFDEntryToBuffer(ref writer, ref pos, TIFF_TagType.StripOffsetsPointer, TIFF_TagSize.LONG, (uint)data.StripCount,
         (uint)data.StripOffsetsPointer);
-      TIFFInternals.WriteIFDEntryToBuffer(ref writer, ref pos, TagType.RowsPerStrip, TagSize.LONG, 1,
+      TIFFInternals.WriteIFDEntryToBuffer(ref writer, ref pos, TIFF_TagType.RowsPerStrip, TIFF_TagSize.LONG, 1,
         (uint)data.RowsPerStrip);
-      TIFFInternals.WriteIFDEntryToBuffer(ref writer, ref pos, TagType.StripByteCountsPointer, TagSize.LONG, (uint)data.StripCount,
+      TIFFInternals.WriteIFDEntryToBuffer(ref writer, ref pos, TIFF_TagType.StripByteCountsPointer, TIFF_TagSize.LONG, (uint)data.StripCount,
         (uint)data.StripByteCounterOffsets);
       // Have to write 2 more entiries so start offsets for rationals will be _stream.Position + 2 (2 *12) + 4
-      TIFFInternals.WriteIFDEntryToBuffer(ref writer, ref pos, TagType.XResolution, TagSize.RATIONAL, 1,
+      TIFFInternals.WriteIFDEntryToBuffer(ref writer, ref pos, TIFF_TagType.XResolution, TIFF_TagSize.RATIONAL, 1,
         (uint)(_stream.Position + 2 + tagCount * 12 + 4));
-      TIFFInternals.WriteIFDEntryToBuffer(ref writer, ref pos, TagType.YResolution, TagSize.RATIONAL, 1,
+      TIFFInternals.WriteIFDEntryToBuffer(ref writer, ref pos, TIFF_TagType.YResolution, TIFF_TagSize.RATIONAL, 1,
         (uint)(_stream.Position + 2 + tagCount * 12 + 4 + 8));
-      TIFFInternals.WriteIFDEntryToBuffer(ref writer, ref pos, TagType.ResolutionUnit, TagSize.SHORT, 1,
-        (uint)ResolutionUnit.Inch);
+      TIFFInternals.WriteIFDEntryToBuffer(ref writer, ref pos, TIFF_TagType.ResolutionUnit, TIFF_TagSize.SHORT, 1,
+        (uint)TIFF_ResolutionUnit.Inch);
     }
 
     protected virtual void Dispose(bool disposing)

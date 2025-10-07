@@ -1,4 +1,4 @@
-﻿using Converter.FileStructures.TIFF;
+﻿using Converter.FileStructures.General;
 
 namespace Converter.FileStructures
 {

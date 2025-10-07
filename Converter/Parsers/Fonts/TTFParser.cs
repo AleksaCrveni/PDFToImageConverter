@@ -1,5 +1,5 @@
 ﻿using Converter.FileStructures;
-using Converter.FileStructures.TIFF;
+using Converter.FileStructures.General;
 using System.Buffers.Binary;
 using System.Diagnostics;
 using System.Numerics;

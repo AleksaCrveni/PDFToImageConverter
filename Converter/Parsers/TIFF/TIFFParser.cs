@@ -25,7 +25,7 @@ namespace Converter.Parsers.FileParsers
     {
       // First check max stripCount so we can allocate just once and not for each 'image'(IFD)
       uint maxStripCount = 0;
-      foreach (TIFFData d in file.TIFFs)
+      foreach (TIFF_Data d in file.TIFFs)
       {
         uint stripCount = d.Tag.ImageLength / d.Tag.RowsPerStrip;
         if (d.Tag.ImageLength % d.Tag.RowsPerStrip > 0)
@@ -40,8 +40,8 @@ namespace Converter.Parsers.FileParsers
       // ARENA can't work easily, as I cant read into span starting at half
       Span<byte> stripOffsetsBuffer = maxStripCount * 4 <= KB * 4 ? stackalloc byte[(int)maxStripCount * 4] : new byte[maxStripCount * 4];
       Span<byte> stripCountsBuffer = maxStripCount * 4 <= KB * 4 ? stackalloc byte[(int)maxStripCount * 4] : new byte[maxStripCount * 4];
-      Tag tag;
-      TIFFData data;
+      TIFF_Tag tag;
+      TIFF_Data data;
       for (int z = 0; z < file.TIFFs.Count; z++)
       {
         data = file.TIFFs[z];
@@ -98,7 +98,7 @@ namespace Converter.Parsers.FileParsers
 
     public void ParseHeader(TIFFFile file)
     {
-      TIFFHeader header = file.Header;
+      TIFF_Header header = file.Header;
       Span<byte> buffer = stackalloc byte[8];
       int readBytes = file.Stream.Read(buffer);
       if (readBytes < 8)
@@ -140,8 +140,8 @@ namespace Converter.Parsers.FileParsers
         throw new InvalidDataException("Invalid IFD NoDE.");
 
       // -4 for next IFD position
-      TIFFData tiffData = new TIFFData();
-      Tag tag = new Tag();
+      TIFF_Data tiffData = new TIFF_Data();
+      TIFF_Tag tag = new TIFF_Tag();
       ushort tagValue = 0;
       ushort type = 0;
       uint count = 0;
@@ -177,19 +177,19 @@ namespace Converter.Parsers.FileParsers
             tag.BitsPerSample = (ushort)valueOrOffset;
             break;
           case 259:
-            Compression c = valueOrOffset switch
+            TIFF_Compression c = valueOrOffset switch
             {
-              1 => Compression.NoCompression,
-              2 => Compression.CCITT,
-              32773 => Compression.PackBits,
+              1 => TIFF_Compression.NoCompression,
+              2 => TIFF_Compression.CCITT,
+              32773 => TIFF_Compression.PackBits,
               _ => throw new InvalidDataException("Invalid compression tag value!")
             };
             tag.Compression = c;
             break;
           case 262:
-            PhotometricInterpretation p = valueOrOffset switch
+            TIFF_PhotometricInterpretation p = valueOrOffset switch
             {
-              >= 0 and <= 4 => (PhotometricInterpretation)valueOrOffset,
+              >= 0 and <= 4 => (TIFF_PhotometricInterpretation)valueOrOffset,
               _ => throw new InvalidDataException("Invalid photometric interpretation tag value!")
             };
             tag.PhotometricInterpretation = p;
@@ -247,11 +247,11 @@ namespace Converter.Parsers.FileParsers
             tag.PlanarConfiguration = (ushort)valueOrOffset;
             break;
           case 296:
-            ResolutionUnit r = valueOrOffset switch
+            TIFF_ResolutionUnit r = valueOrOffset switch
             {
-              1 => ResolutionUnit.NoAbsoluteUnitOfMe,
-              2 => ResolutionUnit.Inch,
-              3 => ResolutionUnit.Centimeter,
+              1 => TIFF_ResolutionUnit.NoAbsoluteUnitOfMe,
+              2 => TIFF_ResolutionUnit.Inch,
+              3 => TIFF_ResolutionUnit.Centimeter,
               _ => throw new InvalidDataException("Invalid Resolution Unit tag value!")
             };
             tag.ResolutionUnit = r;

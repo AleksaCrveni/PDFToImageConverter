@@ -1,5 +1,4 @@
-﻿
-namespace Converter.FileStructures.TIFF
+﻿namespace Converter.FileStructures.General
 {
   public struct FakeSpan
   {
