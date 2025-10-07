@@ -2,9 +2,9 @@
 using System.Globalization;
 using System.Text;
 
-namespace Converter.Parsers
+namespace Converter.Parsers.PDF
 {
-  public ref struct SpanParseHelper
+  public ref struct PDFSpanParseHelper
   {
     public ReadOnlySpan<byte> _buffer;
     public int _position = 0; // current posion
@@ -15,11 +15,11 @@ namespace Converter.Parsers
     private static readonly byte[] delimiters = [0x28, 0x29, 0x3C, 0x3E, 0x5B, 0x5D, 0x7B, 0x7D, 0x2F, 0x25];
 
     // TODO: do 0x00 check whenever looping ReadByte()
-    public SpanParseHelper(ref Span<byte> buffer)
+    public PDFSpanParseHelper(ref Span<byte> buffer)
     {
       _buffer = (ReadOnlySpan<byte>)buffer;
     }
-    public SpanParseHelper(ref ReadOnlySpan<byte> buffer)
+    public PDFSpanParseHelper(ref ReadOnlySpan<byte> buffer)
     {
       _buffer = buffer;
     }

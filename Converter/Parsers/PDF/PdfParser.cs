@@ -68,7 +68,7 @@ namespace Converter.Parsers.PDF
         throw new InvalidDataException("Invalid data");
 
 
-      SpanParseHelper parseHelper = new SpanParseHelper(ref footerBuffer);
+      PDFSpanParseHelper parseHelper = new PDFSpanParseHelper(ref footerBuffer);
       ParseTrailer(file, ref parseHelper);
       // TODO use parsehelper dont seek and copy again
       ParseLastCrossRefByteOffset(file);
@@ -134,7 +134,7 @@ namespace Converter.Parsers.PDF
       // if streams are interrupted
       // for now just expect that stream dict at least will fit in 8kb, later chang if needed when testing with big files
       Span<byte> buffer = stackalloc byte[KB * 8];
-      SpanParseHelper helper = new SpanParseHelper(ref buffer);
+      PDFSpanParseHelper helper = new PDFSpanParseHelper(ref buffer);
       file.Stream.Position = objectByteOffset;
       int readBytes = file.Stream.Read(buffer);
       if (readBytes == 0)
@@ -200,7 +200,7 @@ namespace Converter.Parsers.PDF
       // if streams are interrupted
       // for now just expect that stream dict at least will fit in 8kb, later chang if needed when testing with big files
       Span<byte> buffer = stackalloc byte[KB * 8];
-      SpanParseHelper helper = new SpanParseHelper(ref buffer);
+      PDFSpanParseHelper helper = new PDFSpanParseHelper(ref buffer);
       file.Stream.Position = objectByteOffset;
       int readBytes = file.Stream.Read(buffer);
       if (readBytes == 0)
@@ -278,7 +278,7 @@ namespace Converter.Parsers.PDF
       fontFileInfo.CommonStreamInfo = commonStreamDict;
     }
 
-    private void ParseCommonStreamDictAsExtension(PDFFile file, ref SpanParseHelper helper, string tokenString, ref PDF_CommonStreamDict dict)
+    private void ParseCommonStreamDictAsExtension(PDFFile file, ref PDFSpanParseHelper helper, string tokenString, ref PDF_CommonStreamDict dict)
     {
       switch (tokenString)
       {
@@ -295,7 +295,7 @@ namespace Converter.Parsers.PDF
             file.Stream.Position = IRByteOffset;
 
             Span<byte> irBuffer = stackalloc byte[KB / 4]; // 256
-            SpanParseHelper irHelper = new SpanParseHelper(ref irBuffer);
+            PDFSpanParseHelper irHelper = new PDFSpanParseHelper(ref irBuffer);
             file.Stream.Read(irBuffer);
             irHelper.SkipNextToken(); // object id
             irHelper.SkipNextToken(); // seocnd number
@@ -410,7 +410,7 @@ namespace Converter.Parsers.PDF
       // do it like this, operations should be same only difference is where underleying memory will be stored
       Span<byte> buffer = objectLength <= KB * 8 ? stackalloc byte[(int)objectLength] : new byte[objectLength];
       file.Stream.Position = objectByteOffset;
-      SpanParseHelper helper = new SpanParseHelper(ref buffer);
+      PDFSpanParseHelper helper = new PDFSpanParseHelper(ref buffer);
       int readBytes = file.Stream.Read(buffer);
       if (buffer.Length != readBytes)
         throw new InvalidDataException("Invalid Data");
@@ -538,7 +538,7 @@ namespace Converter.Parsers.PDF
       if (readBytes != buffer.Length)
         throw new InvalidDataException("Invalid ColorSpace dict and stream length!");
 
-      SpanParseHelper helper = new SpanParseHelper(ref buffer);
+      PDFSpanParseHelper helper = new PDFSpanParseHelper(ref buffer);
       bool startDictFound = false;
       while (!startDictFound)
       {
@@ -616,7 +616,7 @@ namespace Converter.Parsers.PDF
     // i.e [ /ICCBased 7 0 R]
     private void ParseColorSpaceIRArray(PDFFile file, ReadOnlySpan<byte> buffer, ref List<PDF_ColorSpaceInfo> info)
     {
-      SpanParseHelper helper = new SpanParseHelper(ref buffer);
+      PDFSpanParseHelper helper = new PDFSpanParseHelper(ref buffer);
       helper.ReadUntilNonWhiteSpaceDelimiter();
       if (helper._char != '[')
         throw new InvalidDataException("Invalid ColorSpace Family array!");
@@ -642,7 +642,7 @@ namespace Converter.Parsers.PDF
 
     private void ParseColorSpaceIRDictionary(PDFFile file, ReadOnlySpan<byte> buffer, bool dictOpen, ref List<PDF_ColorSpaceData> csData)
     {
-      SpanParseHelper helper = new SpanParseHelper(ref buffer);
+      PDFSpanParseHelper helper = new PDFSpanParseHelper(ref buffer);
 
       bool dictStartFound = dictOpen;
       while (!dictStartFound)
@@ -695,7 +695,7 @@ namespace Converter.Parsers.PDF
     // TODO: fix this as well, after you add array pooling of some kind
     private void ParseFontIRDictionary(PDFFile file, ReadOnlySpan<byte> buffer, bool dictOpen, ref List<PDF_FontData> fontData)
     {
-      SpanParseHelper helper = new SpanParseHelper(ref buffer);
+      PDFSpanParseHelper helper = new PDFSpanParseHelper(ref buffer);
 
       bool dictStartFound = dictOpen;
       while (!dictStartFound)
@@ -759,7 +759,7 @@ namespace Converter.Parsers.PDF
     /// <returns>Number of bytes moved inside small buffer</returns>
     private void ParseFontDictionary(PDFFile file, ReadOnlySpan<byte> buffer, ref PDF_FontInfo fontInfo)
     {
-      SpanParseHelper helper = new SpanParseHelper(ref buffer);
+      PDFSpanParseHelper helper = new PDFSpanParseHelper(ref buffer);
       bool dictStartFound = false;
       while (!dictStartFound)
       {
@@ -862,7 +862,7 @@ namespace Converter.Parsers.PDF
         if (bytesRead != objectLength)
           throw new InvalidDataException("Invalid array for Widths field!");
         file.Stream.Position = currPos;
-        SpanParseHelper irHelper = new SpanParseHelper(ref irBuffer);
+        PDFSpanParseHelper irHelper = new PDFSpanParseHelper(ref irBuffer);
 
         irHelper.SkipNextToken(); // object id
         irHelper.SkipNextToken(); // seocnd number
@@ -898,7 +898,7 @@ namespace Converter.Parsers.PDF
       long objectByteOffset = file.CrossReferenceEntries[objectIndex].TenDigitValue;
       long objectLength = GetDistanceToNextObject(objectIndex, objectByteOffset, file);
       Span<byte> buffer = new byte[objectLength];
-      SpanParseHelper helper = new SpanParseHelper(ref buffer);
+      PDFSpanParseHelper helper = new PDFSpanParseHelper(ref buffer);
       file.Stream.Position = objectByteOffset;
       int readBytes = file.Stream.Read(buffer);
       if (readBytes != objectLength)
@@ -1028,7 +1028,7 @@ namespace Converter.Parsers.PDF
       // ok for now just load all and store it, later be smarter
       file.Stream.Position = objectByteOffset;
       Span<byte> pageBuffer = stackalloc byte[(int)objectLength];
-      SpanParseHelper helper = new SpanParseHelper(ref pageBuffer);
+      PDFSpanParseHelper helper = new PDFSpanParseHelper(ref pageBuffer);
       int readBytes = file.Stream.Read(pageBuffer);
       // do i need this...?
       if (pageBuffer.Length != readBytes)
@@ -1036,7 +1036,7 @@ namespace Converter.Parsers.PDF
       FillRootPageTreeFrom(file, ref helper, ref rootPageTree);
     }
 
-    private void FillRootPageTreeFrom(PDFFile file, ref SpanParseHelper helper, ref PDF_PageTree root)
+    private void FillRootPageTreeFrom(PDFFile file, ref PDFSpanParseHelper helper, ref PDF_PageTree root)
     {
       //
       FillRootPageTreeInfo(ref helper, ref root);
@@ -1053,7 +1053,7 @@ namespace Converter.Parsers.PDF
       file.PageInformation = pages;
     }
 
-    private void FillRootPageTreeInfo(ref SpanParseHelper helper, ref PDF_PageTree pageTree)
+    private void FillRootPageTreeInfo(ref PDFSpanParseHelper helper, ref PDF_PageTree pageTree)
     {
       bool dictStartFound = false;
       while (!dictStartFound)
@@ -1106,7 +1106,7 @@ namespace Converter.Parsers.PDF
       file.Stream.Position = objectByteOffset;
       Span<byte> buffer = objectLength <= KB * 8 ? stackalloc byte[(int)objectLength] : new byte[objectLength];
      
-      SpanParseHelper helper = new SpanParseHelper(ref buffer);
+      PDFSpanParseHelper helper = new PDFSpanParseHelper(ref buffer);
       int readBytes = file.Stream.Read(buffer);
       // do i need this...?
       if (buffer.Length != readBytes)
@@ -1281,7 +1281,7 @@ namespace Converter.Parsers.PDF
       file.Stream.Position = objectByteOffset;
       Span<byte> buffer = objectLength <= KB * 8 ? stackalloc byte[(int)objectLength] : new byte[objectLength];
 
-      SpanParseHelper helper = new SpanParseHelper(ref buffer);
+      PDFSpanParseHelper helper = new PDFSpanParseHelper(ref buffer);
       int readBytes = file.Stream.Read(buffer);
       if (buffer.Length != readBytes)
         throw new InvalidDataException("Invalid data");
@@ -1296,7 +1296,7 @@ namespace Converter.Parsers.PDF
       file.Catalog = catalog;
     }
 
-    private void FillCatalog(ref SpanParseHelper helper, ref PDF_Catalog catalog)
+    private void FillCatalog(ref PDFSpanParseHelper helper, ref PDF_Catalog catalog)
     {
       bool startOfDictFound = false;
       while (!startOfDictFound)
@@ -1427,7 +1427,7 @@ namespace Converter.Parsers.PDF
         throw new InvalidDataException("Invalid data");
 
       Span<byte> nextLineBuffer = StreamHelper.GetNextLineAsSpan(file.Stream);
-      SpanParseHelper parseHelper = new SpanParseHelper(ref nextLineBuffer);
+      PDFSpanParseHelper parseHelper = new PDFSpanParseHelper(ref nextLineBuffer);
       int startObj = parseHelper.GetNextInt32();
       int endObj = parseHelper.GetNextInt32();
       int sectionLen = endObj - startObj;
@@ -1458,7 +1458,7 @@ namespace Converter.Parsers.PDF
       file.CrossReferenceEntries = cRefEntries;
     }
     // TODO: test case when trailer is not complete ">>" can't be found after opening brackets
-    private void ParseTrailer(PDFFile file, ref SpanParseHelper helper)
+    private void ParseTrailer(PDFFile file, ref PDFSpanParseHelper helper)
     {
       PDF_Trailer trailer = new PDF_Trailer();
 
@@ -1586,7 +1586,7 @@ namespace Converter.Parsers.PDF
       }
     }
 
-    private PDF_Version ParsePdfVersionFromCatalog(ref SpanParseHelper helper)
+    private PDF_Version ParsePdfVersionFromCatalog(ref PDFSpanParseHelper helper)
     {
       ReadOnlySpan<byte> buffer = new ReadOnlySpan<byte>();
       helper.GetNextStringAsReadOnlySpan(ref buffer);
