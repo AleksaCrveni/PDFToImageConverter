@@ -1,5 +1,4 @@
 ﻿using Converter.FileStructures.PDF;
-using Converter.Parsers.PDF;
 using System.Globalization;
 using System.Text;
 

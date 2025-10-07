@@ -4,7 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace Converter.Parsers.PDF
+namespace Converter.FileStructures.PDF
 {
   public static class PDFConstants
   {
