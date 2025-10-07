@@ -90,3 +90,4 @@
     public bool EvenOddClippingPath = false;
   }
 }
+ 

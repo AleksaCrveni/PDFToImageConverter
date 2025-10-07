@@ -1,5 +1,5 @@
-﻿using Converter.FileStructures;
-using Converter.FileStructures.General;
+﻿using Converter.FileStructures.General;
+using Converter.FileStructures.TTF;
 using System.Buffers.Binary;
 using System.Diagnostics;
 using System.Numerics;
@@ -22,7 +22,7 @@ namespace Converter.Parsers.Fonts
     // use endOfArr internally to know if you reached end of array or not
     private uint endOfArr;
     private uint beginOfSfnt;
-    public RASTERIZER_VERSION RasterizerVersion = RASTERIZER_VERSION.V2;
+    public TTF_RASTERIZER_VERSION RasterizerVersion = TTF_RASTERIZER_VERSION.V2;
     public void Init(ref byte[] buffer)
     {
       _buffer = buffer;
@@ -43,10 +43,10 @@ namespace Converter.Parsers.Fonts
       fd.ScalarType = scalarType switch
       {
         // true
-        0x00010000 => ScalarType.True,
-        0x74727565 => ScalarType.True,
-        0x4F54544F => ScalarType.Otto,
-        0x74797031 => ScalarType.Typ1,
+        0x00010000 => TTF_ScalarType.True,
+        0x74727565 => TTF_ScalarType.True,
+        0x4F54544F => TTF_ScalarType.Otto,
+        0x74797031 => TTF_ScalarType.Typ1,
         _ => throw new InvalidDataException("Invalid scalar type in the embedded true font!")
       };
 
@@ -188,20 +188,20 @@ namespace Converter.Parsers.Fonts
         // not sure if this check is even require need to be done here, stb_truetype only does this 
         switch (platformID)
         {
-          case (ushort)FileStructures.PlatformID.Microsoft:
+          case (ushort)FileStructures.TTF.TTF_PlatformID.Microsoft:
             switch (platformSpecificID)
             {
-              case (ushort)MSPlatformSpecificID.MS_UnicodeBMP:
-              case (ushort)MSPlatformSpecificID.MS_UnicodeFULL:
+              case (ushort)TTF_MSPlatformSpecificID.MS_UnicodeBMP:
+              case (ushort)TTF_MSPlatformSpecificID.MS_UnicodeFULL:
                 _ttf.IndexMapOffset = tOff.cmap.Position + (int)offset;
                 break;
 
             }
             break;
-          case (ushort)FileStructures.PlatformID.Unicode:
+          case (ushort)FileStructures.TTF.TTF_PlatformID.Unicode:
             _ttf.IndexMapOffset = tOff.cmap.Position + (int)offset;
             break;
-          case (ushort)FileStructures.PlatformID.Macintosh:
+          case (ushort)FileStructures.TTF.TTF_PlatformID.Macintosh:
             _ttf.IndexMapOffset = tOff.cmap.Position + (int)offset;
             break;
         }
@@ -1082,7 +1082,7 @@ namespace Converter.Parsers.Fonts
       int n, i, j, k, m;
 
       int vSubSample;
-      if (RasterizerVersion == RASTERIZER_VERSION.V1)
+      if (RasterizerVersion == TTF_RASTERIZER_VERSION.V1)
       {
         vSubSample = result.H < 8 ? 15 : 5;
       }
@@ -1140,7 +1140,7 @@ namespace Converter.Parsers.Fonts
       SortEdges(ref edges, n);
       
       // TODO:  scanelines rasterization for both V1 and V2
-      if (RasterizerVersion == RASTERIZER_VERSION.V1)
+      if (RasterizerVersion == TTF_RASTERIZER_VERSION.V1)
       {
 
       }
@@ -1242,7 +1242,7 @@ namespace Converter.Parsers.Fonts
       // count how many "moves" there are to get the countour count
       for (i = 0; i < numOfVerts; i++)
       {
-        if (vertices[i].type == (byte)VMove.VMOVE)
+        if (vertices[i].type == (byte)TTF_VMove.VMOVE)
           n++;
       }
 
@@ -1275,7 +1275,7 @@ namespace Converter.Parsers.Fonts
           vertex = vertices[i];
           switch (vertex.type)
           {
-            case (byte)VMove.VMOVE:
+            case (byte)TTF_VMove.VMOVE:
               // start next countour
               if (n >= 0)
                 windingLengths[n] = numOfPoints - start;
@@ -1285,17 +1285,17 @@ namespace Converter.Parsers.Fonts
               y = vertex.y;
               AddPoint(points, numOfPoints++, x, y);
               break;
-            case (byte)VMove.VLINE:
+            case (byte)TTF_VMove.VLINE:
               x = vertex.x;
               y = vertex.y;
               AddPoint(points, numOfPoints++, x, y);
               break;
-            case (byte)VMove.VCURVE:
+            case (byte)TTF_VMove.VCURVE:
               TesselateCurve(points, ref numOfPoints, x, y, vertex.cx, vertex.cy, vertex.x, vertex.y, objspaceFlatnessSquared, 0);
               x = vertex.x;
               y = vertex.y;
               break;
-            case (byte)VMove.VCUBIC:
+            case (byte)TTF_VMove.VCUBIC:
               TesselateCubic(points, ref numOfPoints, x, y, vertex.cx, vertex.cy, vertex.cx1, vertex.cy1, vertex.x, vertex.y, objspaceFlatness, 0);
               x = vertex.x;
               y = vertex.y;
@@ -1336,14 +1336,14 @@ namespace Converter.Parsers.Fonts
       if (startOff)
       {
         if (wasOff)
-          SetVertex(ref vertex, (byte)VMove.VCURVE, (cx + scx) >> 1, (cy + scy) >> 1, cx, cy);
-        SetVertex(ref vertex, (byte)VMove.VCURVE, sx, sy, scx, scy);
+          SetVertex(ref vertex, (byte)TTF_VMove.VCURVE, (cx + scx) >> 1, (cy + scy) >> 1, cx, cy);
+        SetVertex(ref vertex, (byte)TTF_VMove.VCURVE, sx, sy, scx, scy);
       } else
       {
         if (wasOff)
-          SetVertex(ref vertex, (byte)VMove.VCURVE, sx, sy, cx, cy);
+          SetVertex(ref vertex, (byte)TTF_VMove.VCURVE, sx, sy, cx, cy);
         else
-          SetVertex(ref vertex, (byte)VMove.VLINE, sx, sy, 0, 0);
+          SetVertex(ref vertex, (byte)TTF_VMove.VLINE, sx, sy, 0, 0);
       }
       vertices[numOfVertices++] = vertex;
       return numOfVertices;
@@ -1531,7 +1531,7 @@ namespace Converter.Parsers.Fonts
             }
 
             vertex = vertices[numOfVertices];
-            SetVertex(ref vertex, (byte)VMove.VMOVE, sx, sy, 0, 0);
+            SetVertex(ref vertex, (byte)TTF_VMove.VMOVE, sx, sy, 0, 0);
             vertices[numOfVertices++] = vertex;
             wasOff = false;
             nextMove = 1 + ReadUInt16(ref buffer, endPtsOfContoursOffset + j * 2);
@@ -1545,7 +1545,7 @@ namespace Converter.Parsers.Fonts
               // two off-curv control points in a row means interpolate an on-curve midpoint
               if (wasOff)
               {
-                SetVertex(ref vertex, (byte)VMove.VCURVE, (cx + x) >> 1, (cy + y) >> 1, cx, cy);
+                SetVertex(ref vertex, (byte)TTF_VMove.VCURVE, (cx + x) >> 1, (cy + y) >> 1, cx, cy);
                 vertices[numOfVertices++] = vertex;
               }
                 cx = x;
@@ -1555,9 +1555,9 @@ namespace Converter.Parsers.Fonts
             else
             {
               if (wasOff)
-                SetVertex(ref vertex, (byte)VMove.VCURVE, x, y, cx, cy);
+                SetVertex(ref vertex, (byte)TTF_VMove.VCURVE, x, y, cx, cy);
               else
-                SetVertex(ref vertex, (byte)VMove.VLINE, x, y, 0, 0);
+                SetVertex(ref vertex, (byte)TTF_VMove.VLINE, x, y, 0, 0);
 
               vertices[numOfVertices++] = vertex;
               wasOff = false;
