@@ -35,14 +35,14 @@ namespace Converter.Parsers.PDF
     private PathConstruction currentPC;
     private TextObject currentTextObject;
     private List<FontData> _fontInfo;
-    private ITIFFWriter _writer;
     private Span<byte> _fourByteSlice;
     private ResourceDict _resourceDict;
     private long tokensParsed = 0; // for debugging
+    private Span<byte> outputBuffer;
     // TODO: maybe NULL check is redundant if we let it throw to end?
-    public PDFGOInterpreter(ref ResourceDict resourceDict, ReadOnlySpan<byte> buffer, List<FontData> fontInfo, ITIFFWriter tiffWriter, ref Span<byte> fourByteSlice)
+    public PDFGOInterpreter(ReadOnlySpan<byte> contentBuffer, Span<byte> outputBuffer, ref ResourceDict resourceDict, List<FontData> fontInfo, ref Span<byte> fourByteSlice)
     {
-      _buffer = buffer;
+      _buffer = contentBuffer;
       intOperands = new Stack<int>(100);
       realOperands = new Stack<double>(100);
       operandTypes = new Stack<OperandType>();
@@ -53,16 +53,15 @@ namespace Converter.Parsers.PDF
       currentGS = new GraphicsState();
       currentPC = new PathConstruction();
       _fontInfo = fontInfo;
-      _writer = tiffWriter;
       _resourceDict = resourceDict;
-
+      outputBuffer = outputBuffer;
       // should be always 4 bytes
       if (fourByteSlice.Length != 4)
         throw new Exception("Four byte slice must be 4 in length!");
       _fourByteSlice = fourByteSlice;
     }
 
-    public void ParseAll()
+    public void ConvertToPixelData()
     {
       currentGS = new GraphicsState();
 
@@ -602,6 +601,51 @@ namespace Converter.Parsers.PDF
     {
       return (_char >= 48 && _char <= 57);
     }
+
+    public void Write(TTFParser parser, int bitmapWidth, int bitmapHeight, int lineHeight, string textToTranslate, string imageName)
+    {
+      byte[] bitmap = new byte[bitmapHeight * bitmapWidth];
+      float scaleFactor = parser.ScaleForPixelHeight(lineHeight);
+      int x = 0;
+      // ascent and descent are defined in font descriptor, use those I think over getting i from  the font
+      int ascent = 0;
+      int descent = 0;
+      int lineGap = 0;
+      parser.GetFontVMetrics(ref ascent, ref descent, ref lineGap);
+      ascent = (int)Math.Round(ascent * scaleFactor);
+      descent = (int)Math.Round(descent * scaleFactor);
+      int baseline = 0;
+
+      for (int i = 0; i < textToTranslate.Length; i++)
+      {
+        int ax = 0; // charatcter width
+        int lsb = 0; // left side bearing
+
+        parser.GetCodepointHMetrics(textToTranslate[i], ref ax, ref lsb);
+
+        int c_x0 = 0;
+        int c_y0 = 0;
+        int c_x1 = 0;
+        int c_y1 = 0;
+        parser.GetCodepointBitmapBox(textToTranslate[i], scaleFactor, scaleFactor, ref c_x0, ref c_y0, ref c_x1, ref c_y1);
+
+        // char height
+        int y = ascent + c_y0 + baseline;
+
+        int byteOffset = x + (int)Math.Round(lsb * scaleFactor) + (y * bitmapWidth);
+        parser.MakeCodepointBitmap(ref bitmap, byteOffset, c_x1 - c_x0, c_y1 - c_y0, bitmapWidth, scaleFactor, scaleFactor, textToTranslate[i]);
+
+        // advance x
+        x += (int)Math.Round(ax * scaleFactor);
+
+        // kerning
+
+        //int kern;
+        //kern = parser.GetCodepointKernAdvance(textToTranslate[i], textToTranslate[i + 1]);
+        //x += (int)Math.Round(kern * scaleFactor);
+      }
+    }
+
   }
 
   public enum OperandType

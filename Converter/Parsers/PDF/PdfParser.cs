@@ -82,17 +82,23 @@ namespace Converter.Parsers.PDF
     private void ConvertPageDataToImage(PDFFile file)
     {
       byte[] rawContent = file.PageInformation[0].ContentDict.RawStreamData;
-      ITIFFWriter writer = new TIFFBilevelWriter("convertTest.pdf");
+      ITIFFWriter writer = new TIFFGrayscaleWriter("convertTest.pdf");
+      int width = (int)file.PageInformation[0].MediaBox.urX;
+      int height = (int)file.PageInformation[0].MediaBox.urY;
       TIFFWriterOptions tiffOptions = new TIFFWriterOptions()
       {
-        Width = (int)file.PageInformation[0].MediaBox.urX,
-        Height = (int)file.PageInformation[0].MediaBox.urY,
+        Width = width,
+        Height = height
       };
       writer.WriteEmptyImage(ref tiffOptions);
       Span<byte> fourByteSlice = stackalloc byte[4];
       ResourceDict rDict = file.PageInformation[0].ResourceDict;
-      PDFGOInterpreter pdfGo = new PDFGOInterpreter(ref rDict, rawContent.AsSpan(), file.PageInformation[0].ResourceDict.Font, writer, ref fourByteSlice);
-      pdfGo.ParseAll();
+
+      byte[] outputBytes = new byte[width * height];
+      Span<byte> outSpan = outputBytes.AsSpan();
+      PDFGOInterpreter pdfGo = new PDFGOInterpreter(rawContent.AsSpan(), outSpan, ref rDict, file.PageInformation[0].ResourceDict.Font, ref fourByteSlice);
+      pdfGo.ConvertToPixelData();
+      writer.WriteImageWithBuffer(ref tiffOptions, outputBytes);
     }
 
     // TODO: process resource and content in parallel?
