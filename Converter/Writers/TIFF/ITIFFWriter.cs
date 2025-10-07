@@ -4,5 +4,6 @@
   {
     void WriteEmptyImage(ref TIFFWriterOptions options);
     void WriteIntoImageData(int x, int y, int[,] bitmap);
+    void WriteImageWithBuffer(ref TIFFWriterOptions options, byte[] buffer);
   }
 }
