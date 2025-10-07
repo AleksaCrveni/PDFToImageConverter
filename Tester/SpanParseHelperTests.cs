@@ -1,5 +1,5 @@
 ﻿using Converter.FileStructures.PDF;
-using Converter.Parsers;
+using Converter.Parsers.PDF;
 
 namespace Tester
 {
@@ -27,7 +27,7 @@ namespace Tester
       Span<byte> buffer = new byte[input.Length];
       for (int i = 0; i < input.Length; i++)
         buffer[i] = (byte)input[i];
-      SpanParseHelper helper = new SpanParseHelper(ref buffer);
+      PDFSpanParseHelper helper = new PDFSpanParseHelper(ref buffer);
 
       string nextToken = helper.GetNextToken();
       Assert.IsTrue(nextToken == "Type");
@@ -106,7 +106,7 @@ namespace Tester
       Span<byte> buffer = new byte[input.Length];
       for (int i = 0; i < input.Length; i++)
         buffer[i] = (byte)input[i];
-      SpanParseHelper helper = new SpanParseHelper(ref buffer);
+      PDFSpanParseHelper helper = new PDFSpanParseHelper(ref buffer);
 
       GenericEnum f = helper.GetNextName<GenericEnum>();
       Assert.IsTrue(f == GenericEnum.Enum3);
@@ -119,7 +119,7 @@ namespace Tester
       Span<byte> buffer = new byte[input.Length];
       for (int i = 0; i < input.Length; i++)
         buffer[i] = (byte)input[i];
-      SpanParseHelper helper = new SpanParseHelper(ref buffer);
+      PDFSpanParseHelper helper = new PDFSpanParseHelper(ref buffer);
 
       GenericEnum f = helper.GetNextName<GenericEnum>();
       Assert.IsTrue(f == GenericEnum.Enum1);
@@ -132,7 +132,7 @@ namespace Tester
       Span<byte> buffer = new byte[input.Length];
       for (int i = 0; i < input.Length; i++)
         buffer[i] = (byte)input[i];
-      SpanParseHelper helper = new SpanParseHelper(ref buffer);
+      PDFSpanParseHelper helper = new PDFSpanParseHelper(ref buffer);
 
       List<GenericEnum> f = helper.GetListOfNames<GenericEnum>();
       Assert.IsTrue(f[0] == GenericEnum.Enum1);
@@ -146,7 +146,7 @@ namespace Tester
       Span<byte> buffer = new byte[input.Length];
       for (int i = 0; i < input.Length; i++)
         buffer[i] = (byte)input[i];
-      SpanParseHelper helper = new SpanParseHelper(ref buffer);
+      PDFSpanParseHelper helper = new PDFSpanParseHelper(ref buffer);
 
       PDF_Filter f = helper.GetNextName<PDF_Filter>();
       Assert.IsTrue(f == PDF_Filter.LZWDecode);
@@ -159,7 +159,7 @@ namespace Tester
       Span<byte> buffer = new byte[input.Length];
       for (int i = 0; i < input.Length; i++)
         buffer[i] = (byte)input[i];
-      SpanParseHelper helper = new SpanParseHelper(ref buffer);
+      PDFSpanParseHelper helper = new PDFSpanParseHelper(ref buffer);
 
       PDF_Rect r = helper.GetNextRectangle();
       PDF_Rect testR = new PDF_Rect();
@@ -174,7 +174,7 @@ namespace Tester
       Span<byte> buffer = new byte[input.Length];
       for (int i = 0; i < input.Length; i++)
         buffer[i] = (byte)input[i];
-      SpanParseHelper helper = new SpanParseHelper(ref buffer);
+      PDFSpanParseHelper helper = new PDFSpanParseHelper(ref buffer);
 
       double f = helper.GetNextDouble();
       Assert.IsTrue(f == 127);
@@ -187,7 +187,7 @@ namespace Tester
       Span<byte> buffer = new byte[input.Length];
       for (int i = 0; i < input.Length; i++)
         buffer[i] = (byte)input[i];
-      SpanParseHelper helper = new SpanParseHelper(ref buffer);
+      PDFSpanParseHelper helper = new PDFSpanParseHelper(ref buffer);
 
       double f = helper.GetNextDouble();
       Assert.IsTrue(f == 127.523);
