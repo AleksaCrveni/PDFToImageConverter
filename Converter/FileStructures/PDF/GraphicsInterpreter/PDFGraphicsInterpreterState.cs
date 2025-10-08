@@ -43,6 +43,14 @@
     public int[] DashArray;
     public int Phase;
   }
+
+  /*
+   * [
+   *  xLocation    yLocation    0
+   *  xOrientation yOrientation 0
+   *  xLen         yLen         1
+   *                              ]
+   */
   public struct PDFGI_CTM
   {
     public PDFGI_CTM (double _xLocation, double _yLocation, double _xOrientation, double _yOrientation, double _xLen, double _yLen)
@@ -51,7 +59,7 @@
       YLocation = _yLocation;
       XOrientation = _xOrientation;
       YOrientation = _yOrientation;
-      XxLen = _xLen;
+      XLen = _xLen;
       YLen = _yLen;
     }
     // origin location
@@ -63,7 +71,7 @@
     public double YOrientation;
 
     // lengths of the units along each axis
-    public double XxLen;
+    public double XLen;
     public double YLen;
   }
 

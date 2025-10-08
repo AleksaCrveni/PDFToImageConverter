@@ -15,7 +15,7 @@ namespace Converter.Parsers.Fonts
   /// </summary>
   public class TTFParser
   {
-    private byte[] _buffer;
+    public byte[] _buffer;
     private TrueTypeFont _ttf;
     // size of byte in bits, for some reason some archs have non 8 bit byte size
     private int byteSize;
@@ -348,11 +348,11 @@ namespace Converter.Parsers.Fonts
       lineGap = ReadSignedInt16(ref buffer, _ttf.Offsets.hhea.Position + 8);
     }
 
-    public float ScaleForPixelHeight(float lineHeight)
+    public float ScaleForPixelHeight(float size)
     {
       ReadOnlySpan<byte> buffer = _buffer.AsSpan();
       int fHeight = ReadSignedInt16(ref buffer, _ttf.Offsets.hhea.Position + 4) - ReadSignedInt16(ref buffer, _ttf.Offsets.hhea.Position + 6);
-      return lineHeight / fHeight;
+      return size / fHeight;
     }
     public int GetGlyphOffset(ref ReadOnlySpan<byte> buffer, int glyphIndex)
     {

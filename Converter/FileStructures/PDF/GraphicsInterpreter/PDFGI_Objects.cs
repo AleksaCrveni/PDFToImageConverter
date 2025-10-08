@@ -13,7 +13,14 @@
     public double[,] TextLineMatrix;
     public string FontRef;
     public double FontScaleFactor;
-    // to know if we are inside or not
+    // to know if we are inside or not -- i forgot why I added this..
+    // rename later
+    public double Th = 100; // Horizontal Scaling
+    public double Tl = 0; // Leading
+    public double Tw = 0; // Word Space
+    public double Tc = 0; // Char space
+    public int TMode = 0; // Render mode
+    public double TRise = 0; // Rise
     public bool Active;
     public void InitMatrixes()
     {
