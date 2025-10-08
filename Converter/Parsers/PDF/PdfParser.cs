@@ -82,7 +82,7 @@ namespace Converter.Parsers.PDF
     private void ConvertPageDataToImage(PDFFile file)
     {
       byte[] rawContent = file.PageInformation[0].ContentDict.RawStreamData;
-      ITIFFWriter writer = new TIFFGrayscaleWriter("convertTest.pdf");
+      ITIFFWriter writer = new TIFFGrayscaleWriter("convertTest.tiff");
       int width = (int)file.PageInformation[0].MediaBox.urX;
       int height = (int)file.PageInformation[0].MediaBox.urY;
       TIFFWriterOptions tiffOptions = new TIFFWriterOptions()
@@ -95,9 +95,16 @@ namespace Converter.Parsers.PDF
       PDF_ResourceDict rDict = file.PageInformation[0].ResourceDict;
 
       byte[] outputBytes = new byte[width * height];
-      Span<byte> outSpan = outputBytes.AsSpan();
-      PDFGOInterpreter pdfGo = new PDFGOInterpreter(rawContent.AsSpan(), outSpan, ref rDict, file.PageInformation[0].ResourceDict.Font, ref fourByteSlice);
+      rawContent = File.ReadAllBytes(@"W:\PDFToImageConverter\Files\LittleContentSample.txt");
+      PDFGOInterpreter pdfGo = new PDFGOInterpreter(rawContent.AsSpan(), ref outputBytes, ref rDict, file.PageInformation[0].ResourceDict.Font, ref fourByteSlice, (width, height));
       pdfGo.ConvertToPixelData();
+      List<string> lines = new List<string>();
+      for (int i = 0; i < outputBytes.Length; i++)
+      {
+        if (outputBytes[i] > 0)
+          lines.Add(i.ToString());
+      }
+      File.WriteAllLines(@"W:\PDFToImageConverter\Files\PDFGORes.txt", lines);
       writer.WriteImageWithBuffer(ref tiffOptions, outputBytes);
     }
 
@@ -440,8 +447,10 @@ namespace Converter.Parsers.PDF
             {
               helper.ReadChar();
               // use this because we dont know when dict ends so we can just skip those and not read again on main buffer
-              ParseColorSpaceIRDictionary(file, helper._buffer.Slice(helper._position), true, ref csData);
-
+              int movedInside = ParseColorSpaceIRDictionary(file, helper._buffer.Slice(helper._position), true, ref csData);
+              helper._position += movedInside + 1;
+              helper._readPosition += movedInside + 1;
+              helper._char = buffer[helper._readPosition];
             }
             else
             {
@@ -482,8 +491,10 @@ namespace Converter.Parsers.PDF
             {
               helper.ReadChar();
               // use this because we dont know when dict ends so we can just skip those and not read again on main buffer
-              ParseFontIRDictionary(file, helper._buffer.Slice(helper._position), true, ref fontData);
-
+              int movedInside = ParseFontIRDictionary(file, helper._buffer.Slice(helper._position), true, ref fontData);
+              helper._position += movedInside + 1;
+              helper._readPosition += movedInside + 1;
+              helper._char = buffer[helper._readPosition];
             }
             else
             {
@@ -640,7 +651,7 @@ namespace Converter.Parsers.PDF
 
     }
 
-    private void ParseColorSpaceIRDictionary(PDFFile file, ReadOnlySpan<byte> buffer, bool dictOpen, ref List<PDF_ColorSpaceData> csData)
+    private int ParseColorSpaceIRDictionary(PDFFile file, ReadOnlySpan<byte> buffer, bool dictOpen, ref List<PDF_ColorSpaceData> csData)
     {
       PDFSpanParseHelper helper = new PDFSpanParseHelper(ref buffer);
 
@@ -690,10 +701,11 @@ namespace Converter.Parsers.PDF
         helper.ReadUntilNonWhiteSpaceDelimiter();
       }
       file.Stream.Position = origPos;
+      return helper._position;
     }
 
     // TODO: fix this as well, after you add array pooling of some kind
-    private void ParseFontIRDictionary(PDFFile file, ReadOnlySpan<byte> buffer, bool dictOpen, ref List<PDF_FontData> fontData)
+    private int ParseFontIRDictionary(PDFFile file, ReadOnlySpan<byte> buffer, bool dictOpen, ref List<PDF_FontData> fontData)
     {
       PDFSpanParseHelper helper = new PDFSpanParseHelper(ref buffer);
 
@@ -745,6 +757,7 @@ namespace Converter.Parsers.PDF
         helper.ReadUntilNonWhiteSpaceDelimiter();
       }
       file.Stream.Position = origPos;
+      return helper._position;
     }
 
 

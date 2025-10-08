@@ -8,7 +8,7 @@ namespace Converter.Parsers.PDF
   {
     public ReadOnlySpan<byte> _buffer;
     public int _position = 0; // current posion
-    private int _readPosition = 0; // next position
+    public int _readPosition = 0; // next position
     public byte _char; // current char
     private const int MAX_STRING_SPAN_ALLOC_SIZE = 4096;
     //                                              (,    ),    <,    >,    [,    ],    {,    },    /,    %
