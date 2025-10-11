@@ -775,9 +775,12 @@ namespace Converter.Parsers.PDF
         //int kern;
         //kern = parser.GetCodepointKernAdvance(textToTranslate[i], textToTranslate[i + 1]);
         //x += (int)Math.Round(kern * scaleFactor);
-
+        int idx = (int)textToTranslate[i] - activeFontData.FontInfo.FirstChar;
+        float width = activeWidths[idx] / 1000f;
         //UpdateTextMatrixAfterGlyphRender(glyphWidth, glyphHeight, positionAdjustment);
-        currentTextObject.TextMatrix[2, 0] += 20;
+        currentTextObject.TextMatrix[2, 0] = width * currentTextObject.TextMatrix[0, 0] + currentTextObject.TextMatrix[2, 0];
+        currentTextObject.TextMatrix[2, 1] = 0 * currentTextObject.TextMatrix[1, 1] + currentTextObject.TextMatrix[2, 1];
+        //currentTextObject.TextMatrix[2, 0] += 20;
         
       }
 
