@@ -182,6 +182,7 @@ namespace Converter.Writers.TIFF
       _stream.Seek(0, SeekOrigin.End);
 
       pos = 0;
+      // Make this configurable??
       // XRes
       writer.WriteUnsigned32ToBuffer(ref pos, 72);
       writer.WriteUnsigned32ToBuffer(ref pos, 1);

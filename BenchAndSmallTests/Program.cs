@@ -93,9 +93,9 @@ using Microsoft.Diagnostics.Tracing.Parsers.MicrosoftWindowsWPF;
 TTFParser parser = new TTFParser();
 byte[] arr = File.ReadAllBytes(@"W:\\PDFToImageConverter\\Files\\F1.0FontInfoSample.txt");
 parser.Init(ref arr);
-int bitmapWidth = 1024;
-int bitmapHeight = 256;
-int lineHeight = 64;
+int bitmapWidth = 612;
+int bitmapHeight = 792;
+int lineHeight = 36;
 parser.InitFont(); // required
 byte[] bitmap = new byte[bitmapHeight * bitmapWidth];
 float scaleFactor = parser.ScaleForPixelHeight(lineHeight);
@@ -130,7 +130,11 @@ for (int i = 0; i < textToTranslate.Length; i++)
   int byteOffset = x + (int)MathF.Round(lsb * scaleFactor) + (y * bitmapWidth);
   // BUG IS THAT I AM NOT ACCOUNTI)NG BYTE OFFSET??
   parser.MakeCodepointBitmap(ref bitmap, byteOffset, c_x1 - c_x0, c_y1 - c_y0, bitmapWidth, scaleFactor, scaleFactor, textToTranslate[i]);
-
+  for (int ss = 0; ss < bitmap.Length;ss++)
+    if (bitmap[ss] > 0)
+    {
+      int sdasd = ss;
+    }
   // advance x
   x += (int)Math.Round(ax * scaleFactor);
 
@@ -148,7 +152,8 @@ for (int i = 0; i < bitmap.Length; i++)
     ints.Add($"{i.ToString()} ");
 }
 
-File.WriteAllLines("myByteOutput_letter_T.txt", ints.ToArray());
+List<string> lines = new List<string>();
+File.WriteAllLines(@"W:\PDFToImageConverter\Files\program.txt", ints.ToArray());
 
 TIFFGrayscaleWriter writer = new TIFFGrayscaleWriter("RasterizationTest.tiff");
 var options = new TIFFWriterOptions()
