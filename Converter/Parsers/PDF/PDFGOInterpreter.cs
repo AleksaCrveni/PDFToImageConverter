@@ -4,8 +4,6 @@ using Converter.FileStructures.TTF;
 using Converter.Parsers.Fonts;
 using System.Diagnostics;
 using System.Globalization;
-using System.Runtime.InteropServices.Marshalling;
-using System.Security.Cryptography.X509Certificates;
 using System.Text;
 
 namespace Converter.Parsers.PDF
@@ -46,7 +44,7 @@ namespace Converter.Parsers.PDF
     private double[,] textRenderingMatrix;
     private double[,] reUsableMatrix1;
     private double[,] reUsableMatrix2;
-    private TTFParser parser;
+    private PDF_FontData activeFontData;
     // TODO: maybe NULL check is redundant if we let it throw to end?
     public PDFGOInterpreter(ReadOnlySpan<byte> contentBuffer, ref byte[] outputBuffer, ref PDF_ResourceDict resourceDict, List<PDF_FontData> fontInfo, ref Span<byte> fourByteSlice, (int W, int H) bitmapSize)
     {
@@ -67,21 +65,19 @@ namespace Converter.Parsers.PDF
       if (fourByteSlice.Length != 4)
         throw new Exception("Four byte slice must be 4 in length!");
       _fourByteSlice = fourByteSlice;
-      rasterState = new RasterState(0,0, bitmapSize.W, bitmapSize.H);
+      rasterState = new RasterState(0,0, 0, bitmapSize.W, bitmapSize.H);
       textRenderingMatrix = new double[3,3];
       reUsableMatrix1 = new double[3, 3];
       reUsableMatrix2 = new double[3, 3];
-      // temp
-      foreach (PDF_FontData fd in fontInfo)
-      {
-        if (fd.Key == "F1.0")
-          parser = fd.Parser;
-      }
     }
-
-    public void ConvertToPixelData()
+    public void InitGS()
     {
       currentGS = new GraphicsState();
+      currentGS.CTM = MyMath.RealIdentityMatrix3x3();
+    }
+    public void ConvertToPixelData()
+    {
+      InitGS();
 
       uint val = ReadNext();
       // TODO: instead of string, we can return hexadecimals or numbers
@@ -149,18 +145,14 @@ namespace Converter.Parsers.PDF
             currentGS = GSS.Pop();
             break;
           case 0x6d63: // cm
-                       // a b c e d f - real numbers but can be saved as ints
-            PDFGI_CTM newCtm = new PDFGI_CTM();
-            // get it as reverse since its stack
-
-            newCtm.YLen = GetNextStackValAsDouble();
-            newCtm.XLen = GetNextStackValAsDouble();
-            newCtm.YOrientation = GetNextStackValAsDouble();
-            newCtm.XOrientation = GetNextStackValAsDouble();
-            newCtm.YLocation = GetNextStackValAsDouble();
-            newCtm.XLocation = GetNextStackValAsDouble();
-
-            currentGS.CTM = newCtm;
+            // a b c e d f - real numbers but can be saved as ints
+            double f = GetNextStackValAsDouble();
+            double d = GetNextStackValAsDouble();
+            double e = GetNextStackValAsDouble();
+            double c = GetNextStackValAsDouble();
+            double b = GetNextStackValAsDouble();
+            double a = GetNextStackValAsDouble();
+            UpdateCTM(a, b, c, e, d, f);
             break;
           #endregion gss&sgs
           #region pathConstruction
@@ -266,7 +258,7 @@ namespace Converter.Parsers.PDF
             currentTextObject.Tw = GetNextStackValAsDouble();
             break;
           case 0x7a54: // Tz
-            currentTextObject.Th = GetNextStackValAsDouble();
+            currentTextObject.Th = GetNextStackValAsDouble() / 100;
             break;
           case 0x4c54: // TL
             currentTextObject.Tl = GetNextStackValAsDouble();
@@ -274,6 +266,15 @@ namespace Converter.Parsers.PDF
           case 0x6654: // Tf
             currentTextObject.FontScaleFactor = GetNextStackValAsDouble();
             currentTextObject.FontRef = GetNextStackValAsString();
+
+            foreach (PDF_FontData fd in _fontInfo)
+            {
+              if (fd.Key == currentTextObject.FontRef)
+              {
+                activeFontData = fd;
+                break;
+              }
+            }
             break;
           case 0x7254: // Tr
             currentTextObject.TMode = GetNextStackValAsInt();
@@ -316,19 +317,8 @@ namespace Converter.Parsers.PDF
           #endregion textPositioning;
           #region textShowing
           case 0x6a54: // Tj
-            // placeholder
-            if (operandTypes.Peek() == OperandType.ARRAY)
-            {
-              operandTypes.Pop();
-              int arrLen = arrayLengths.Pop();
-              for (int i = 0; i < arrLen; i++)
-                GetNextStackValAsString();
-            }
-            else
-            {
-              literal = GetNextStackValAsString();
-              Write(literal);
-            }
+            literal = GetNextStackValAsString();
+            Write(literal);
             break;
           case 0x4a54: // TJ
             // placeholder
@@ -337,10 +327,17 @@ namespace Converter.Parsers.PDF
               operandTypes.Pop();
               int arrLen = arrayLengths.Pop();
               for (int i = 0; i < arrLen; i++)
-                GetNextStackValAsString();
+              {
+                int posCorrection = 0;
+                if (operandTypes.Peek() == OperandType.INT)
+                {
+                  posCorrection = GetNextStackValAsInt();
+                }
+                Write(GetNextStackValAsString(), posCorrection);
+              }
             }
             else
-              literal = GetNextStackValAsString();
+              Write(GetNextStackValAsString());
             break;
           case 0x27:   // '
           case 0x22:   // "
@@ -382,6 +379,8 @@ namespace Converter.Parsers.PDF
           case 0x6e6373: // scn
           case 0x47: // G
           case 0x67: // g
+            GetNextStackValAsDouble();
+            break;
           case 0x4752: // RG
           case 0x6772: // rg
           case 0x4b: // K
@@ -555,7 +554,7 @@ namespace Converter.Parsers.PDF
       {
         int x = 0;
       }
-        
+      
       if (operandTypes.Pop() == OperandType.INT)
         return intOperands.Pop();
       else
@@ -656,7 +655,7 @@ namespace Converter.Parsers.PDF
 
     public void UpdateTextMatrixAfterGlyphRender(int charWidth, int charHeight, int posAdjustment)
     {
-      double tx = ((charWidth - posAdjustment / 1000) * currentTextObject.FontScaleFactor + currentTextObject.Tc + currentTextObject.Tw) * currentTextObject.Th;
+      double tx = ((charWidth - posAdjustment / 1000) * currentTextObject.FontScaleFactor + currentTextObject.Tc + currentTextObject.Tw) * (currentTextObject.Th);
       double ty = (charHeight - posAdjustment / 1000) * currentTextObject.FontScaleFactor + currentTextObject.Tc + currentTextObject.Tw;
       // init first matrix
       reUsableMatrix1[0, 0] = 1;
@@ -685,55 +684,91 @@ namespace Converter.Parsers.PDF
       currentTextObject.TextMatrix[2, 0] = reUsableMatrix2[2, 0];
       currentTextObject.TextMatrix[2, 1] = reUsableMatrix2[2, 1];
       currentTextObject.TextMatrix[2, 2] = reUsableMatrix2[2, 2];
+
     }
 
-    public void Write(string textToTranslate, int positionAdjustment)
+    private void UpdateCTM(double a, double b, double c, double d, double e, double f)
     {
-     
-      // ascent and descent are defined in font descriptor, use those I think over getting i from  the font
-      TTFParser parser = new TTFParser();
-     
-      
+      reUsableMatrix1[0, 0] = a;
+      reUsableMatrix1[0, 1] = b;
+      reUsableMatrix1[0, 2] = 0;
 
+      reUsableMatrix1[1, 0] = c;
+      reUsableMatrix1[1, 1] = d;
+      reUsableMatrix1[1, 2] = 0;
+
+      reUsableMatrix1[2, 0] = e;
+      reUsableMatrix1[2, 1] = f;
+      reUsableMatrix1[2, 2] = 1;
+
+      MyMath.MultiplyMatrixes3x3(reUsableMatrix1, currentGS.CTM, ref reUsableMatrix2);
+
+      currentGS.CTM[0, 0] = reUsableMatrix2[0, 0];
+      currentGS.CTM[0, 1] = reUsableMatrix2[0, 1];
+      currentGS.CTM[0, 2] = reUsableMatrix2[0, 2];
+
+      currentGS.CTM[1, 0] = reUsableMatrix2[1, 0];
+      currentGS.CTM[1, 1] = reUsableMatrix2[1, 1];
+      currentGS.CTM[1, 2] = reUsableMatrix2[1, 2];
+
+      currentGS.CTM[2, 0] = reUsableMatrix2[2, 0];
+      currentGS.CTM[2, 1] = reUsableMatrix2[2, 1];
+      currentGS.CTM[2, 2] = reUsableMatrix2[2, 2];
+    }
+
+    public void Write(string textToTranslate, int positionAdjustment = 0)
+    {
+      TTFParser activeParser = activeFontData.Parser;
+      int[] activeWidths = activeFontData.FontInfo.Widths;
+      // ascent and descent are defined in font descriptor, use those I think over getting i from  the font
+   
       for (int i = 0; i < textToTranslate.Length; i++)
       {
         ComputeTextRenderingMatrix();
-        int xPos = (int)textRenderingMatrix[2, 0];
-        int yPos = (int)textRenderingMatrix[2, 1];
-        float scaleFactor = parser.ScaleForPixelHeight((float)textRenderingMatrix[1, 1]);
+        float matrixScaleX = (float)textRenderingMatrix[0, 0];
+        float matrixScaleY = (float)textRenderingMatrix[1, 1];
+        // not sure about these 2 for now
+        float scaleX = activeParser.ScaleForPixelHeight(matrixScaleX * currentTextObject.FontScaleFactor);
+        float scaleY = activeParser.ScaleForPixelHeight(matrixScaleY * currentTextObject.FontScaleFactor);
+
+        rasterState.X = (int)(textRenderingMatrix[2, 0]);
+        // because origin is bottom-left we have do bitmapHeight - , to get position on the top
+        rasterState.Y = rasterState.BitmapHeight - (int)(textRenderingMatrix[2, 1]);
+        Debug.Assert(rasterState.X > 0, $"X is negative at index {i}");
+        Debug.Assert(rasterState.Y > 0, $"Y is negative at index {i}");
+        Debug.Assert(rasterState.X < rasterState.BitmapWidth, $"X must be within bounds.X: {rasterState.X} - Width: {rasterState.BitmapWidth}");
+        Debug.Assert(rasterState.Y < rasterState.BitmapHeight, $"Y must be within bounds.Y: {rasterState.Y} - Height: {rasterState.BitmapWidth}");
+       
+        Debug.Assert(scaleX > 0, $"Scale factor X must be higher than 0! sfX: {scaleX}");
+        Debug.Assert(scaleY > 0, $"Scale factor Y must be higher than 0! sfY: {scaleY}");
         int ascent = 0;
         int descent = 0;
         int lineGap = 0;
-        parser.GetFontVMetrics(ref ascent, ref descent, ref lineGap);
-        ascent = (int)Math.Round(ascent * scaleFactor);
-        descent = (int)Math.Round(descent * scaleFactor);
+        activeParser.GetFontVMetrics(ref ascent, ref descent, ref lineGap);
+        ascent = (int)Math.Round(ascent * scaleY);
+        descent = (int)Math.Round(descent * scaleY);
 
         int ax = 0; // charatcter width
         int lsb = 0; // left side bearing
 
-        parser.GetCodepointHMetrics(textToTranslate[i], ref ax, ref lsb);
+        activeParser.GetCodepointHMetrics(textToTranslate[i], ref ax, ref lsb);
 
         int c_x0 = 0;
         int c_y0 = 0;
         int c_x1 = 0;
         int c_y1 = 0;
-        parser.GetCodepointBitmapBox(textToTranslate[i], (float)scaleFactor, (float)scaleFactor, ref c_x0, ref c_y0, ref c_x1, ref c_y1);
+        activeParser.GetCodepointBitmapBox(textToTranslate[i], scaleX, scaleY, ref c_x0, ref c_y0, ref c_x1, ref c_y1);
 
         // char height - different than bounding box height
-        int y = ascent + c_y0 + rasterState.Baseline;
+        int y = ascent + c_y0 + rasterState.Y;
 
         int glyphWidth = c_x1 - c_x0; // I think that this should be replaced from value in Widths array
         int glyphHeight = c_y1 - c_y0;
 
-        int byteOffset = rasterState.X + (int)Math.Round(lsb * scaleFactor) + (y * rasterState.BitmapWidth);
-        parser.MakeCodepointBitmap(ref outputBuffer, byteOffset, glyphWidth, glyphHeight, rasterState.BitmapWidth, (float)scaleFactor, (float)scaleFactor, textToTranslate[i]);
-        for (int ss = 0; ss < outputBuffer.Length; ss++)
-          if (outputBuffer[ss] > 0)
-          {
-            int sdasd = ss;
-          }
+        int byteOffset = rasterState.X + (int)Math.Round(lsb * scaleX) + (y * rasterState.BitmapWidth);
+        activeParser.MakeCodepointBitmap(ref outputBuffer, byteOffset, glyphWidth, glyphHeight, rasterState.BitmapWidth, scaleX, scaleY, textToTranslate[i]);
         // advance x
-        rasterState.X += (int)Math.Round(ax * scaleFactor);
+        rasterState.X += (int)Math.Round(ax * scaleX);
 
         // kerning
 
@@ -741,7 +776,9 @@ namespace Converter.Parsers.PDF
         //kern = parser.GetCodepointKernAdvance(textToTranslate[i], textToTranslate[i + 1]);
         //x += (int)Math.Round(kern * scaleFactor);
 
-        UpdateTextMatrixAfterGlyphRender(glyphWidth, glyphHeight, (int)(positionAdjustment * scaleFactor));
+        //UpdateTextMatrixAfterGlyphRender(glyphWidth, glyphHeight, positionAdjustment);
+        currentTextObject.TextMatrix[2, 0] += 20;
+        
       }
 
 

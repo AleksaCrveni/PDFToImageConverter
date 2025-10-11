@@ -15,7 +15,7 @@
     public double FontScaleFactor;
     // to know if we are inside or not -- i forgot why I added this..
     // rename later
-    public double Th = 100; // Horizontal Scaling
+    public double Th = 100 / 100; // Horizontal Scaling
     public double Tl = 0; // Leading
     public double Tw = 0; // Word Space
     public double Tc = 0; // Char space

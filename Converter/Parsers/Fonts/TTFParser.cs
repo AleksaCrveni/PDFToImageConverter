@@ -354,6 +354,13 @@ namespace Converter.Parsers.Fonts
       int fHeight = ReadSignedInt16(ref buffer, _ttf.Offsets.hhea.Position + 4) - ReadSignedInt16(ref buffer, _ttf.Offsets.hhea.Position + 6);
       return size / fHeight;
     }
+
+    public float ScaleForPixelHeight(double size)
+    {
+      ReadOnlySpan<byte> buffer = _buffer.AsSpan();
+      int fHeight = ReadSignedInt16(ref buffer, _ttf.Offsets.hhea.Position + 4) - ReadSignedInt16(ref buffer, _ttf.Offsets.hhea.Position + 6);
+      return (float)size / fHeight;
+    }
     public int GetGlyphOffset(ref ReadOnlySpan<byte> buffer, int glyphIndex)
     {
       int g1, g2;

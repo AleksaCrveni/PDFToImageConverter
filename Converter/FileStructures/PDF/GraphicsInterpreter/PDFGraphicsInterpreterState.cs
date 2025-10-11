@@ -9,7 +9,7 @@
 
     }
     // Device Independent
-    public PDFGI_CTM CTM;
+    public double[,] CTM;
     public object ClippingPath;
     public PDF_ColorSpaceInfo ColorSpaceInfo;
     public object Color;
@@ -42,37 +42,6 @@
   {
     public int[] DashArray;
     public int Phase;
-  }
-
-  /*
-   * [
-   *  xLocation    yLocation    0
-   *  xOrientation yOrientation 0
-   *  xLen         yLen         1
-   *                              ]
-   */
-  public struct PDFGI_CTM
-  {
-    public PDFGI_CTM (double _xLocation, double _yLocation, double _xOrientation, double _yOrientation, double _xLen, double _yLen)
-    {
-      XLocation = _xLocation;
-      YLocation = _yLocation;
-      XOrientation = _xOrientation;
-      YOrientation = _yOrientation;
-      XLen = _xLen;
-      YLen = _yLen;
-    }
-    // origin location
-    public double XLocation;
-    public double YLocation;
-
-    // axis orientation
-    public double XOrientation;
-    public double YOrientation;
-
-    // lengths of the units along each axis
-    public double XLen;
-    public double YLen;
   }
 
   public struct PDFGI_Point()
