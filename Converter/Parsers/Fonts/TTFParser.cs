@@ -240,7 +240,10 @@ namespace Converter.Parsers.Fonts
       ReadOnlySpan<byte> buffer = _buffer.AsSpan();
       if (_ttf.CmapFormat == 0)
       {
-        throw new NotImplementedException();
+        ushort len = ReadUInt16(ref buffer, _ttf.IndexMapOffset + 2);
+        if (unicodeCodepoint < len - 6)
+          return ReadByte(ref buffer, _ttf.IndexMapOffset + 6 + unicodeCodepoint);
+        return 0;
       } else if (_ttf.CmapFormat == 2)
       {
         throw new NotImplementedException();

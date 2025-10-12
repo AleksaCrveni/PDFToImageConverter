@@ -734,8 +734,8 @@ namespace Converter.Parsers.PDF
       TTFParser activeParser = activeFontData.Parser;
       int[] activeWidths = activeFontData.FontInfo.Widths;
       // skip for now 
-      if (activeFontData.Key == "F2.0")
-        return;
+      //if (activeFontData.Key == "F2.0")
+      //  return;
       // ascent and descent are defined in font descriptor, use those I think over getting i from  the font
       currentTextObject.TextMatrix[2, 0] = (positionAdjustment / 1000f) * currentTextObject.TextMatrix[0,0] + currentTextObject.TextMatrix[2, 0];
       for (int i = 0; i < textToTranslate.Length; i++)
@@ -789,12 +789,13 @@ namespace Converter.Parsers.PDF
         //kern = parser.GetCodepointKernAdvance(textToTranslate[i], textToTranslate[i + 1]);
         //x += (int)Math.Round(kern * scaleFactor);
         int idx = (int)textToTranslate[i] - activeFontData.FontInfo.FirstChar;
-        float width = activeWidths[idx] / 1000f;
-        //UpdateTextMatrixAfterGlyphRender(glyphWidth, glyphHeight, positionAdjustment);
+        float width = 0;
+        if (idx < activeWidths.Length)
+          width = activeWidths[idx] / 1000f;
+        else
+          width = activeFontData.FontInfo.FontDescriptor.MissingWidth;
         currentTextObject.TextMatrix[2, 0] = width * currentTextObject.TextMatrix[0, 0] + currentTextObject.TextMatrix[2, 0];
         currentTextObject.TextMatrix[2, 1] = 0 * currentTextObject.TextMatrix[1, 1] + currentTextObject.TextMatrix[2, 1];
-        //currentTextObject.TextMatrix[2, 0] += 20;
-        
       }
 
 
