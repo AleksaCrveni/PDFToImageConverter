@@ -4,6 +4,7 @@ using Converter.FileStructures.TTF;
 using Converter.Parsers.Fonts;
 using System.Diagnostics;
 using System.Globalization;
+using System.Reflection.Emit;
 using System.Text;
 
 namespace Converter.Parsers.PDF
@@ -49,8 +50,8 @@ namespace Converter.Parsers.PDF
     public PDFGOInterpreter(ReadOnlySpan<byte> contentBuffer, ref byte[] outputBuffer, ref PDF_ResourceDict resourceDict, List<PDF_FontData> fontInfo, ref Span<byte> fourByteSlice, (int W, int H) bitmapSize)
     {
       _buffer = contentBuffer;
-      intOperands = new Stack<int>(100);
-      realOperands = new Stack<double>(100);
+      intOperands = new Stack<int>();
+      realOperands = new Stack<double>();
       operandTypes = new Stack<OperandType>();
       arrayLengths = new Stack<int>();
       stringOperands = new Stack<string>();
@@ -138,11 +139,13 @@ namespace Converter.Parsers.PDF
             break;
 
           // special graphics states
+          // NOTE: This may not work with multiple cm, they may need to be stored and calculated at TJ
+          // because of order between different types of transformations
           case 0x71: // q
-            GSS.Push(currentGS);
+            GSS.Push(currentGS.DeepCopy());
             break;
           case 0x51: // Q
-            currentGS = GSS.Pop();
+            currentGS = GSS.Pop().DeepCopy();
             break;
           case 0x6d63: // cm
             // a b c e d f - real numbers but can be saved as ints
@@ -321,23 +324,37 @@ namespace Converter.Parsers.PDF
             Write(literal);
             break;
           case 0x4a54: // TJ
-            // placeholder
+            // TODO: This is very bad
+            // ~ I should actually load it into list while parsing arrays
+            // Load as a human
             if (operandTypes.Peek() == OperandType.ARRAY)
             {
               operandTypes.Pop();
               int arrLen = arrayLengths.Pop();
+              List<(string Literal, int PosCorrection)> literalsList = new List<(string, int)>();
+
+              
               for (int i = 0; i < arrLen; i++)
               {
+                operandTypes.Pop();// this should always pop string
+                literal = stringOperands.Pop();
                 int posCorrection = 0;
-                if (operandTypes.Peek() == OperandType.INT)
+                if (operandTypes.Count > 0 && operandTypes.Peek() == OperandType.INT)
                 {
-                  posCorrection = GetNextStackValAsInt();
+                  posCorrection = intOperands.Pop();
+                  operandTypes.Pop();
+                  i++;
                 }
-                Write(GetNextStackValAsString(), posCorrection);
+
+                literalsList.Add((literal, posCorrection));
+
               }
+              // read in proper order
+              for (int i = literalsList.Count -1 ; i >0; i--)
+                Write(literalsList[i].Literal, literalsList[i].PosCorrection);
             }
             else
-              Write(GetNextStackValAsString());
+              throw new Exception("Invalid TJ value!");
             break;
           case 0x27:   // '
           case 0x22:   // "
@@ -475,13 +492,9 @@ namespace Converter.Parsers.PDF
         {
           if (IsCurrentCharDigit() || _char == '-')
             GetNumber();
-
-          // is a name
-          if (_char == '/')
+          else if (_char == '/')
             GetName();
-
-          // string literal
-          if (_char == '(')
+          else if (_char == '(')
             GetStringLiteral();
 
           count++;
@@ -720,8 +733,11 @@ namespace Converter.Parsers.PDF
     {
       TTFParser activeParser = activeFontData.Parser;
       int[] activeWidths = activeFontData.FontInfo.Widths;
+      // skip for now 
+      if (activeFontData.Key == "F2.0")
+        return;
       // ascent and descent are defined in font descriptor, use those I think over getting i from  the font
-   
+      currentTextObject.TextMatrix[2, 0] = (positionAdjustment / 1000f) * currentTextObject.TextMatrix[0,0] + currentTextObject.TextMatrix[2, 0];
       for (int i = 0; i < textToTranslate.Length; i++)
       {
         ComputeTextRenderingMatrix();
@@ -731,16 +747,16 @@ namespace Converter.Parsers.PDF
         float scaleX = activeParser.ScaleForPixelHeight(matrixScaleX * currentTextObject.FontScaleFactor);
         float scaleY = activeParser.ScaleForPixelHeight(matrixScaleY * currentTextObject.FontScaleFactor);
 
-        rasterState.X = (int)(textRenderingMatrix[2, 0]);
+        rasterState.X = (int)(textRenderingMatrix[2, 0]) - (int)((positionAdjustment/ 1000f) * matrixScaleX);
         // because origin is bottom-left we have do bitmapHeight - , to get position on the top
         rasterState.Y = rasterState.BitmapHeight - (int)(textRenderingMatrix[2, 1]);
-        Debug.Assert(rasterState.X > 0, $"X is negative at index {i}");
-        Debug.Assert(rasterState.Y > 0, $"Y is negative at index {i}");
-        Debug.Assert(rasterState.X < rasterState.BitmapWidth, $"X must be within bounds.X: {rasterState.X} - Width: {rasterState.BitmapWidth}");
-        Debug.Assert(rasterState.Y < rasterState.BitmapHeight, $"Y must be within bounds.Y: {rasterState.Y} - Height: {rasterState.BitmapWidth}");
+        Debug.Assert(rasterState.X > 0, $"X is negative at index {i}. Lit: {textToTranslate}");
+        Debug.Assert(rasterState.Y > 0, $"Y is negative at index {i}. Lit: {textToTranslate}");
+        Debug.Assert(rasterState.X < rasterState.BitmapWidth, $"X must be within bounds.X: {rasterState.X} - Width: {rasterState.BitmapWidth}. Lit: {textToTranslate}");
+        Debug.Assert(rasterState.Y < rasterState.BitmapHeight, $"Y must be within bounds.Y: {rasterState.Y} - Height: {rasterState.BitmapWidth}. Lit: {textToTranslate}");
        
-        Debug.Assert(scaleX > 0, $"Scale factor X must be higher than 0! sfX: {scaleX}");
-        Debug.Assert(scaleY > 0, $"Scale factor Y must be higher than 0! sfY: {scaleY}");
+        Debug.Assert(scaleX > 0, $"Scale factor X must be higher than 0! sfX: {scaleX}. Lit: {textToTranslate}");
+        Debug.Assert(scaleY > 0, $"Scale factor Y must be higher than 0! sfY: {scaleY}. Lit: {textToTranslate}");
         int ascent = 0;
         int descent = 0;
         int lineGap = 0;
@@ -767,9 +783,6 @@ namespace Converter.Parsers.PDF
 
         int byteOffset = rasterState.X + (int)Math.Round(lsb * scaleX) + (y * rasterState.BitmapWidth);
         activeParser.MakeCodepointBitmap(ref outputBuffer, byteOffset, glyphWidth, glyphHeight, rasterState.BitmapWidth, scaleX, scaleY, textToTranslate[i]);
-        // advance x
-        rasterState.X += (int)Math.Round(ax * scaleX);
-
         // kerning
 
         //int kern;

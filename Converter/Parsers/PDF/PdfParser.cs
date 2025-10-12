@@ -95,7 +95,7 @@ namespace Converter.Parsers.PDF
       PDF_ResourceDict rDict = file.PageInformation[0].ResourceDict;
 
       byte[] outputBytes = new byte[width * height];
-      rawContent = File.ReadAllBytes(@"W:\PDFToImageConverter\Files\LittleContentSample.txt");
+      //rawContent = File.ReadAllBytes(@"W:\PDFToImageConverter\Files\LittleContentSample.txt");
       PDFGOInterpreter pdfGo = new PDFGOInterpreter(rawContent.AsSpan(), ref outputBytes, ref rDict, file.PageInformation[0].ResourceDict.Font, ref fourByteSlice, (width, height));
       pdfGo.ConvertToPixelData();
       List<string> lines = new List<string>();

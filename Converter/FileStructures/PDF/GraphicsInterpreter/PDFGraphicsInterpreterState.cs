@@ -1,4 +1,6 @@
-﻿namespace Converter.FileStructures.PDF.GraphicsInterpreter
+﻿using System.Security.Cryptography.X509Certificates;
+
+namespace Converter.FileStructures.PDF.GraphicsInterpreter
 {
   // this data specified in page descriptions
   // Table 52 + 53 
@@ -6,7 +8,9 @@
   {
     public GraphicsState()
     {
-
+      // double assignedmnet, fix later
+      CTM = new double[3,3];
+      BlendMode = new object[1];
     }
     // Device Independent
     public double[,] CTM;
@@ -36,6 +40,39 @@
     public object Halftone;
     public double Flatness;
     public double Smoothness;
+
+    public GraphicsState DeepCopy()
+    {
+      GraphicsState newGS = new GraphicsState();
+      newGS.CTM[0, 0] = this.CTM[0, 0];
+      newGS.CTM[0, 1] = this.CTM[0, 1];
+      newGS.CTM[0, 2] = this.CTM[0, 2];
+      newGS.CTM[1, 0] = this.CTM[1, 0];
+      newGS.CTM[1, 1] = this.CTM[1, 1];
+      newGS.CTM[1, 2] = this.CTM[1, 2];
+      newGS.CTM[2, 0] = this.CTM[2, 0];
+      newGS.CTM[2, 1] = this.CTM[2, 1];
+      newGS.CTM[2, 2] = this.CTM[2, 2];
+
+      // TODO: make sure these are coppied propely
+      newGS.ClippingPath = this.ClippingPath;
+      newGS.ColorSpaceInfo = this.ColorSpaceInfo;
+      newGS.Color = this.Color;
+      newGS.TextState = this.TextState;
+      newGS.LineWidth = this.LineWidth;
+      newGS.LineCap = this.LineCap;
+      newGS.LineJoin = this.LineJoin;
+      newGS.MiterLimit = this.MiterLimit;
+      newGS.DashPattern = this.DashPattern;
+      newGS.RenderingIntent = this.RenderingIntent;
+      newGS.StrokeAdjustment = this.StrokeAdjustment;
+      newGS.BlendMode = this.BlendMode;
+      newGS.SoftMask = this.SoftMask;
+      newGS.AlphaConstant = this.AlphaConstant;
+      newGS.AlphaSource = this.AlphaSource;
+
+      return newGS;
+    }
   }
 
   public struct PDFGI_DashPattern
