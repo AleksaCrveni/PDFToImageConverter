@@ -737,9 +737,12 @@ namespace Converter.Parsers.PDF
       //if (activeFontData.Key == "F2.0")
       //  return;
       // ascent and descent are defined in font descriptor, use those I think over getting i from  the font
-      currentTextObject.TextMatrix[2, 0] = (positionAdjustment / 1000f) * currentTextObject.TextMatrix[0,0] + currentTextObject.TextMatrix[2, 0];
+      currentTextObject.TextMatrix[2, 0] =  (-(positionAdjustment / 1000f) * currentTextObject.FontScaleFactor * currentTextObject.Th) + currentTextObject.TextMatrix[2, 0];
+      char c;
+      int baseline = 0;
       for (int i = 0; i < textToTranslate.Length; i++)
       {
+        c = textToTranslate[i];
         ComputeTextRenderingMatrix();
         float matrixScaleX = (float)textRenderingMatrix[0, 0];
         float matrixScaleY = (float)textRenderingMatrix[1, 1];
@@ -767,34 +770,47 @@ namespace Converter.Parsers.PDF
         int ax = 0; // charatcter width
         int lsb = 0; // left side bearing
 
-        activeParser.GetCodepointHMetrics(textToTranslate[i], ref ax, ref lsb);
+        activeParser.GetCodepointHMetrics(c, ref ax, ref lsb);
 
         int c_x0 = 0;
         int c_y0 = 0;
         int c_x1 = 0;
         int c_y1 = 0;
-        activeParser.GetCodepointBitmapBox(textToTranslate[i], scaleX, scaleY, ref c_x0, ref c_y0, ref c_x1, ref c_y1);
+        activeParser.GetCodepointBitmapBox(c, scaleX, scaleY, ref c_x0, ref c_y0, ref c_x1, ref c_y1);
 
         // char height - different than bounding box height
-        int y = ascent + c_y0 + rasterState.Y;
-
+        // NOTE: stb rasterizer is top-left origin, but pdf is bottom-left origin, so we have to adjust heigh
+        int y = rasterState.Y - (descent + ascent) + (ascent + c_y0);
+        //int y = rasterState.Y;
+        if (y < 0)
+          y = 0;
         int glyphWidth = c_x1 - c_x0; // I think that this should be replaced from value in Widths array
         int glyphHeight = c_y1 - c_y0;
 
         int byteOffset = rasterState.X + (int)Math.Round(lsb * scaleX) + (y * rasterState.BitmapWidth);
-        activeParser.MakeCodepointBitmap(ref outputBuffer, byteOffset, glyphWidth, glyphHeight, rasterState.BitmapWidth, scaleX, scaleY, textToTranslate[i]);
+        activeParser.MakeCodepointBitmap(ref outputBuffer, byteOffset, glyphWidth, glyphHeight, rasterState.BitmapWidth, scaleX, scaleY, c);
         // kerning
 
         //int kern;
         //kern = parser.GetCodepointKernAdvance(textToTranslate[i], textToTranslate[i + 1]);
         //x += (int)Math.Round(kern * scaleFactor);
-        int idx = (int)textToTranslate[i] - activeFontData.FontInfo.FirstChar;
+        int idx = (int)c - activeFontData.FontInfo.FirstChar;
         float width = 0;
         if (idx < activeWidths.Length)
           width = activeWidths[idx] / 1000f;
         else
-          width = activeFontData.FontInfo.FontDescriptor.MissingWidth;
-        currentTextObject.TextMatrix[2, 0] = width * currentTextObject.TextMatrix[0, 0] + currentTextObject.TextMatrix[2, 0];
+          width = activeFontData.FontInfo.FontDescriptor.MissingWidth / 1000f;
+
+        double advanceX = width * currentTextObject.FontScaleFactor + currentTextObject.Tc;
+        double advanceY = 0 + currentTextObject.FontScaleFactor; // when advance Y not 0? when fonts are vertical??
+        if (c == ' ')
+          advanceX += currentTextObject.Tw;
+        advanceX *= currentTextObject.Th;
+        // TODO: this really depends on what type of CTM it is. i.e is there shear, transaltion, rotation etc
+        // I should detect this and save state somewhere
+        // for now just support translate and scale
+        // NOTE: actually I think I can just multiply matrix, and this is done to avoid matrix multiplciation
+        currentTextObject.TextMatrix[2, 0] = advanceX * currentTextObject.TextMatrix[0, 0] + currentTextObject.TextMatrix[2, 0];
         currentTextObject.TextMatrix[2, 1] = 0 * currentTextObject.TextMatrix[1, 1] + currentTextObject.TextMatrix[2, 1];
       }
 
