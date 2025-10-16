@@ -1,12 +1,12 @@
 ﻿using Converter.FileStructures.TIFF;
 
-namespace Converter.Parsers.FileParsers
+namespace Converter.Rasterizers
 {
   // NOTE: FOR NOW JUST SUPPORT LITTLE ENDIAN
-  public class TIFFParser
+  public class STBTrueType
   {
     private static readonly int KB = 1024;
-    public TIFFParser()
+    public STBTrueType()
     {
 
     }
