@@ -522,13 +522,13 @@ namespace Converter.Parsers.PDF
       }
     }
     // can this be inlined?
-    private bool IsByteDigit(byte b)
+    public bool IsByteDigit(byte b)
     {
       if (b < 48 || b > 57)
         return false;
       return true;
     }
-    private bool IsCurrentByteDigit()
+    public bool IsCurrentByteDigit()
     {
       if (_char < 48 || _char > 57)
         return false;

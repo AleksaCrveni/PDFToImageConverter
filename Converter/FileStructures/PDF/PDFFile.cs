@@ -209,10 +209,36 @@ namespace Converter.FileStructures.PDF
     // is IR
     public PDF_FontDescriptor FontDescriptor;
     // can be name of dict, but just do enum for now
-    public PDF_EncodingInf Encoding;
+    public PDF_FontEncodingData EncodingData;
     public byte[] ToUnicode;
   }
- 
+
+  // Table 114
+  public class PDF_FontEncodingData
+  {
+    public PDF_FontEncodingType BaseEncoding;
+    public List<(int code, string val)> Differences;
+
+    public PDF_FontEncodingData()
+    {
+      Differences = new List<(int code, string val)>();
+    }
+    /// <summary>
+    /// Returns empty string if it doesn't exist
+    /// TODO: See if binary search would be faster here
+    /// </summary>
+    public string GetGlyphNameFromDifferences(int codepoint)
+    {
+      foreach ((int startCode, string val) in Differences)
+      {
+        if (startCode == codepoint)
+          return val;
+      };
+
+      return string.Empty;
+    }
+  }
+
   // Table 122
   public struct PDF_FontDescriptor
   {

@@ -98,7 +98,7 @@ namespace Tester
       
       Assert.IsTrue(tt2FI.SubType == PDF_FontType.TrueType);
       Assert.IsTrue(tt2FI.BaseFont == "QVIYZW+AvenirNext-Regular");
-      Assert.IsTrue(tt2FI.Encoding == PDF_EncodingInf.MacRomanEncoding);
+      Assert.IsTrue(tt2FI.EncodingData.BaseEncoding == PDF_FontEncodingType.MacRomanEncoding);
       Assert.IsTrue(tt2FI.FirstChar == 32);
       Assert.IsTrue(tt2FI.LastChar == 117);
       int[] tt2FIWidths = new int[117 - 32 + 1]
@@ -143,7 +143,7 @@ namespace Tester
 
       Assert.IsTrue(tt1FI.SubType == PDF_FontType.TrueType);
       Assert.IsTrue(tt1FI.BaseFont == "IJPPFY+AvenirNext-Medium");
-      Assert.IsTrue(tt1FI.Encoding == PDF_EncodingInf.MacRomanEncoding);
+      Assert.IsTrue(tt1FI.EncodingData.BaseEncoding == PDF_FontEncodingType.MacRomanEncoding);
       Assert.IsTrue(tt1FI.FirstChar == 32);
       Assert.IsTrue(tt1FI.LastChar == 118);
       int[] tt1FIWidths = new int[118 - 32 + 1]
@@ -362,7 +362,7 @@ namespace Tester
 
       Assert.IsTrue(tt2FI.SubType == PDF_FontType.TrueType);
       Assert.IsTrue(tt2FI.BaseFont == "QVIYZW+AvenirNext-Regular");
-      Assert.IsTrue(tt2FI.Encoding == PDF_EncodingInf.MacRomanEncoding);
+      Assert.IsTrue(tt2FI.EncodingData.BaseEncoding == PDF_FontEncodingType.MacRomanEncoding);
       Assert.IsTrue(tt2FI.FirstChar == 32);
       Assert.IsTrue(tt2FI.LastChar == 117);
       int[] tt2FIWidths = new int[117 - 32 + 1]
@@ -407,7 +407,7 @@ namespace Tester
 
       Assert.IsTrue(tt1FI.SubType == PDF_FontType.TrueType);
       Assert.IsTrue(tt1FI.BaseFont == "IJPPFY+AvenirNext-Medium");
-      Assert.IsTrue(tt1FI.Encoding == PDF_EncodingInf.MacRomanEncoding);
+      Assert.IsTrue(tt1FI.EncodingData.BaseEncoding == PDF_FontEncodingType.MacRomanEncoding);
       Assert.IsTrue(tt1FI.FirstChar == 32);
       Assert.IsTrue(tt1FI.LastChar == 118);
       int[] tt1FIWidths = new int[118 - 32 + 1]

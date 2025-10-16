@@ -43,7 +43,7 @@
     S
   }
 
-  public enum PDF_EncodingInf
+  public enum PDF_FontEncodingType
   {
     Null = 0,
     StandardEncoding,

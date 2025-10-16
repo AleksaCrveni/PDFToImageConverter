@@ -514,8 +514,6 @@ namespace Converter.Parsers.PDF
               ParseFontIRDictionary(file, irBuffer, false, ref fontData);
               file.Stream.Position = prevPos;
             }
-
-
             resourceDict.Font = fontData;
             break;
           case "ProcSet":
@@ -844,8 +842,37 @@ namespace Converter.Parsers.PDF
             fontInfo.FontDescriptor = fontDescriptor;
             break;
           case "Encoding":
-            //TODO: Fix later to support dictionaries as welll
-            fontInfo.Encoding = helper.GetNextName<PDF_EncodingInf>();
+            // can be either name of IR to dict
+            helper.SkipWhiteSpace();
+            int bytesRead = 0;
+            PDF_FontEncodingData encodingData = new PDF_FontEncodingData();
+            if (helper._char == '/')
+            {
+              PDF_FontEncodingType encType = helper.GetNextName<PDF_FontEncodingType>();
+              if (encType == PDF_FontEncodingType.Null)
+                throw new InvalidDataException("Invalid encoding name!");
+              encodingData.BaseEncoding = encType;
+            }
+            else
+            {
+              (int objectIndex, int b) IR = helper.GetNextIndirectReference();
+              long objectByteOffset = file.CrossReferenceEntries[IR.objectIndex].TenDigitValue;
+              long objectLength = GetDistanceToNextObject(IR.objectIndex, objectByteOffset, file);
+
+              // use array pool
+              Span<byte> irBuffer = new byte[objectLength];
+
+              long prevPos = file.Stream.Position;
+              file.Stream.Position = objectByteOffset;
+              bytesRead = file.Stream.Read(irBuffer);
+              // do i need this...?
+              if (irBuffer.Length != bytesRead)
+                throw new InvalidDataException("Invalid data");
+              ParseFontEncodingDictionary(file, irBuffer, ref encodingData);
+              file.Stream.Position = prevPos;
+            }
+
+            fontInfo.EncodingData = encodingData;
             break;
           case "ToUnicode":
             //TODO: fix, this is actually IR to stream
@@ -861,6 +888,13 @@ namespace Converter.Parsers.PDF
         if (helper._char == '>' && helper.IsCurrentCharacterSameAsNext())
           break;
         tokenString = helper.GetNextToken();
+
+
+        if (fontInfo.EncodingData.BaseEncoding == PDF_FontEncodingType.Null)
+        {
+          if (!((fontInfo.FontDescriptor.Flags & PDF_FontFlags.Symbolic) == PDF_FontFlags.Symbolic))
+            fontInfo.EncodingData.BaseEncoding = PDF_FontEncodingType.StandardEncoding;
+        }
       }
 
       //parse width if its IR
@@ -903,6 +937,62 @@ namespace Converter.Parsers.PDF
       
       if (tokenString == "")
         throw new InvalidDataException("Invalid dictionary");
+    }
+
+    private void ParseFontEncodingDictionary(PDFFile file, Span<byte> buffer, ref PDF_FontEncodingData data)
+    {
+      // default value is StandardFont for nonsymbolic and for symbolic fonts its fon's encoding
+      // so set null if it ssymbolic and not defined and later checked to skip it
+      // we will set correction in parent function because encoding might come before font dictionary
+      data.BaseEncoding = PDF_FontEncodingType.Null;
+      bool dictStartFound = false;
+      PDFSpanParseHelper helper = new PDFSpanParseHelper(ref buffer);
+      while (!dictStartFound)
+      {
+        helper.ReadUntilNonWhiteSpaceDelimiter();
+        if (helper._char == '<')
+          dictStartFound = helper.IsCurrentCharacterSameAsNext();
+      }
+
+      string tokenString = helper.GetNextToken();
+      while (tokenString != "")
+      {
+        switch (tokenString)
+        {
+          case "BaseEncoding":
+            data.BaseEncoding = helper.GetNextName<PDF_FontEncodingType>();
+            break;
+          case "Differences":
+            helper.ReadUntilNonWhiteSpaceDelimiter();
+            if (helper._char != '[')
+              throw new InvalidDataException("Invalid start of Differences Array!");
+            helper.ReadChar();
+            int lastIndex = 0;
+            helper.SkipWhiteSpace();
+            while (helper._char != ']' || helper._char == PDFConstants.NULL)
+            {
+
+              if (helper.IsCurrentByteDigit())
+                lastIndex = helper.GetNextInt32();
+              else if (helper._char == '/')
+              {
+
+                data.Differences.Add((lastIndex, helper.GetNextToken()));
+                lastIndex++;
+              }
+
+              helper.SkipWhiteSpace();
+            }
+            break;
+          default:
+            break;
+        }
+        helper.ReadUntilNonWhiteSpaceDelimiter();
+        if (helper._char == '>' && helper.IsCurrentCharacterSameAsNext())
+          break;
+        tokenString = helper.GetNextToken();
+      }
+
     }
 
     private void ParseFontDescriptor(PDFFile file, (int objectIndex, int _) objectPosition, ref PDF_FontDescriptor fontDescriptor)
