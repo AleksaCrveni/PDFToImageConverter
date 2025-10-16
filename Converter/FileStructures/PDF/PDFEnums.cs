@@ -45,10 +45,12 @@
 
   public enum PDF_EncodingInf
   {
-    Custom,
+    Null = 0,
+    StandardEncoding,
     MacRomanEncoding,
     MacExpertEncoding,
     WinAnsiEncoding,
+    SymbolSetEncoding
   }
 
   // Table 122
