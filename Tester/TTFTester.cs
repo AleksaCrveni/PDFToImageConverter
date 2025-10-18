@@ -1,4 +1,4 @@
-﻿using Converter.Parsers.Fonts;
+﻿using Converter.Rasterizers;
 using Converter.Writers.TIFF;
 
 namespace Tester
@@ -24,7 +24,7 @@ namespace Tester
     }
     public void Write(byte[] arr, int bitmapWidth, int bitmapHeight, int lineHeight, string textToTranslate, string imageName)
     {
-      TTFParser parser = new TTFParser();
+      STBTrueType parser = new STBTrueType();
       parser.Init(ref arr);
       parser.InitFont();
       byte[] bitmap = new byte[bitmapHeight * bitmapWidth];

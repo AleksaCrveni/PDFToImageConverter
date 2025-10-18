@@ -1,5 +1,5 @@
 ﻿using Converter;
-using Converter.Rasterizers;
+using Converter.Parsers.TIFF;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -14,14 +14,14 @@ namespace Tester
     [TestMethod]
     public void ParseTest()
     {
-      STBTrueType parser = new STBTrueType();
+      TIFFParser parser = new TIFFParser();
       parser.Parse(Files.BilevelTiff);
     }
 
     [TestMethod]
     public void ParseMyTiff()
     {
-      STBTrueType parser = new STBTrueType();
+      TIFFParser parser = new TIFFParser();
       parser.Parse(Files.CreateTestTiff);
     }
   }

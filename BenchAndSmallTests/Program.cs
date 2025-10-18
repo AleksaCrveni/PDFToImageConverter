@@ -1,8 +1,8 @@
 ﻿using BenchAndSmallTests;
 using BenchmarkDotNet.Running;
 using Converter;
-using Converter.Parsers.Fonts;
 using Converter.Parsers.PDF;
+using Converter.Rasterizers;
 using Converter.Writers;
 using Converter.Writers.TIFF;
 using Microsoft.Diagnostics.Tracing.Parsers.MicrosoftWindowsWPF;
@@ -90,7 +90,7 @@ using Microsoft.Diagnostics.Tracing.Parsers.MicrosoftWindowsWPF;
 
 // TODO: SEE WHY ASSERTS GET TRIGGERED SOMETIMES
 
-TTFParser parser = new TTFParser();
+STBTrueType parser = new STBTrueType();
 byte[] arr = File.ReadAllBytes(@"W:\\PDFToImageConverter\\Files\\F1.0FontInfoSample.txt");
 parser.Init(ref arr);
 int bitmapWidth = 612;
