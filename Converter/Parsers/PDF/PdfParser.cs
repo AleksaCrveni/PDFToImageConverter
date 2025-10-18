@@ -1,6 +1,6 @@
 ﻿using Converter.FileStructures;
 using Converter.FileStructures.PDF;
-using Converter.Parsers.Fonts;
+using Converter.Rasterizers;
 using Converter.Writers.TIFF;
 using System.Globalization;
 using System.IO;
@@ -720,7 +720,7 @@ namespace Converter.Parsers.PDF
       long objectByteOffset = 0;
       long objectLength = 0;
       PDF_FontData fd;
-      TTFParser ttfParser;
+      STBTrueType ttfParser;
 
       // make this larger in size so it can be reused, otherwise make new one
       // or maybe new one could be come main buffer since its bigger..??
@@ -735,7 +735,7 @@ namespace Converter.Parsers.PDF
           break;
         fontInfo = new PDF_FontInfo();
         fd = new PDF_FontData();
-        ttfParser = new TTFParser();
+        ttfParser = new STBTrueType();
         (int objectIndex, int _) IR = helper.GetNextIndirectReference();
         objectByteOffset = file.CrossReferenceEntries[IR.objectIndex].TenDigitValue;
         objectLength = GetDistanceToNextObject(IR.objectIndex, objectByteOffset, file);
@@ -888,13 +888,12 @@ namespace Converter.Parsers.PDF
         if (helper._char == '>' && helper.IsCurrentCharacterSameAsNext())
           break;
         tokenString = helper.GetNextToken();
+      }
 
-
-        if (fontInfo.EncodingData.BaseEncoding == PDF_FontEncodingType.Null)
-        {
-          if (!((fontInfo.FontDescriptor.Flags & PDF_FontFlags.Symbolic) == PDF_FontFlags.Symbolic))
-            fontInfo.EncodingData.BaseEncoding = PDF_FontEncodingType.StandardEncoding;
-        }
+      if (fontInfo.EncodingData.BaseEncoding == PDF_FontEncodingType.Null)
+      {
+        if (!((fontInfo.FontDescriptor.Flags & PDF_FontFlags.Symbolic) == PDF_FontFlags.Symbolic))
+          fontInfo.EncodingData.BaseEncoding = PDF_FontEncodingType.StandardEncoding;
       }
 
       //parse width if its IR

@@ -146,4 +146,11 @@
     Separation,
     DeviceN
   }
+
+  public enum PDF_FontEncodingSource
+  {
+    ENCODING,
+    CMAP
+  }
+
 }

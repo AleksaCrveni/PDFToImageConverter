@@ -1,4 +1,4 @@
-﻿using Converter.Parsers.Fonts;
+﻿using Converter.Rasterizers;
 
 namespace Converter.FileStructures.PDF
 {
@@ -191,7 +191,7 @@ namespace Converter.FileStructures.PDF
   {
     public string Key;
     public PDF_FontInfo FontInfo;
-    public TTFParser Parser;
+    public STBTrueType Parser;
   }
 
   // Table 111
