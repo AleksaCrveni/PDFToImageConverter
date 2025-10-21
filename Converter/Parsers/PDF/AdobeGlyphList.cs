@@ -56,14 +56,14 @@ namespace Converter.Parsers.PDF
     {
       // optimize this later
       List<KeyValuePair<string, List<int>>> list = new();
-      string[] lines = Resources.AdobeGlyphList.Split('\n');
-      for (int i = 43; i < lines.Length -1; i++)
+      string[] lines = Resources.AdobeGlyphList.Split("\n");
+      for (int i = 43; i < lines.Length -2; i++)
       {
         string[] splitRow = lines[i].Split(";");
         string[] unicodes = splitRow[1].Split(" ");
         List<int> unicodeValues = new List<int>();
-        for (int i = 0; i < unicodes.Length; i++)
-          unicodeValues.Add(Convert.ToInt16(unicodes[i], 16));
+        for (int j = 0; j < unicodes.Length; j++)
+          unicodeValues.Add(Convert.ToInt16(unicodes[j].Trim(), 16));
         list.Add(new KeyValuePair<string, List<int>>(splitRow[0], unicodeValues));
         _glyphs = FrozenDictionary.ToFrozenDictionary<string, List<int>>(list);
       }
