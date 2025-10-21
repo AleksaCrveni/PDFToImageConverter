@@ -1,11 +1,12 @@
 ﻿using Converter.FileStructures.PDF;
 using Converter.FileStructures.PDF.GraphicsInterpreter;
 using Converter.FileStructures.TTF;
-using Converter.Parsers.Fonts;
+using Converter.Rasterizers;
 using System.Diagnostics;
 using System.Globalization;
 using System.Reflection.Emit;
 using System.Text;
+using static System.Formats.Asn1.AsnWriter;
 
 namespace Converter.Parsers.PDF
 {
@@ -609,7 +610,7 @@ namespace Converter.Parsers.PDF
         ReadChar();
       }
 
-      stringOperands.Push(Encoding.Default.GetString(_buffer.Slice(startPos, _pos - startPos)));
+      stringOperands.Push(Encoding.UTF8.GetString(_buffer.Slice(startPos, _pos - startPos)));
       operandTypes.Push(OperandType.STRING);
       ReadChar(); // skip ')'
     }
@@ -731,42 +732,61 @@ namespace Converter.Parsers.PDF
 
     public void Write(string textToTranslate, int positionAdjustment = 0)
     {
-      TTFParser activeParser = activeFontData.Parser;
+      STBTrueType activeParser = activeFontData.Parser;
       int[] activeWidths = activeFontData.FontInfo.Widths;
       // skip for now 
       //if (activeFontData.Key == "F2.0")
       //  return;
       // ascent and descent are defined in font descriptor, use those I think over getting i from  the font
-      currentTextObject.TextMatrix[2, 0] =  (-(positionAdjustment / 1000f) * currentTextObject.FontScaleFactor * currentTextObject.Th) + currentTextObject.TextMatrix[2, 0];
+      currentTextObject.TextMatrix[2, 0] =  (-(positionAdjustment / 1000f) * currentGS.CTM[0,0] * currentTextObject.FontScaleFactor * currentTextObject.Th) + currentTextObject.TextMatrix[2, 0];
+
       char c;
+      int glyphIndex;
       int baseline = 0;
+      PDFTrueTypeFontHelper ttfHelper = new PDFTrueTypeFontHelper(activeFontData.Parser._buffer, ref activeFontData);
+      // int res = ttfHelper.GetGlyphFromEncoding('S');
       for (int i = 0; i < textToTranslate.Length; i++)
       {
         c = textToTranslate[i];
-        ComputeTextRenderingMatrix();
-        float matrixScaleX = (float)textRenderingMatrix[0, 0];
-        float matrixScaleY = (float)textRenderingMatrix[1, 1];
-        // not sure about these 2 for now
-        float scaleX = activeParser.ScaleForPixelHeight(matrixScaleX * currentTextObject.FontScaleFactor);
-        float scaleY = activeParser.ScaleForPixelHeight(matrixScaleY * currentTextObject.FontScaleFactor);
+        // TODO: use this instead of c, FIX 
+        (int glyphIndex, string glyphName) glyph = ttfHelper.GetGlyphInfo(c);
 
-        rasterState.X = (int)(textRenderingMatrix[2, 0]) - (int)((positionAdjustment/ 1000f) * matrixScaleX);
+        //glyphIndex = activeParser.FindGlyphIndex(c);
+        ComputeTextRenderingMatrix();
+        
+        rasterState.X = (int)(textRenderingMatrix[2, 0]) - (int)((positionAdjustment/ 1000f) * textRenderingMatrix[0, 0]); // this isn't quite right
         // because origin is bottom-left we have do bitmapHeight - , to get position on the top
         rasterState.Y = rasterState.BitmapHeight - (int)(textRenderingMatrix[2, 1]);
+
+        int idx = (int)c - activeFontData.FontInfo.FirstChar;
+        float width = 0;
+        if (idx < activeWidths.Length)
+          width = activeWidths[idx] / 1000f;
+        else
+          width = activeFontData.FontInfo.FontDescriptor.MissingWidth / 1000f;
+
+        (float scaleX, float scaleY) s = ttfHelper.GetScale(glyph.glyphIndex, textRenderingMatrix, width);
+        #region asserts
         Debug.Assert(rasterState.X > 0, $"X is negative at index {i}. Lit: {textToTranslate}");
         Debug.Assert(rasterState.Y > 0, $"Y is negative at index {i}. Lit: {textToTranslate}");
         Debug.Assert(rasterState.X < rasterState.BitmapWidth, $"X must be within bounds.X: {rasterState.X} - Width: {rasterState.BitmapWidth}. Lit: {textToTranslate}");
         Debug.Assert(rasterState.Y < rasterState.BitmapHeight, $"Y must be within bounds.Y: {rasterState.Y} - Height: {rasterState.BitmapWidth}. Lit: {textToTranslate}");
-       
-        Debug.Assert(scaleX > 0, $"Scale factor X must be higher than 0! sfX: {scaleX}. Lit: {textToTranslate}");
-        Debug.Assert(scaleY > 0, $"Scale factor Y must be higher than 0! sfY: {scaleY}. Lit: {textToTranslate}");
-        int ascent = 0;
-        int descent = 0;
-        int lineGap = 0;
-        activeParser.GetFontVMetrics(ref ascent, ref descent, ref lineGap);
-        ascent = (int)Math.Round(ascent * scaleY);
-        descent = (int)Math.Round(descent * scaleY);
+        Debug.Assert(s.scaleX > 0, $"Scale factor X must be higher than 0! sfX: {s.scaleX}. Lit: {textToTranslate}. Ind : {i}");
+        Debug.Assert(s.scaleY > 0, $"Scale factor Y must be higher than 0! sfY: {s.scaleY}. Lit: {textToTranslate}.Ind : {i}");
+        #endregion asserts
 
+       
+
+        
+        int ascent = activeFontData.FontInfo.FontDescriptor.Ascent;
+        int descent = activeFontData.FontInfo.FontDescriptor.Ascent;
+        int lineGap = 0;
+        // missing data in font descriptor, read from font
+        if (ascent == 0 || descent == 0)
+          activeParser.GetFontVMetrics(ref ascent, ref descent, ref lineGap);
+        ascent = (int)Math.Round(ascent * s.scaleY);
+        descent = (int)Math.Round(descent * s.scaleY);
+        lineGap = (int)Math.Round(lineGap * s.scaleY);
         int ax = 0; // charatcter width
         int lsb = 0; // left side bearing
 
@@ -776,7 +796,7 @@ namespace Converter.Parsers.PDF
         int c_y0 = 0;
         int c_x1 = 0;
         int c_y1 = 0;
-        activeParser.GetCodepointBitmapBox(c, scaleX, scaleY, ref c_x0, ref c_y0, ref c_x1, ref c_y1);
+        activeParser.GetCodepointBitmapBox(c, s.scaleX, s.scaleY, ref c_x0, ref c_y0, ref c_x1, ref c_y1);
 
         // char height - different than bounding box height
         // NOTE: stb rasterizer is top-left origin, but pdf is bottom-left origin, so we have to adjust heigh
@@ -787,19 +807,14 @@ namespace Converter.Parsers.PDF
         int glyphWidth = c_x1 - c_x0; // I think that this should be replaced from value in Widths array
         int glyphHeight = c_y1 - c_y0;
 
-        int byteOffset = rasterState.X + (int)Math.Round(lsb * scaleX) + (y * rasterState.BitmapWidth);
-        activeParser.MakeCodepointBitmap(ref outputBuffer, byteOffset, glyphWidth, glyphHeight, rasterState.BitmapWidth, scaleX, scaleY, c);
+        int byteOffset = rasterState.X + (int)Math.Round(lsb * s.scaleX) + (y * rasterState.BitmapWidth);
+        activeParser.MakeCodepointBitmap(ref outputBuffer, byteOffset, glyphWidth, glyphHeight, rasterState.BitmapWidth, s.scaleX, s.scaleY, c);
         // kerning
 
         //int kern;
         //kern = parser.GetCodepointKernAdvance(textToTranslate[i], textToTranslate[i + 1]);
         //x += (int)Math.Round(kern * scaleFactor);
-        int idx = (int)c - activeFontData.FontInfo.FirstChar;
-        float width = 0;
-        if (idx < activeWidths.Length)
-          width = activeWidths[idx] / 1000f;
-        else
-          width = activeFontData.FontInfo.FontDescriptor.MissingWidth / 1000f;
+        
 
         double advanceX = width * currentTextObject.FontScaleFactor + currentTextObject.Tc;
         double advanceY = 0 + currentTextObject.FontScaleFactor; // when advance Y not 0? when fonts are vertical??
@@ -810,7 +825,7 @@ namespace Converter.Parsers.PDF
         // I should detect this and save state somewhere
         // for now just support translate and scale
         // NOTE: actually I think I can just multiply matrix, and this is done to avoid matrix multiplciation
-        currentTextObject.TextMatrix[2, 0] = advanceX * currentTextObject.TextMatrix[0, 0] + currentTextObject.TextMatrix[2, 0];
+        currentTextObject.TextMatrix[2, 0] = advanceX * textRenderingMatrix[0, 0] + currentTextObject.TextMatrix[2, 0];
         currentTextObject.TextMatrix[2, 1] = 0 * currentTextObject.TextMatrix[1, 1] + currentTextObject.TextMatrix[2, 1];
       }
 

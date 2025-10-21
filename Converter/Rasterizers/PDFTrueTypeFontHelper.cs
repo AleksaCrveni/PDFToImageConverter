@@ -17,6 +17,7 @@ namespace Converter.Rasterizers
     private int[] _encodingArray;
     private TTF_Table_POST _ttfTablePOST;
     private TTF_Table_CMAP _ttfTableCMAP;
+    private float _unitsPerEm = 1000f; // used to covnert from glyph to text space, for ttf its 1/1000 default value
     public PDFTrueTypeFontHelper(byte[] rawFontProgram, ref PDF_FontData fontData)
     {
       _rawFontProgram = rawFontProgram;
@@ -30,13 +31,17 @@ namespace Converter.Rasterizers
     }
 
     // Page 274. Make this more robust, ok for basic start
-    public int GetGlyphFromEncoding(char c)
+    public (int glyphIndex, string glyphName) GetGlyphInfo(char c)
     {
       // GlyphName sometime may not be needed in TTF, but do it for now
       // 1. Get correct glyphname based on encoding
       // 2. Get glyphIndex of given glyphname
 
-      byte b = (byte)c;
+      // unicode values aren't always right?? bug? other converters treat � as DDFE, but its actually FFFD (??), some encoding is wrong on my side?
+      if ((int)c > 255)
+        c = ' ';
+      // single byte
+      byte b = (byte)(c & 255);
       // if its non symbolic font encdoing are mac or win, ther shouldn't be anything in the differences array (or it should be empty in code)
       
       // 1.
@@ -59,7 +64,7 @@ namespace Converter.Rasterizers
       {
         glyphIndex = GetGlyphIndexFromPostTable(glyphName);
         if (glyphIndex != 0)
-          return glyphIndex;
+          return (glyphIndex, glyphName);
       }
 
       // if not found check adobe list
@@ -68,13 +73,42 @@ namespace Converter.Rasterizers
       {
         // is this ok?
         char character = (char)unicodeValues[0];
-        if (_ttfTableCMAP.Format31 == -1)
-          ParseCmapTable();
+        if (_ttfTableCMAP == null)
+          _ttfTableCMAP = ParseCmapTable();
 
-       return GetGlyphIndexFromCmap(character, _ttfTableCMAP.Index31SubtableOffset, _ttfTableCMAP.Format31);
+        glyphIndex = GetGlyphIndexFromCmap(character, _ttfTableCMAP.Index31SubtableOffset, _ttfTableCMAP.Format31);
+        return (glyphIndex, glyphName);
       }
-      return 0;
+      return (0, "");
     }
+    // This has to be called for each character because of widths array, it may or may not be same as advance in hmtx table 
+    public (float scaleX, float scaleY) GetScale(int glyphIndex, double[,] textRenderingMatrix, float width)
+    {
+      int aw = 0;
+      int lsb = 0;
+      _ttfParser.GetGlyphHMetrics(glyphIndex, ref aw, ref lsb);
+
+      float advance = aw / _unitsPerEm;
+      float widthScale = width / advance;
+
+      // 1 x 1 space that can be scaled (glyph -> text space)
+      // later we will cache these values with unscaled vertex data and multiply on scale
+      // so we dont have to compute vertexes each time but can just scale
+      float scaleX = 1 / _unitsPerEm;
+      float scaleY = 1 / _unitsPerEm;
+
+      // scale advance
+      if (widthScale > 0)
+        scaleX *= widthScale;
+
+      // scale text -> device space
+      scaleX *= (float)textRenderingMatrix[0, 0];
+      scaleY *= (float)textRenderingMatrix[1, 1];
+
+      return (scaleX, scaleY);
+    }
+
+
     // TODO: not sure if this is implemented right, test tomorrow
     private int GetGlyphIndexFromPostTable(string glyphName)
     {
@@ -101,7 +135,16 @@ namespace Converter.Rasterizers
         }
 
         if (index == -1)
-          index = PDFEncodings.PostTableF1MacGlyphEncoding.Contains(glyphName) == true ? 1 : 0;
+        {
+          for (int i = 0; i < PDFEncodings.PostTableF1MacGlyphEncoding.Length; i++)
+          {
+            if (glyphName == PDFEncodings.PostTableF1MacGlyphEncoding[i])
+            {
+              index = i;
+              break;
+            }
+          }
+        }
 
         // now get the entry in the index
         for (int i = 0; i < _ttfTablePOST.GlyphNameIndexes.Length; i++)
@@ -331,11 +374,11 @@ namespace Converter.Rasterizers
         int maxGlyph = 257;
         for (int i = 0; i < numberOfGlyphs; i++)
         {
-          pos = pos + i * 2;
           glyphNameIndexes[i] = ReadSignedInt16(ref buffer, pos);
 
           if (glyphNameIndexes[i] > maxGlyph)
             maxGlyph = glyphNameIndexes[i];
+          pos += 2;
         }
 
         // max glyph are literal indexes (NOT OFFSETS), so maximum will be size of names string array

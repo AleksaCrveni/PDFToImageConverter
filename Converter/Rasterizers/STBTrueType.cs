@@ -1552,7 +1552,7 @@ namespace Converter.Rasterizers
               // two off-curv control points in a row means interpolate an on-curve midpoint
               if (wasOff)
               {
-                SetVertex(ref vertex, (byte)TTF_VMove.VCURVE, cx + x >> 1, cy + y >> 1, cx, cy);
+                SetVertex(ref vertex, (byte)TTF_VMove.VCURVE, (cx + x) >> 1, (cy + y) >> 1, cx, cy);
                 vertices[numOfVertices++] = vertex;
               }
                 cx = x;
