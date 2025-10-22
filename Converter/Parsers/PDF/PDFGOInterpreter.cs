@@ -738,7 +738,7 @@ namespace Converter.Parsers.PDF
       //if (activeFontData.Key == "F2.0")
       //  return;
       // ascent and descent are defined in font descriptor, use those I think over getting i from  the font
-      currentTextObject.TextMatrix[2, 0] =  (-(positionAdjustment / 1000f) * currentGS.CTM[0,0] * currentTextObject.FontScaleFactor * currentTextObject.Th) + currentTextObject.TextMatrix[2, 0];
+     
 
       char c;
       int glyphIndex;
@@ -807,14 +807,14 @@ namespace Converter.Parsers.PDF
         int glyphWidth = c_x1 - c_x0; // I think that this should be replaced from value in Widths array
         int glyphHeight = c_y1 - c_y0;
 
-        int byteOffset = rasterState.X + (int)Math.Round(lsb * s.scaleX) + (y * rasterState.BitmapWidth);
+        int byteOffset = rasterState.X + (y * rasterState.BitmapWidth);
         activeParser.MakeCodepointBitmap(ref outputBuffer, byteOffset, glyphWidth, glyphHeight, rasterState.BitmapWidth, s.scaleX, s.scaleY, c);
         // kerning
 
         //int kern;
         //kern = parser.GetCodepointKernAdvance(textToTranslate[i], textToTranslate[i + 1]);
         //x += (int)Math.Round(kern * scaleFactor);
-        
+
 
         double advanceX = width * currentTextObject.FontScaleFactor + currentTextObject.Tc;
         double advanceY = 0 + currentTextObject.FontScaleFactor; // when advance Y not 0? when fonts are vertical??
@@ -827,8 +827,8 @@ namespace Converter.Parsers.PDF
         // NOTE: actually I think I can just multiply matrix, and this is done to avoid matrix multiplciation
         currentTextObject.TextMatrix[2, 0] = advanceX * textRenderingMatrix[0, 0] + currentTextObject.TextMatrix[2, 0];
         currentTextObject.TextMatrix[2, 1] = 0 * currentTextObject.TextMatrix[1, 1] + currentTextObject.TextMatrix[2, 1];
+        
       }
-
 
     }
 
