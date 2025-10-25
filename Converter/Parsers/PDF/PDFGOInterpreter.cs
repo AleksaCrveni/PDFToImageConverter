@@ -325,20 +325,21 @@ namespace Converter.Parsers.PDF
             Write(literal);
             break;
           case 0x4a54: // TJ
-            // TODO: This is very bad
-            // ~ I should actually load it into list while parsing arrays
-            // Load as a human
+            //TODO: This is very bad
+            //~I should actually load it into list while parsing arrays
+            //  Load as a human
             if (operandTypes.Peek() == OperandType.ARRAY)
             {
               operandTypes.Pop();
               int arrLen = arrayLengths.Pop();
               List<(string Literal, int PosCorrection)> literalsList = new List<(string, int)>();
 
-              
+
               for (int i = 0; i < arrLen; i++)
               {
                 operandTypes.Pop();// this should always pop string
                 literal = stringOperands.Pop();
+
                 int posCorrection = 0;
                 if (operandTypes.Count > 0 && operandTypes.Peek() == OperandType.INT)
                 {
@@ -351,11 +352,9 @@ namespace Converter.Parsers.PDF
 
               }
               // read in proper order
-              for (int i = literalsList.Count -1 ; i >0; i--)
+              for (int i = literalsList.Count - 1; i >= 0; i--)
                 Write(literalsList[i].Literal, literalsList[i].PosCorrection);
             }
-            else
-              throw new Exception("Invalid TJ value!");
             break;
           case 0x27:   // '
           case 0x22:   // "
@@ -744,6 +743,7 @@ namespace Converter.Parsers.PDF
       int glyphIndex;
       int baseline = 0;
       PDFTrueTypeFontHelper ttfHelper = new PDFTrueTypeFontHelper(activeFontData.Parser._buffer, ref activeFontData);
+      currentTextObject.TextMatrix[2, 0] -= (positionAdjustment / 1000f) * currentTextObject.TextMatrix[0, 0] * currentTextObject.FontScaleFactor;
       // int res = ttfHelper.GetGlyphFromEncoding('S');
       for (int i = 0; i < textToTranslate.Length; i++)
       {
@@ -753,8 +753,9 @@ namespace Converter.Parsers.PDF
 
         //glyphIndex = activeParser.FindGlyphIndex(c);
         ComputeTextRenderingMatrix();
-        
-        rasterState.X = (int)(textRenderingMatrix[2, 0]) - (int)((positionAdjustment/ 1000f) * textRenderingMatrix[0, 0]); // this isn't quite right
+
+        // rounding makes it look a bit better?
+        rasterState.X = (int)MathF.Round((float)textRenderingMatrix[2, 0]);
         // because origin is bottom-left we have do bitmapHeight - , to get position on the top
         rasterState.Y = rasterState.BitmapHeight - (int)(textRenderingMatrix[2, 1]);
 
@@ -775,9 +776,6 @@ namespace Converter.Parsers.PDF
         Debug.Assert(s.scaleY > 0, $"Scale factor Y must be higher than 0! sfY: {s.scaleY}. Lit: {textToTranslate}.Ind : {i}");
         #endregion asserts
 
-       
-
-        
         int ascent = activeFontData.FontInfo.FontDescriptor.Ascent;
         int descent = activeFontData.FontInfo.FontDescriptor.Ascent;
         int lineGap = 0;
@@ -801,7 +799,7 @@ namespace Converter.Parsers.PDF
         // char height - different than bounding box height
         // NOTE: stb rasterizer is top-left origin, but pdf is bottom-left origin, so we have to adjust heigh
         int y = rasterState.Y - (descent + ascent) + (ascent + c_y0);
-        //int y = rasterState.Y;
+
         if (y < 0)
           y = 0;
         int glyphWidth = c_x1 - c_x0; // I think that this should be replaced from value in Widths array
