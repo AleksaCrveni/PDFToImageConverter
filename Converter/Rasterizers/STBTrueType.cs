@@ -1,6 +1,7 @@
 ﻿using Converter.FileStructures.General;
 using Converter.FileStructures.TTF;
 using System.Buffers.Binary;
+using System.ComponentModel.Design;
 using System.Diagnostics;
 
 namespace Converter.Rasterizers
@@ -327,6 +328,15 @@ namespace Converter.Rasterizers
       }
 
       return 0;
+    }
+
+    public void GetFontBoundingBox(ref int x0, ref int y0, ref int x1, ref int y1)
+    {
+      ReadOnlySpan<byte> buffer = _buffer.AsSpan();
+      x0 = (int)ReadSignedInt16(ref buffer, _ttf.Offsets.head.Position + 36);
+      y0 = (int)ReadSignedInt16(ref buffer, _ttf.Offsets.head.Position + 38);
+      x1 = (int)ReadSignedInt16(ref buffer, _ttf.Offsets.head.Position + 40);
+      y1 = (int)ReadSignedInt16(ref buffer, _ttf.Offsets.head.Position + 42);
     }
 
 
@@ -919,7 +929,6 @@ namespace Converter.Rasterizers
           edge = edges[eIndex];
         }
 
-        // Fix bug here, scanlines aren't filled properly
         if (activeEdges.Count > 0)
           FillActiveEdgesNewV2(scanline, scanline2, result.W, ref activeEdges, scanYTop);
 
@@ -1142,8 +1151,6 @@ namespace Converter.Rasterizers
       }
 
       // now sort the edges by their highest point (should snap to integer, and then by x)
-      //STBTT_sort(e, n, sizeof(e[0]), stbtt__edge_compare);
-      // DEBUG: here actual count is 19
       SortEdges(ref edges, n);
       
       // TODO:  scanelines rasterization for both V1 and V2
