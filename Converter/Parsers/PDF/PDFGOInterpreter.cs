@@ -797,8 +797,7 @@ namespace Converter.Parsers.PDF
         activeParser.GetCodepointBitmapBox(c, s.scaleX, s.scaleY, ref c_x0, ref c_y0, ref c_x1, ref c_y1);
 
         // char height - different than bounding box height
-        // NOTE: stb rasterizer is top-left origin, but pdf is bottom-left origin, so we have to adjust heigh
-        int y = rasterState.Y - (descent + ascent) + (ascent + c_y0);
+        int y = rasterState.Y + c_y0;
 
         if (y < 0)
           y = 0;
