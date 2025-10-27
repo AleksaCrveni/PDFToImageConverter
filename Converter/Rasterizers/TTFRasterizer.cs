@@ -7,7 +7,7 @@ using System.Text;
 
 namespace Converter.Rasterizers
 {
-  public class PDFTrueTypeFontHelper : IFontHelper
+  public class TTFRasterizer : IFontHelper
   {
     private byte[] _rawFontProgram;
     private STBTrueType _ttfParser;
@@ -18,7 +18,7 @@ namespace Converter.Rasterizers
     private TTF_Table_POST _ttfTablePOST;
     private TTF_Table_CMAP _ttfTableCMAP;
     private float _unitsPerEm = 1000f; // used to covnert from glyph to text space, for ttf its 1/1000 default value
-    public PDFTrueTypeFontHelper(byte[] rawFontProgram, ref PDF_FontData fontData)
+    public TTFRasterizer(byte[] rawFontProgram, ref PDF_FontData fontData)
     {
       _rawFontProgram = rawFontProgram;
       _fontData = fontData;
