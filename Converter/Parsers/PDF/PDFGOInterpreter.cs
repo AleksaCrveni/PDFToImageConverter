@@ -36,19 +36,15 @@ namespace Converter.Parsers.PDF
     private GraphicsState currentGS;
     private PDFGI_PathConstruction currentPC;
     private PDFGI_TextObject currentTextObject;
-    private List<PDF_FontData> _fontInfo;
     private Span<byte> _fourByteSlice;
     private PDF_ResourceDict _resourceDict;
     private long tokensParsed = 0; // for debugging
-    private byte[] outputBuffer;
-    private RasterState rasterState;
     private double[,] textRenderingMatrix;
     private double[,] reUsableMatrix1;
     private double[,] reUsableMatrix2;
-    private PDF_FontData activeFontData;
     private IConverter _converter;
     // TODO: maybe NULL check is redundant if we let it throw to end?
-    public PDFGOInterpreter(ReadOnlySpan<byte> contentBuffer, ref byte[] outputBuffer, ref PDF_ResourceDict resourceDict, List<PDF_FontData> fontInfo, ref Span<byte> fourByteSlice, (int W, int H) bitmapSize, IConverter converter)
+    public PDFGOInterpreter(ReadOnlySpan<byte> contentBuffer, ref PDF_ResourceDict resourceDict, ref Span<byte> fourByteSlice, IConverter converter)
     {
       _buffer = contentBuffer;
       intOperands = new Stack<int>();
@@ -60,14 +56,11 @@ namespace Converter.Parsers.PDF
       GSS = new Stack<GraphicsState>();
       currentGS = new GraphicsState();
       currentPC = new PDFGI_PathConstruction();
-      _fontInfo = fontInfo;
       _resourceDict = resourceDict;
-      this.outputBuffer = outputBuffer;
       // should be always 4 bytes
       if (fourByteSlice.Length != 4)
         throw new Exception("Four byte slice must be 4 in length!");
       _fourByteSlice = fourByteSlice;
-      rasterState = new RasterState(0,0, 0, bitmapSize.W, bitmapSize.H);
       textRenderingMatrix = new double[3,3];
       reUsableMatrix1 = new double[3, 3];
       reUsableMatrix2 = new double[3, 3];
@@ -272,15 +265,6 @@ namespace Converter.Parsers.PDF
           case 0x6654: // Tf
             currentTextObject.FontScaleFactor = GetNextStackValAsDouble();
             currentTextObject.FontRef = GetNextStackValAsString();
-
-            foreach (PDF_FontData fd in _fontInfo)
-            {
-              if (fd.Key == currentTextObject.FontRef)
-              {
-                activeFontData = fd;
-                break;
-              }
-            }
             break;
           case 0x7254: // Tr
             currentTextObject.TMode = GetNextStackValAsInt();
@@ -328,8 +312,7 @@ namespace Converter.Parsers.PDF
             state.CTM = currentGS.CTM;
             state.TextObject = currentTextObject;
             state.TextRenderingMatrix = textRenderingMatrix;
-            _converter.PDF_DrawText(activeFontData.Key, literal, state);
-            //Write(literal);
+            _converter.PDF_DrawText(currentTextObject.FontRef, literal, state);
             break;
           case 0x4a54: // TJ
             //TODO: This is very bad
@@ -366,10 +349,8 @@ namespace Converter.Parsers.PDF
               // read in proper order
               for (int i = literalsList.Count - 1; i >= 0; i--)
               {
-                _converter.PDF_DrawText(activeFontData.Key, literalsList[i].Literal, state, literalsList[i].PosCorrection);
-                //Write(literalsList[i].Literal, literalsList[i].PosCorrection);
-              }
-                
+                _converter.PDF_DrawText(currentTextObject.FontRef, literalsList[i].Literal, state, literalsList[i].PosCorrection);
+              } 
             }
             break;
           case 0x27:   // '
@@ -746,107 +727,6 @@ namespace Converter.Parsers.PDF
       currentGS.CTM[2, 1] = reUsableMatrix2[2, 1];
       currentGS.CTM[2, 2] = reUsableMatrix2[2, 2];
     }
-
-    public void Write(string textToTranslate, int positionAdjustment = 0)
-    {
-      // workaround, use IRasterizer in covnerter
-      TTFRasterizer activeParser = (TTFRasterizer)activeFontData.Rasterizer;
-      int[] activeWidths = activeFontData.FontInfo.Widths;
-      // skip for now 
-      //if (activeFontData.Key == "F2.0")
-      //  return;
-      // ascent and descent are defined in font descriptor, use those I think over getting i from  the font
-     
-
-      char c;
-      int glyphIndex;
-      int baseline = 0;
-      currentTextObject.TextMatrix[2, 0] -= (positionAdjustment / 1000f) * currentTextObject.TextMatrix[0, 0] * currentTextObject.FontScaleFactor;
-      // int res = ttfHelper.GetGlyphFromEncoding('S');
-      for (int i = 0; i < textToTranslate.Length; i++)
-      {
-        c = textToTranslate[i];
-        // TODO: use this instead of c, FIX 
-        (int glyphIndex, string glyphName) glyph = activeParser.GetGlyphInfo(c);
-
-        //glyphIndex = activeParser.FindGlyphIndex(c);
-        ComputeTextRenderingMatrix();
-
-        // rounding makes it look a bit better?
-        rasterState.X = (int)MathF.Round((float)textRenderingMatrix[2, 0]);
-        // because origin is bottom-left we have do bitmapHeight - , to get position on the top
-        rasterState.Y = rasterState.BitmapHeight - (int)(textRenderingMatrix[2, 1]);
-
-        int idx = (int)c - activeFontData.FontInfo.FirstChar;
-        float width = 0;
-        if (idx < activeWidths.Length)
-          width = activeWidths[idx] / 1000f;
-        else
-          width = activeFontData.FontInfo.FontDescriptor.MissingWidth / 1000f;
-
-        (float scaleX, float scaleY) s = activeParser.GetScale(glyph.glyphIndex, textRenderingMatrix, width);
-        #region asserts
-        Debug.Assert(rasterState.X > 0, $"X is negative at index {i}. Lit: {textToTranslate}");
-        Debug.Assert(rasterState.Y > 0, $"Y is negative at index {i}. Lit: {textToTranslate}");
-        Debug.Assert(rasterState.X < rasterState.BitmapWidth, $"X must be within bounds.X: {rasterState.X} - Width: {rasterState.BitmapWidth}. Lit: {textToTranslate}");
-        Debug.Assert(rasterState.Y < rasterState.BitmapHeight, $"Y must be within bounds.Y: {rasterState.Y} - Height: {rasterState.BitmapWidth}. Lit: {textToTranslate}");
-        Debug.Assert(s.scaleX > 0, $"Scale factor X must be higher than 0! sfX: {s.scaleX}. Lit: {textToTranslate}. Ind : {i}");
-        Debug.Assert(s.scaleY > 0, $"Scale factor Y must be higher than 0! sfY: {s.scaleY}. Lit: {textToTranslate}.Ind : {i}");
-        #endregion asserts
-
-        int ascent = activeFontData.FontInfo.FontDescriptor.Ascent;
-        int descent = activeFontData.FontInfo.FontDescriptor.Ascent;
-        int lineGap = 0;
-        // missing data in font descriptor, read from font
-        if (ascent == 0 || descent == 0)
-          activeParser.GetFontVMetrics(ref ascent, ref descent, ref lineGap);
-        ascent = (int)Math.Round(ascent * s.scaleY);
-        descent = (int)Math.Round(descent * s.scaleY);
-        lineGap = (int)Math.Round(lineGap * s.scaleY);
-        int ax = 0; // charatcter width
-        int lsb = 0; // left side bearing
-
-        activeParser.GetCodepointHMetrics(c, ref ax, ref lsb);
-
-        int c_x0 = 0;
-        int c_y0 = 0;
-        int c_x1 = 0;
-        int c_y1 = 0;
-        activeParser.GetCodepointBitmapBox(c, s.scaleX, s.scaleY, ref c_x0, ref c_y0, ref c_x1, ref c_y1);
-
-        // char height - different than bounding box height
-        int y = rasterState.Y + c_y0;
-
-        if (y < 0)
-          y = 0;
-        int glyphWidth = c_x1 - c_x0; // I think that this should be replaced from value in Widths array
-        int glyphHeight = c_y1 - c_y0;
-
-        int byteOffset = rasterState.X + (y * rasterState.BitmapWidth);
-        activeParser.MakeCodepointBitmap(ref outputBuffer, byteOffset, glyphWidth, glyphHeight, rasterState.BitmapWidth, s.scaleX, s.scaleY, c);
-        // kerning
-
-        //int kern;
-        //kern = parser.GetCodepointKernAdvance(textToTranslate[i], textToTranslate[i + 1]);
-        //x += (int)Math.Round(kern * scaleFactor);
-
-
-        double advanceX = width * currentTextObject.FontScaleFactor + currentTextObject.Tc;
-        double advanceY = 0 + currentTextObject.FontScaleFactor; // when advance Y not 0? when fonts are vertical??
-        if (c == ' ')
-          advanceX += currentTextObject.Tw;
-        advanceX *= currentTextObject.Th;
-        // TODO: this really depends on what type of CTM it is. i.e is there shear, transaltion, rotation etc
-        // I should detect this and save state somewhere
-        // for now just support translate and scale
-        // NOTE: actually I think I can just multiply matrix, and this is done to avoid matrix multiplciation
-        currentTextObject.TextMatrix[2, 0] = advanceX * textRenderingMatrix[0, 0] + currentTextObject.TextMatrix[2, 0];
-        currentTextObject.TextMatrix[2, 1] = 0 * currentTextObject.TextMatrix[1, 1] + currentTextObject.TextMatrix[2, 1];
-        
-      }
-
-    }
-
   }
 
   public enum OperandType
