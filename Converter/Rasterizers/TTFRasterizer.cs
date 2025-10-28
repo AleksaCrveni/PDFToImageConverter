@@ -1,33 +1,227 @@
-﻿using Converter.FileStructures.PDF;
+﻿using Converter.FileStructures.General;
+using Converter.FileStructures.PDF;
 using Converter.FileStructures.TTF;
 using Converter.Parsers.PDF;
 using Converter.StaticData;
-using System.Buffers.Binary;
 using System.Text;
 
 namespace Converter.Rasterizers
 {
-  public class TTFRasterizer : IFontHelper
+  public class TTFRasterizer : STBRasterizer, IRasterizer
   {
-    private byte[] _rawFontProgram;
-    private STBTrueType _ttfParser;
-    private PDF_FontData _fontData;
+    private PDF_FontInfo _fontInfo;
     private PDF_FontEncodingData _encodingData;
     private PDF_FontEncodingSource _encodingSource;
     private int[] _encodingArray;
     private TTF_Table_POST _ttfTablePOST;
     private TTF_Table_CMAP _ttfTableCMAP;
     private float _unitsPerEm = 1000f; // used to covnert from glyph to text space, for ttf its 1/1000 default value
-    public TTFRasterizer(byte[] rawFontProgram, ref PDF_FontData fontData)
+    public TTFRasterizer(byte[] rawFontProgram, ref PDF_FontInfo fontInfo) : base (rawFontProgram)
     {
-      _rawFontProgram = rawFontProgram;
-      _fontData = fontData;
-      _encodingData = fontData.FontInfo.EncodingData;
+      _fontInfo = fontInfo;
+      _encodingData = fontInfo.EncodingData;
 
-      _ttfParser = new STBTrueType();
-      _ttfParser.Init(ref _rawFontProgram);
-      _ttfParser.InitFont();
+      InitFont(); // should be called in derived class??
       SetCorrectEncoding();
+   
+    }
+
+    protected override void InitFont()
+    {
+      ReadOnlySpan<byte> buffer = _buffer.AsSpan();
+      FontDirectory fd = new FontDirectory();
+      TableOffsets tOff = new TableOffsets();
+      int mainPos = 0;
+      uint scalarType = ReadUInt32(ref buffer, mainPos);
+      mainPos += 4;
+      fd.ScalarType = scalarType switch
+      {
+        // true
+        0x00010000 => TTF_ScalarType.True,
+        0x74727565 => TTF_ScalarType.True,
+        0x4F54544F => TTF_ScalarType.Otto,
+        0x74797031 => TTF_ScalarType.Typ1,
+        _ => throw new InvalidDataException("Invalid scalar type in the embedded true font!")
+      };
+
+      fd.NumTables = ReadUInt16(ref buffer, mainPos);
+      fd.SearchRange = ReadUInt16(ref buffer, mainPos + 2);
+      fd.EntrySelector = ReadUInt16(ref buffer, mainPos + 4);
+      fd.RangeShift = ReadUInt16(ref buffer, mainPos + 6);
+      mainPos += 8;
+
+      uint tag = 0;
+      uint checkSum = 0;
+      uint offset = 0;
+      uint length;
+      uint pad = 0;
+      uint computedCheckSum = 0;
+      FakeSpan tableBuffer;
+      // TODO: Optimize to do binary search?
+      for (int i = 0; i < fd.NumTables; i++)
+      {
+        tag = ReadUInt32(ref buffer, mainPos);
+        checkSum = ReadUInt32(ref buffer, mainPos + 4);
+        // offset from beggning of sfnt , thats why we add here
+        offset = ReadUInt32(ref buffer, mainPos + 4 + 4) + (uint)_beginOfSfnt;
+        // does not include padded bytes, so i want to include them as well to stay on long boundary
+        // and tight as possible 
+        length = ReadUInt32(ref buffer, mainPos + 4 + 4 + 4);
+        mainPos += 16;
+        pad = length % 4;
+        length += pad;
+
+        // case {num} where num is uint32 representation of 4 byte string that represent table tag
+        // did this so I don't allocate string when comparing 
+        tableBuffer = new FakeSpan((int)offset, (int)length);
+
+        switch (tag)
+        {
+          // cmap
+          case 1668112752:
+            tOff.cmap = tableBuffer;
+            break;
+          // glyf
+          case 1735162214:
+            tOff.glyf = tableBuffer;
+            break;
+          // head
+          case 1751474532:
+            tOff.head = tableBuffer;
+            break;
+          // hhea
+          case 1751672161:
+            tOff.hhea = tableBuffer;
+            break;
+          // hmtx
+          case 1752003704:
+            tOff.hmtx = tableBuffer;
+            break;
+          // loca
+          case 1819239265:
+            tOff.loca = tableBuffer;
+            break;
+          // maxp
+          case 1835104368:
+            tOff.maxp = tableBuffer;
+            break;
+          // name
+          case 1851878757:
+            tOff.name = tableBuffer;
+            break;
+          // post
+          case 1886352244:
+            tOff.post = tableBuffer;
+            break;
+          // cvt 
+          case 1668707360:
+            tOff.cvt = tableBuffer;
+            break;
+          // fpgm - don't need this for now i Think
+          case 1718642541:
+            tOff.fpgm = tableBuffer;
+            break;
+          // hdmx 
+          case 1751412088:
+            tOff.hdmx = tableBuffer;
+            break;
+          // kern 
+          case 1801810542:
+            tOff.kern = tableBuffer;
+            break;
+          // OS/2 
+          case 1330851634:
+            tOff.OS_2 = tableBuffer;
+            break;
+          // prep 
+          case 1886545264:
+            tOff.prep = tableBuffer;
+            break;
+          // gpos
+          case 1196445523:
+            tOff.gpos = tableBuffer;
+            break;
+          default:
+            break;
+        }
+      }
+
+      // TODO: cmpa is needed only for non CIDFont dicts
+      if (
+        tOff.head.Length == 0 ||
+        tOff.hhea.Length == 0 ||
+        tOff.loca.Length == 0 ||
+        tOff.maxp.Length == 0 ||
+        tOff.cvt.Length == 0 ||
+        tOff.prep.Length == 0 ||
+        tOff.glyf.Length == 0 ||
+        tOff.hmtx.Length == 0 ||
+        tOff.fpgm.Length == 0 ||
+        tOff.cmap.Length == 0)
+      {
+        throw new InvalidDataException("Missing one of the required tables!");
+      }
+      ReadOnlySpan<byte> slice = buffer.Slice(tOff.maxp.Position, tOff.maxp.Length);
+      _ttf.NumOfGlyphs = ReadUInt16(ref slice, 4);
+      _ttf.Svg = -1; // ??
+      slice = buffer.Slice(tOff.cmap.Position, tOff.cmap.Length);
+      // Find number of cmap subtables and check encodings
+      ushort numOfCmapSubtables = ReadUInt16(ref slice, 2);
+      ReadOnlySpan<byte> encodingSubtable;
+      ushort platformID;
+      ushort platformSpecificID;
+      offset = 0;
+
+      _ttfTableCMAP = new TTF_Table_CMAP();
+      for (int i = 0; i < numOfCmapSubtables; i++)
+      {
+        // 4 -> skip cmap index, 8 is size of encoding subtable and there can be multiple
+        encodingSubtable = slice.Slice(4 + 8 * i, 8);
+        platformID = ReadUInt16(ref encodingSubtable, 0);
+        platformSpecificID = ReadUInt16(ref encodingSubtable, 2);
+        offset = ReadUInt32(ref encodingSubtable, 4);
+
+        // not sure if this check is even require need to be done here, stb_truetype only does this 
+        switch (platformID)
+        {
+          case (ushort)TTF_PlatformID.Microsoft:
+            switch (platformSpecificID)
+            {
+              case (ushort)TTF_MSPlatformSpecificID.MS_UnicodeBMP:
+                _ttf.IndexMapOffset = tOff.cmap.Position + (int)offset;
+                break;
+              case (ushort)TTF_MSPlatformSpecificID.MS_UnicodeFULL:
+                _ttfTableCMAP.Index31SubtableOffset = tOff.cmap.Position + (int)offset;
+                _ttf.IndexMapOffset = _ttfTableCMAP.Index31SubtableOffset;
+                break;
+
+            }
+            break;
+          case (ushort)TTF_PlatformID.Unicode:
+            _ttf.IndexMapOffset = tOff.cmap.Position + (int)offset;
+            break;
+          case (ushort)TTF_PlatformID.Macintosh:
+            _ttfTableCMAP.Index10SubtableOffset = tOff.cmap.Position + (int)offset;
+            _ttf.IndexMapOffset = _ttfTableCMAP.Index10SubtableOffset;
+            break;
+        }
+      }
+
+      if (_ttfTableCMAP.Index31SubtableOffset > 0)
+        _ttfTableCMAP.Format31 = ReadUInt16(ref buffer, _ttfTableCMAP.Index31SubtableOffset);
+
+      if (_ttfTableCMAP.Index10SubtableOffset > 0)
+        _ttfTableCMAP.Format10 = ReadUInt16(ref buffer, _ttfTableCMAP.Index10SubtableOffset);
+
+
+      if (_ttf.IndexMapOffset == 0)
+        throw new InvalidDataException("Missing index map!");
+      _ttf.CmapFormat = ReadUInt16(ref buffer, _ttf.IndexMapOffset);
+      slice = buffer.Slice(tOff.head.Position, tOff.head.Length);
+      _ttf.IndexToLocFormat = ReadUInt16(ref slice, 50);
+
+      _ttf.FontDirectory = fd;
+      _ttf.Offsets = tOff;
     }
 
     // Page 274. Make this more robust, ok for basic start
@@ -60,7 +254,7 @@ namespace Converter.Rasterizers
       // 2.
       int glyphIndex = 0;
       // first check if its post, if it  iseant read fyom Adobe Glyph List and cmap
-      if (_ttfParser._ttf.Offsets.post.Position != 0)
+      if (_ttf.Offsets.post.Position != 0)
       {
         glyphIndex = GetGlyphIndexFromPostTable(glyphName);
         if (glyphIndex != 0)
@@ -73,9 +267,6 @@ namespace Converter.Rasterizers
       {
         // is this ok?
         char character = (char)unicodeValues[0];
-        if (_ttfTableCMAP == null)
-          _ttfTableCMAP = ParseCmapTable();
-
         glyphIndex = GetGlyphIndexFromCmap(character, _ttfTableCMAP.Index31SubtableOffset, _ttfTableCMAP.Format31);
         return (glyphIndex, glyphName);
       }
@@ -86,7 +277,7 @@ namespace Converter.Rasterizers
     {
       int aw = 0;
       int lsb = 0;
-      _ttfParser.GetGlyphHMetrics(glyphIndex, ref aw, ref lsb);
+      GetGlyphHMetrics(glyphIndex, ref aw, ref lsb);
 
       float advance = aw / _unitsPerEm;
       float widthScale = width / advance;
@@ -163,7 +354,7 @@ namespace Converter.Rasterizers
     }
     private int GetGlyphIndexFromCmap(int unicodeCodepoint, int subTableOffset, int format)
     {
-      ReadOnlySpan<byte> buffer = _rawFontProgram.AsSpan().Slice(subTableOffset);
+      ReadOnlySpan<byte> buffer = _buffer.AsSpan().Slice(subTableOffset);
       int startOffset = 0;
       if (format == 0)
       {
@@ -267,11 +458,12 @@ namespace Converter.Rasterizers
       return 0;
     }
 
+    // TODO: remove redundant cmap code
     private void SetCorrectEncoding()
     {
       // I am not sure who much of all of this is needed
       // I know this is done in _ttfParser.InitFont() -- its ok for now, keep _ttfParser pure
-      ReadOnlySpan<byte> buffer = _rawFontProgram.AsSpan().Slice(_ttfParser._ttf.Offsets.cmap.Position, _ttfParser._ttf.Offsets.cmap.Length);
+      ReadOnlySpan<byte> buffer = _buffer.AsSpan().Slice(_ttf.Offsets.cmap.Position, _ttf.Offsets.cmap.Length);
       // Find number of cmap subtables and check encodings
       ushort numOfCmapSubtables = ReadUInt16(ref buffer, 2);
       ReadOnlySpan<byte> encodingSubtable;
@@ -303,11 +495,11 @@ namespace Converter.Rasterizers
             {
               case (ushort)TTF_MSPlatformSpecificID.MS_Symbol:
                 microsoft3_0Present = true;
-                microsoft3_0Offset = _ttfParser._ttf.Offsets.cmap.Position + (int)offset;
+                microsoft3_0Offset = _ttf.Offsets.cmap.Position + (int)offset;
                 break;
               case (ushort)TTF_MSPlatformSpecificID.MS_UnicodeBMP:
                 microsoft3_1Present = true;
-                microsoft3_1Offset = _ttfParser._ttf.Offsets.cmap.Position + (int)offset;
+                microsoft3_1Offset = _ttf.Offsets.cmap.Position + (int)offset;
                 break;
             }
             break;
@@ -316,7 +508,7 @@ namespace Converter.Rasterizers
             {
               case 1:
                 mac1_0Present = true;
-                mac1_0Offset = _ttfParser._ttf.Offsets.cmap.Position + (int)offset;
+                mac1_0Offset = _ttf.Offsets.cmap.Position + (int)offset;
                 break;
             }
             break;
@@ -348,9 +540,6 @@ namespace Converter.Rasterizers
         throw new InvalidDataException("Invalid font encoding!");
       }
 
-
-
-
     }
 
     #region table loaders
@@ -359,7 +548,7 @@ namespace Converter.Rasterizers
     private TTF_Table_POST ParsePostTable()
     {
       TTF_Table_POST t = new TTF_Table_POST();
-      ReadOnlySpan<byte> buffer = _rawFontProgram.AsSpan().Slice(_ttfParser._ttf.Offsets.post.Position, _ttfParser._ttf.Offsets.post.Length);
+      ReadOnlySpan<byte> buffer = _buffer.AsSpan().Slice(_ttf.Offsets.post.Position, _ttf.Offsets.post.Length);
       int format = ReadUInt16(ref buffer, 0); // 1, 2, 2.5, 3, 4
       t.Format = format;
       // Intial parsing only needed for second format
@@ -402,75 +591,12 @@ namespace Converter.Rasterizers
       return t;
     }
 
-    private TTF_Table_CMAP ParseCmapTable()
-    {
-      TTF_Table_CMAP t = new TTF_Table_CMAP();
-      ReadOnlySpan<byte> buffer = _rawFontProgram.AsSpan().Slice(_ttfParser._ttf.Offsets.cmap.Position, _ttfParser._ttf.Offsets.cmap.Length);
-      // Find number of cmap subtables and check encodings
-      ushort numOfCmapSubtables = ReadUInt16(ref buffer, 2);
-      ReadOnlySpan<byte> encodingSubtable;
-      ushort platformID;
-      ushort platformSpecificID;
-      uint offset = 0;
-      for (int i = 0; i < numOfCmapSubtables; i++)
-      {
-        // 4 -> skip cmap index, 8 is size of encoding subtable and there can be multiple
-        encodingSubtable = buffer.Slice(4 + 8 * i, 8);
-        platformID = ReadUInt16(ref encodingSubtable, 0);
-        platformSpecificID = ReadUInt16(ref encodingSubtable, 2);
-        offset = ReadUInt32(ref encodingSubtable, 4);
-
-        // not sure if this check is even require need to be done here, stb_truetype only does this 
-        switch (platformID)
-        {
-          case (ushort)TTF_PlatformID.Microsoft:
-            switch (platformSpecificID)
-            {
-              case (ushort)TTF_MSPlatformSpecificID.MS_UnicodeBMP:
-                t.Index31SubtableOffset = _ttfParser._ttf.Offsets.cmap.Position + (int)offset;
-                break;
-            }
-            break;
-          case (ushort)TTF_PlatformID.Macintosh:
-            t.Index10SubtableOffset = _ttfParser._ttf.Offsets.cmap.Position + (int)offset;
-            break;
-        }
-      }
-
-      if (t.Index31SubtableOffset > 0)
-        t.Format31 = ReadUInt16(ref buffer, t.Index31SubtableOffset);
-
-      if (t.Index10SubtableOffset > 0)
-        t.Format10 = ReadUInt16(ref buffer, t.Index10SubtableOffset);
-
-      return t;
-    }
     #endregion table loaders
 
     #region read helpers
     private string ReadStringOfSize(ref ReadOnlySpan<byte> buffer, int pos, int len)
     {
       return Encoding.Default.GetString(buffer.Slice(pos, len));
-    }
-
-    private uint ReadUInt32(ref ReadOnlySpan<byte> buffer, int pos)
-    {
-      return BinaryPrimitives.ReadUInt32BigEndian(buffer.Slice(pos, 4));
-    }
-    private int ReadSignedInt32(ref ReadOnlySpan<byte> buffer, int pos)
-    {
-      return BinaryPrimitives.ReadInt32BigEndian(buffer.Slice(pos, 4));
-    }
-
-    private ushort ReadUInt16(ref ReadOnlySpan<byte> buffer, int pos)
-    {
-      return BinaryPrimitives.ReadUInt16BigEndian(buffer.Slice(pos, 2));
-    }
-
-    private short ReadSignedInt16(ref ReadOnlySpan<byte> buffer, int pos)
-    {
-      return BinaryPrimitives.ReadInt16BigEndian(buffer.Slice(pos, 2));
-
     }
     #endregion read helpers
   }

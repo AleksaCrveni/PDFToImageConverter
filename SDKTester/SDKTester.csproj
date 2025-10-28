@@ -10,6 +10,7 @@
   <ItemGroup>
     <PackageReference Include="ceTe.DynamicPDF.Rasterizer.NET" Version="4.7.0" />
     <PackageReference Include="DynamicPDF" Version="8.0.0" />
+    <PackageReference Include="MuPDFCore" Version="2.0.1" />
   </ItemGroup>
 
   <ItemGroup>

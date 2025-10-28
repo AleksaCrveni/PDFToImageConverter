@@ -43,4 +43,11 @@
   {
 
   }
+
+  public class PDFGI_DrawState
+  {
+    public double[,] TextRenderingMatrix;
+    public double[,] CTM;
+    public PDFGI_TextObject TextObject;
+  }
 }

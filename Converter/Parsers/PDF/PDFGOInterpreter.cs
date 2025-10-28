@@ -1,12 +1,11 @@
-﻿using Converter.FileStructures.PDF;
+﻿using Converter.Converters;
+using Converter.FileStructures.PDF;
 using Converter.FileStructures.PDF.GraphicsInterpreter;
 using Converter.FileStructures.TTF;
 using Converter.Rasterizers;
 using System.Diagnostics;
 using System.Globalization;
-using System.Reflection.Emit;
 using System.Text;
-using static System.Formats.Asn1.AsnWriter;
 
 namespace Converter.Parsers.PDF
 {
@@ -47,8 +46,9 @@ namespace Converter.Parsers.PDF
     private double[,] reUsableMatrix1;
     private double[,] reUsableMatrix2;
     private PDF_FontData activeFontData;
+    private IConverter _converter;
     // TODO: maybe NULL check is redundant if we let it throw to end?
-    public PDFGOInterpreter(ReadOnlySpan<byte> contentBuffer, ref byte[] outputBuffer, ref PDF_ResourceDict resourceDict, List<PDF_FontData> fontInfo, ref Span<byte> fourByteSlice, (int W, int H) bitmapSize)
+    public PDFGOInterpreter(ReadOnlySpan<byte> contentBuffer, ref byte[] outputBuffer, ref PDF_ResourceDict resourceDict, List<PDF_FontData> fontInfo, ref Span<byte> fourByteSlice, (int W, int H) bitmapSize, IConverter converter)
     {
       _buffer = contentBuffer;
       intOperands = new Stack<int>();
@@ -71,6 +71,8 @@ namespace Converter.Parsers.PDF
       textRenderingMatrix = new double[3,3];
       reUsableMatrix1 = new double[3, 3];
       reUsableMatrix2 = new double[3, 3];
+
+      _converter = converter;
     }
     public void InitGS()
     {
@@ -322,7 +324,12 @@ namespace Converter.Parsers.PDF
           #region textShowing
           case 0x6a54: // Tj
             literal = GetNextStackValAsString();
-            Write(literal);
+            PDFGI_DrawState state = new PDFGI_DrawState();
+            state.CTM = currentGS.CTM;
+            state.TextObject = currentTextObject;
+            state.TextRenderingMatrix = textRenderingMatrix;
+            _converter.PDF_DrawText(activeFontData.Key, literal, state);
+            //Write(literal);
             break;
           case 0x4a54: // TJ
             //TODO: This is very bad
@@ -351,9 +358,18 @@ namespace Converter.Parsers.PDF
                 literalsList.Add((literal, posCorrection));
 
               }
+              // TODO: fix this, just a workaround
+              state = new PDFGI_DrawState();
+              state.CTM = currentGS.CTM;
+              state.TextObject = currentTextObject;
+              state.TextRenderingMatrix = textRenderingMatrix;
               // read in proper order
               for (int i = literalsList.Count - 1; i >= 0; i--)
-                Write(literalsList[i].Literal, literalsList[i].PosCorrection);
+              {
+                _converter.PDF_DrawText(activeFontData.Key, literalsList[i].Literal, state, literalsList[i].PosCorrection);
+                //Write(literalsList[i].Literal, literalsList[i].PosCorrection);
+              }
+                
             }
             break;
           case 0x27:   // '
@@ -433,6 +449,8 @@ namespace Converter.Parsers.PDF
         val = ReadNext();
         tokensParsed++;
       }
+
+      _converter.Save();
     }
     /// <summary>
     /// Read to next byte and see if its:
@@ -731,7 +749,8 @@ namespace Converter.Parsers.PDF
 
     public void Write(string textToTranslate, int positionAdjustment = 0)
     {
-      STBTrueType activeParser = activeFontData.Parser;
+      // workaround, use IRasterizer in covnerter
+      TTFRasterizer activeParser = (TTFRasterizer)activeFontData.Rasterizer;
       int[] activeWidths = activeFontData.FontInfo.Widths;
       // skip for now 
       //if (activeFontData.Key == "F2.0")
@@ -742,14 +761,13 @@ namespace Converter.Parsers.PDF
       char c;
       int glyphIndex;
       int baseline = 0;
-      PDFTrueTypeFontHelper ttfHelper = new PDFTrueTypeFontHelper(activeFontData.Parser._buffer, ref activeFontData);
       currentTextObject.TextMatrix[2, 0] -= (positionAdjustment / 1000f) * currentTextObject.TextMatrix[0, 0] * currentTextObject.FontScaleFactor;
       // int res = ttfHelper.GetGlyphFromEncoding('S');
       for (int i = 0; i < textToTranslate.Length; i++)
       {
         c = textToTranslate[i];
         // TODO: use this instead of c, FIX 
-        (int glyphIndex, string glyphName) glyph = ttfHelper.GetGlyphInfo(c);
+        (int glyphIndex, string glyphName) glyph = activeParser.GetGlyphInfo(c);
 
         //glyphIndex = activeParser.FindGlyphIndex(c);
         ComputeTextRenderingMatrix();
@@ -766,7 +784,7 @@ namespace Converter.Parsers.PDF
         else
           width = activeFontData.FontInfo.FontDescriptor.MissingWidth / 1000f;
 
-        (float scaleX, float scaleY) s = ttfHelper.GetScale(glyph.glyphIndex, textRenderingMatrix, width);
+        (float scaleX, float scaleY) s = activeParser.GetScale(glyph.glyphIndex, textRenderingMatrix, width);
         #region asserts
         Debug.Assert(rasterState.X > 0, $"X is negative at index {i}. Lit: {textToTranslate}");
         Debug.Assert(rasterState.Y > 0, $"Y is negative at index {i}. Lit: {textToTranslate}");

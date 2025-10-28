@@ -1,11 +1,11 @@
-﻿using Converter.FileStructures;
+﻿using Converter.Converters;
+using Converter.Converters.Image.TIFF;
+using Converter.FileStructures.General;
 using Converter.FileStructures.PDF;
 using Converter.Rasterizers;
 using Converter.Writers.TIFF;
 using System.Globalization;
-using System.IO;
 using System.IO.Compression;
-using System.Runtime.CompilerServices;
 using System.Text;
 namespace Converter.Parsers.PDF
 {
@@ -82,7 +82,7 @@ namespace Converter.Parsers.PDF
     private void ConvertPageDataToImage(PDFFile file)
     {
       byte[] rawContent = file.PageInformation[0].ContentDict.RawStreamData;
-      ITIFFWriter writer = new TIFFGrayscaleWriter("convertTest.tiff");
+      //ITIFFWriter writer = new TIFFGrayscaleWriter("convertTest.tiff");
       int width = (int)file.PageInformation[0].MediaBox.urX;
       int height = (int)file.PageInformation[0].MediaBox.urY;
       TIFFWriterOptions tiffOptions = new TIFFWriterOptions()
@@ -90,12 +90,16 @@ namespace Converter.Parsers.PDF
         Width = width,
         Height = height
       };
-      writer.WriteEmptyImage(ref tiffOptions);
+      //writer.WriteEmptyImage(ref tiffOptions);
       Span<byte> fourByteSlice = stackalloc byte[4];
       PDF_ResourceDict rDict = file.PageInformation[0].ResourceDict;
 
       byte[] outputBytes = new byte[width * height];
-      PDFGOInterpreter pdfGo = new PDFGOInterpreter(rawContent.AsSpan(), ref outputBytes, ref rDict, file.PageInformation[0].ResourceDict.Font, ref fourByteSlice, (width, height));
+
+      // TODO: make this later based on some mode, to be to convert to other file formats as well
+      // TODO: save in conveter later
+      IConverter converter = new TIFFGrayscaleConverter(rDict.Font, rDict, file.PageInformation[0], SourceConversion.PDF, new TIFFWriterOptions());
+      PDFGOInterpreter pdfGo = new PDFGOInterpreter(rawContent.AsSpan(), ref outputBytes, ref rDict, file.PageInformation[0].ResourceDict.Font, ref fourByteSlice, (width, height), converter);
       pdfGo.ConvertToPixelData();
       List<string> lines = new List<string>();
       for (int i = 0; i < outputBytes.Length; i++)
@@ -104,7 +108,7 @@ namespace Converter.Parsers.PDF
           lines.Add(i.ToString());
       }
       File.WriteAllLines(@"W:\PDFToImageConverter\Files\PDFGORes.txt", lines);
-      writer.WriteImageWithBuffer(ref tiffOptions, outputBytes);
+      //writer.WriteImageWithBuffer(ref tiffOptions, outputBytes);
     }
 
     // TODO: process resource and content in parallel?
@@ -719,7 +723,7 @@ namespace Converter.Parsers.PDF
       long objectByteOffset = 0;
       long objectLength = 0;
       PDF_FontData fd;
-      STBTrueType ttfParser;
+      IRasterizer ttfParser;
 
       // make this larger in size so it can be reused, otherwise make new one
       // or maybe new one could be come main buffer since its bigger..??
@@ -734,7 +738,6 @@ namespace Converter.Parsers.PDF
           break;
         fontInfo = new PDF_FontInfo();
         fd = new PDF_FontData();
-        ttfParser = new STBTrueType();
         (int objectIndex, int _) IR = helper.GetNextIndirectReference();
         objectByteOffset = file.CrossReferenceEntries[IR.objectIndex].TenDigitValue;
         objectLength = GetDistanceToNextObject(IR.objectIndex, objectByteOffset, file);
@@ -746,10 +749,11 @@ namespace Converter.Parsers.PDF
         ParseFontDictionary(file, irBuffer, ref fontInfo);
         fd.Key = key;
         fd.FontInfo = fontInfo;
+        // TODO: assume that data is filled ? 
+        // TODO: create right rasterized based on subtype and fontfile
 
-        ttfParser.Init(ref fontInfo.FontDescriptor.FontFile.CommonStreamInfo.RawStreamData);
-        ttfParser.InitFont();
-        fd.Parser = ttfParser;
+        IRasterizer rasterizer = new TTFRasterizer(fontInfo.FontDescriptor.FontFile.CommonStreamInfo.RawStreamData, ref fontInfo);
+        fd.Rasterizer = rasterizer;
         fontData.Add(fd);
         helper.ReadUntilNonWhiteSpaceDelimiter();
       }

@@ -460,7 +460,7 @@ namespace Converter.Writers.TIFF
 
   /// <summary> Options for TIFF Writer
   /// </summary>
-  public struct TIFFWriterOptions()
+  public class TIFFWriterOptions()
   {
     /// <summary>
     /// Declares wether TIFF Image should be written as BigEndian(MM) or LittleEndian(II)

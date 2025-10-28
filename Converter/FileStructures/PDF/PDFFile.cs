@@ -191,7 +191,7 @@ namespace Converter.FileStructures.PDF
   {
     public string Key;
     public PDF_FontInfo FontInfo;
-    public STBTrueType Parser;
+    public IRasterizer Rasterizer;
   }
 
   // Table 111
