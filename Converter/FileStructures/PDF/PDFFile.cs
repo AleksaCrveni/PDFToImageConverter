@@ -14,7 +14,7 @@ namespace Converter.FileStructures.PDF
     public List<PDF_PageTree> PageTrees { get; set; }
     public List<PDF_PageInfo> PageInformation { get; set; }
     public Stream Stream { get; set; }
-    public TargetConversion Target { get; set; }
+    public TargetConversion Target { get; set; } = TargetConversion.TIFF_GRAYSCALE;
   }
 
  

@@ -187,12 +187,16 @@ namespace Converter.Rasterizers
           case (ushort)TTF_PlatformID.Microsoft:
             switch (platformSpecificID)
             {
-              case (ushort)TTF_MSPlatformSpecificID.MS_UnicodeBMP:
-                _ttf.IndexMapOffset = tOff.cmap.Position + (int)offset;
+              case (ushort)TTF_MSPlatformSpecificID.MS_Symbol:
+                _ttfTableCMAP.Index30SubtableOffset = tOff.cmap.Position + (int)offset;
+                _ttf.IndexMapOffset = _ttfTableCMAP.Index30SubtableOffset;
                 break;
-              case (ushort)TTF_MSPlatformSpecificID.MS_UnicodeFULL:
+              case (ushort)TTF_MSPlatformSpecificID.MS_UnicodeBMP:
                 _ttfTableCMAP.Index31SubtableOffset = tOff.cmap.Position + (int)offset;
                 _ttf.IndexMapOffset = _ttfTableCMAP.Index31SubtableOffset;
+                break;
+              case (ushort)TTF_MSPlatformSpecificID.MS_UnicodeFULL:
+                _ttf.IndexMapOffset = tOff.cmap.Position + (int)offset;
                 break;
 
             }
@@ -201,11 +205,22 @@ namespace Converter.Rasterizers
             _ttf.IndexMapOffset = tOff.cmap.Position + (int)offset;
             break;
           case (ushort)TTF_PlatformID.Macintosh:
-            _ttfTableCMAP.Index10SubtableOffset = tOff.cmap.Position + (int)offset;
-            _ttf.IndexMapOffset = _ttfTableCMAP.Index10SubtableOffset;
+            switch (platformSpecificID)
+            {
+              case 0:
+                _ttfTableCMAP.Index10SubtableOffset = tOff.cmap.Position + (int)offset;
+                _ttf.IndexMapOffset = _ttfTableCMAP.Index10SubtableOffset;
+                break;
+              default:
+                _ttf.IndexMapOffset = tOff.cmap.Position + (int)offset;
+                break;
+            }
             break;
         }
       }
+
+      if (_ttfTableCMAP.Index30SubtableOffset > 0)
+        _ttfTableCMAP.Format30 = ReadUInt16(ref buffer, _ttfTableCMAP.Index30SubtableOffset);
 
       if (_ttfTableCMAP.Index31SubtableOffset > 0)
         _ttfTableCMAP.Format31 = ReadUInt16(ref buffer, _ttfTableCMAP.Index31SubtableOffset);
@@ -370,8 +385,7 @@ namespace Converter.Rasterizers
       else if (format == 4)
       {
         // std mapping for windows fonts: binary search collection of ranges (indexes are not tight as in format 6)
-        // TODO: instead of >> 1, just /2 ??
-        ushort segCount = (ushort)(ReadUInt16(ref buffer, subTableOffset + 6) >> 1); // >> 1 is basically / 2 
+        ushort segCount = (ushort)(ReadUInt16(ref buffer, subTableOffset + 6) >> 1);
         ushort searchRange = (ushort)(ReadUInt16(ref buffer, subTableOffset + 8) >> 1);
         ushort entrySelector = ReadUInt16(ref buffer, subTableOffset + 10);
         ushort rangeShift = (ushort)(ReadUInt16(ref buffer, subTableOffset + 12) >> 1);
@@ -458,64 +472,9 @@ namespace Converter.Rasterizers
       return 0;
     }
 
-    // TODO: remove redundant cmap code
     private void SetCorrectEncoding()
     {
-      // I am not sure who much of all of this is needed
-      // I know this is done in _ttfParser.InitFont() -- its ok for now, keep _ttfParser pure
-      ReadOnlySpan<byte> buffer = _buffer.AsSpan().Slice(_ttf.Offsets.cmap.Position, _ttf.Offsets.cmap.Length);
-      // Find number of cmap subtables and check encodings
-      ushort numOfCmapSubtables = ReadUInt16(ref buffer, 2);
-      ReadOnlySpan<byte> encodingSubtable;
-      ushort platformID;
-      ushort platformSpecificID;
-      uint offset = 0;
-
-      bool microsoft3_1Present = false;
-      int microsoft3_1Offset = 0;
-
-      bool microsoft3_0Present = false;
-      int microsoft3_0Offset = 0;
-
-      bool mac1_0Present = false;
-      int mac1_0Offset = 0;
-      for (int i = 0; i < numOfCmapSubtables; i++)
-      {
-        // 4 -> skip cmap index, 8 is size of encoding subtable and there can be multiple
-        encodingSubtable = buffer.Slice(4 + 8 * i, 8);
-        platformID = ReadUInt16(ref encodingSubtable, 0);
-        platformSpecificID = ReadUInt16(ref encodingSubtable, 2);
-        offset = ReadUInt32(ref encodingSubtable, 4);
-
-        // not sure if this check is even require need to be done here, stb_truetype only does this 
-        switch (platformID)
-        {
-          case (ushort)TTF_PlatformID.Microsoft:
-            switch (platformSpecificID)
-            {
-              case (ushort)TTF_MSPlatformSpecificID.MS_Symbol:
-                microsoft3_0Present = true;
-                microsoft3_0Offset = _ttf.Offsets.cmap.Position + (int)offset;
-                break;
-              case (ushort)TTF_MSPlatformSpecificID.MS_UnicodeBMP:
-                microsoft3_1Present = true;
-                microsoft3_1Offset = _ttf.Offsets.cmap.Position + (int)offset;
-                break;
-            }
-            break;
-          case (ushort)TTF_PlatformID.Macintosh:
-            switch (platformSpecificID)
-            {
-              case 1:
-                mac1_0Present = true;
-                mac1_0Offset = _ttf.Offsets.cmap.Position + (int)offset;
-                break;
-            }
-            break;
-        }
-      }
-
-      // CMAP SHOULD BE USED IF there is cmap dict and if there is encoidng then use encoding xdd
+      // CMAP SHOULD BE USED IF there is cmap dict and if there is encoidng then use encoding
       // set PDF_FontEncodingSource
       if (_encodingData.BaseEncoding == PDF_FontEncodingType.WinAnsiEncoding)
       {
