@@ -4,6 +4,7 @@ using Converter.FileStructures.General;
 using Converter.FileStructures.PDF;
 using Converter.Rasterizers;
 using Converter.Writers.TIFF;
+using System.Diagnostics;
 using System.Globalization;
 using System.IO.Compression;
 using System.Text;
@@ -44,10 +45,11 @@ namespace Converter.Parsers.PDF
     }
 
     // return some kind of struct
-    public PDFFile Parse(string filepath)
+    public PDFFile Parse(string filepath, ref PDF_Options options)
     {
       PDFFile file = new PDFFile();
       file.Stream = File.OpenRead(filepath);
+      file.Options = options;
       
       // go to end to find byte offset to cross refernce table
       
@@ -70,9 +72,15 @@ namespace Converter.Parsers.PDF
 
       PDFSpanParseHelper parseHelper = new PDFSpanParseHelper(ref footerBuffer);
       ParseTrailer(file, ref parseHelper);
-      // TODO use parsehelper dont seek and copy again
-      ParseLastCrossRefByteOffset(file);
-      ParseCrossReferenceTable(file);
+
+      // NOTE: It may already be set in Parse Trailer if xref is cross-reference stream
+      // because in that case trailer and xref dict are in one dictionary
+      if (file.LastCrossReferenceOffset == 0)
+      {
+        ParseLastCrossRefByteOffset(file);
+        ParseCrossReferenceTable(file);
+      }
+  
       ParseCatalogDictionary(file);
       ParseRootPageTree(file);
       ParsePagesData(file);
@@ -400,19 +408,22 @@ namespace Converter.Parsers.PDF
 
   
 
-    private void ParseResourceDictionary(PDFFile file, (int objIndex, int) objectPosition, ref PDF_ResourceDict resourceDict)
+    private void ParseResourceDictionary(PDFFile file, (int objIndex, int generation) objectPosition, ref PDF_ResourceDict resourceDict)
     {
-      int objectIndex = objectPosition.objIndex;
-      long objectByteOffset = file.CrossReferenceEntries[objectIndex].TenDigitValue;
-      long objectLength = GetDistanceToNextObject(objectIndex, objectByteOffset, file);
+      PDF_CRefEntry xRefEntry = GetXrefEntry(file, objectPosition.objIndex, objectPosition.generation);
+      long objectLength = GetDistanceToNextNormalObject(file, ref xRefEntry);
+      Span<byte> buffer = xRefEntry.EntryType == PDF_XrefEntryType.COMPRESSED
+        ? GetCompressedObjBuffer(file, ref xRefEntry, out int offset, out int len).AsSpan(offset, len)
+        : xRefEntry.EntryType == PDF_XrefEntryType.NORMAL
+          ? objectLength <= KB * 8 && file.Options.AllowStack
+            ? stackalloc byte[(int)objectLength]
+            : new byte[objectLength]
+          : Array.Empty<byte>();
 
-      // do it like this, operations should be same only difference is where underleying memory will be stored
-      Span<byte> buffer = objectLength <= KB * 8 ? stackalloc byte[(int)objectLength] : new byte[objectLength];
-      file.Stream.Position = objectByteOffset;
+      if (xRefEntry.EntryType == PDF_XrefEntryType.NORMAL)
+        GetNormalObjBuffer(file, xRefEntry, ref buffer);
+
       PDFSpanParseHelper helper = new PDFSpanParseHelper(ref buffer);
-      int readBytes = file.Stream.Read(buffer);
-      if (buffer.Length != readBytes)
-        throw new InvalidDataException("Invalid Data");
 
       bool dictStartFound = false;
       while (!dictStartFound)
@@ -446,19 +457,21 @@ namespace Converter.Parsers.PDF
             }
             else
             {
-              (int objectIndex, int b) IR = helper.GetNextIndirectReference();
-              objectByteOffset = file.CrossReferenceEntries[IR.objectIndex].TenDigitValue;
-              objectLength = GetDistanceToNextObject(IR.objectIndex, objectByteOffset, file);
+              (int objIndex, int generation) IR = helper.GetNextIndirectReference();
 
-              // use array pool
-              Span<byte> irBuffer = new byte[objectLength];
-
+              xRefEntry = GetXrefEntry(file, IR.objIndex, objectPosition.generation);
+              objectLength = GetDistanceToNextNormalObject(file, ref xRefEntry);
               long prevPos = file.Stream.Position;
-              file.Stream.Position = objectByteOffset;
-              readBytes = file.Stream.Read(irBuffer);
-              // do i need this...?
-              if (irBuffer.Length != readBytes)
-                throw new InvalidDataException("Invalid data");
+
+              Span<byte> irBuffer = xRefEntry.EntryType == PDF_XrefEntryType.COMPRESSED
+                ? GetCompressedObjBuffer(file, ref xRefEntry, out offset, out len).AsSpan(offset, len)
+                : xRefEntry.EntryType == PDF_XrefEntryType.NORMAL
+                  ?  new byte[objectLength]
+                  : Array.Empty<byte>();
+
+              if (xRefEntry.EntryType == PDF_XrefEntryType.NORMAL)
+                GetNormalObjBuffer(file, xRefEntry, ref irBuffer);
+
               ParseColorSpaceIRDictionary(file, irBuffer, false, ref csData);
               file.Stream.Position = prevPos;
             }
@@ -491,20 +504,18 @@ namespace Converter.Parsers.PDF
             else
             {
               (int objectIndex, int b) IR = helper.GetNextIndirectReference();
-              objectByteOffset = file.CrossReferenceEntries[IR.objectIndex].TenDigitValue;
-              objectLength = GetDistanceToNextObject(IR.objectIndex, objectByteOffset, file);
+              xRefEntry = GetXrefEntry(file, objectPosition.objIndex, objectPosition.generation);
+              objectLength = GetDistanceToNextNormalObject(file, ref xRefEntry);
+              Span<byte> irBuffer = xRefEntry.EntryType == PDF_XrefEntryType.COMPRESSED
+                ? GetCompressedObjBuffer(file, ref xRefEntry, out offset, out len).AsSpan(offset, len)
+                : xRefEntry.EntryType == PDF_XrefEntryType.NORMAL
+                  ? new byte[objectLength]
+                  : Array.Empty<byte>();
 
-              // use array pool
-              Span<byte> irBuffer = new byte[objectLength];
-              
-              long prevPos = file.Stream.Position;
-              file.Stream.Position = objectByteOffset;
-              readBytes = file.Stream.Read(irBuffer);
-              // do i need this...?
-              if (irBuffer.Length != readBytes)
-                throw new InvalidDataException("Invalid data");
+              if (xRefEntry.EntryType == PDF_XrefEntryType.NORMAL)
+                GetNormalObjBuffer(file, xRefEntry, ref irBuffer);
+
               ParseFontIRDictionary(file, irBuffer, false, ref fontData);
-              file.Stream.Position = prevPos;
             }
             resourceDict.Font = fontData;
             break;
@@ -528,16 +539,18 @@ namespace Converter.Parsers.PDF
         throw new InvalidDataException("Invalid dictionary");
     }
 
-    private void ParseColorSpaceStreamAndDictionary(PDFFile file, (int objectIndex, int _) objPosition, ref PDF_ColorSpaceDictionary dict)
+    private void ParseColorSpaceStreamAndDictionary(PDFFile file, (int objIndex, int generation) objectPosition, ref PDF_ColorSpaceDictionary dict)
     {
-      long objectByteOffset = file.CrossReferenceEntries[objPosition.objectIndex].TenDigitValue;
-      long objectLength = GetDistanceToNextObject(objPosition.objectIndex, objectByteOffset, file);
-      file.Stream.Position = objectByteOffset;
+      PDF_CRefEntry xRefEntry = GetXrefEntry(file, objectPosition.objIndex, objectPosition.generation);
+      long objectLength = GetDistanceToNextNormalObject(file, ref xRefEntry);
+      Span<byte> buffer = xRefEntry.EntryType == PDF_XrefEntryType.COMPRESSED
+        ? GetCompressedObjBuffer(file, ref xRefEntry, out int offset, out int len).AsSpan(offset, len)
+        : xRefEntry.EntryType == PDF_XrefEntryType.NORMAL
+          ? new byte[objectLength]
+          : Array.Empty<byte>();
 
-      Span<byte> buffer = new byte[objectLength];
-      int readBytes = file.Stream.Read(buffer);
-      if (readBytes != buffer.Length)
-        throw new InvalidDataException("Invalid ColorSpace dict and stream length!");
+      if (xRefEntry.EntryType == PDF_XrefEntryType.NORMAL)
+        GetNormalObjBuffer(file, xRefEntry, ref buffer);
 
       PDFSpanParseHelper helper = new PDFSpanParseHelper(ref buffer);
       bool startDictFound = false;
@@ -585,31 +598,13 @@ namespace Converter.Parsers.PDF
       if (tokenString == "")
         throw new InvalidDataException("Invalid dictionary");
 
-
-      //// Parse stream
-      //// do some checking to know entire stream is already loaded in buffer
-      //long encodedStreamLen = commonStreamDict.Length;
-      //if (encodedStreamLen + helper._position > buffer.Length)
-      //{
-      //  // full stream isn't loaded in the buffer so we have to load it
-      //  if (encodedStreamLen > buffer.Length)
-      //  {
-      //    // heap alloc if we can't reuse existing buffer
-      //    buffer = new byte[encodedStreamLen];
-      //  }
-      //  // set position after stream dict
-      //  file.Stream.Position = objectByteOffset + helper._position;
-      //  readBytes = file.Stream.Read(buffer);
-      //  if (readBytes == 0)
-      //    throw new InvalidDataException("Unexpected EOS!");
-      //  helper._position = 0;
-      //}
-      // go to next line
       helper.SkipNextToken(); // skip stream
       helper.SkipWhiteSpace(); // skip LF
       Span<byte> encodedSpan = buffer.Slice(helper._position, (int)commonStreamDict.Length);
       commonStreamDict.RawStreamData = DecodeFilter(ref encodedSpan, commonStreamDict.Filters);
-      File.WriteAllBytes("W:\\PDFToImageConverter\\Files\\ColorSpaceDecodedSample.txt", commonStreamDict.RawStreamData);
+#if DEBUG
+      File.WriteAllBytes(Path.Join(Files.RootFolder, "ColorSpaceDecodedSample.txt"), commonStreamDict.RawStreamData);
+#endif
       dict.CommonStreamDict = commonStreamDict;
     }
 
@@ -673,17 +668,21 @@ namespace Converter.Parsers.PDF
 
         PDF_ColorSpaceData cs = new PDF_ColorSpaceData();
         List<PDF_ColorSpaceInfo> csInfo = new List<PDF_ColorSpaceInfo>();
-        (int objectIndex, int _) IR = helper.GetNextIndirectReference();
-        objectByteOffset = file.CrossReferenceEntries[IR.objectIndex].TenDigitValue;
-        objectLength = GetDistanceToNextObject(IR.objectIndex, objectByteOffset, file);
-        Span<byte> irBuffer = objectLength <= mainBuffer.Length ? mainBuffer.Slice(0, (int)objectLength) : new byte[objectLength];
-        file.Stream.Position = objectByteOffset;
+        (int objIndex, int generation) IR = helper.GetNextIndirectReference();
+        PDF_CRefEntry xRefEntry = GetXrefEntry(file, IR.objIndex, IR.generation);
+        objectLength = GetDistanceToNextNormalObject(file, ref xRefEntry);
 
-        int bytesRead = file.Stream.Read(irBuffer);
-        if (bytesRead != irBuffer.Length)
-          throw new InvalidDataException("Invalid font dict lenght!");
+        Span<byte> irBuffer = xRefEntry.EntryType == PDF_XrefEntryType.COMPRESSED
+          ? GetCompressedObjBuffer(file, ref xRefEntry, out int offset, out int len).AsSpan(offset, len)
+          : xRefEntry.EntryType == PDF_XrefEntryType.NORMAL
+            ? objectLength <= mainBuffer.Length
+              ? mainBuffer.Slice(0, (int)objectLength)
+              : new byte[objectLength]
+          : Array.Empty<byte>();
 
-      
+        if (xRefEntry.EntryType == PDF_XrefEntryType.NORMAL)
+          GetNormalObjBuffer(file, xRefEntry, ref irBuffer);
+
         ParseColorSpaceIRArray(file, irBuffer, ref csInfo);
         cs.Key = key;
         cs.ColorSpaceInfo = csInfo;
@@ -727,14 +726,21 @@ namespace Converter.Parsers.PDF
           break;
         fontInfo = new PDF_FontInfo();
         fd = new PDF_FontData();
-        (int objectIndex, int _) IR = helper.GetNextIndirectReference();
-        objectByteOffset = file.CrossReferenceEntries[IR.objectIndex].TenDigitValue;
-        objectLength = GetDistanceToNextObject(IR.objectIndex, objectByteOffset, file);
-        Span<byte> irBuffer = objectLength <= mainBuffer.Length ? mainBuffer.Slice(0, (int)objectLength) : new byte[objectLength];
-        file.Stream.Position = objectByteOffset;
-        int bytesRead = file.Stream.Read(irBuffer);
-        if (bytesRead != irBuffer.Length)
-          throw new InvalidDataException("Invalid font dict lenght!");
+        (int objIndex, int generation) IR = helper.GetNextIndirectReference();
+        PDF_CRefEntry xRefEntry = GetXrefEntry(file, IR.objIndex, IR.generation);
+        objectLength = GetDistanceToNextNormalObject(file, ref xRefEntry);
+
+        Span<byte> irBuffer = xRefEntry.EntryType == PDF_XrefEntryType.COMPRESSED
+          ? GetCompressedObjBuffer(file, ref xRefEntry, out int offset, out int len).AsSpan(offset, len)
+          : xRefEntry.EntryType == PDF_XrefEntryType.NORMAL
+            ? objectLength <= mainBuffer.Length
+              ? mainBuffer.Slice(0, (int)objectLength)
+              : new byte[objectLength]
+          : Array.Empty<byte>();
+
+        if (xRefEntry.EntryType == PDF_XrefEntryType.NORMAL)
+          GetNormalObjBuffer(file, xRefEntry, ref irBuffer);
+
         ParseFontDictionary(file, irBuffer, ref fontInfo);
         fd.Key = key;
         fd.FontInfo = fontInfo;
@@ -774,8 +780,7 @@ namespace Converter.Parsers.PDF
       // I should parse IRs and then after function si done check if there are any IRs to be parsed
       // because it seems that data at IR can depend on that that comes after indirect refernce in parent dictionary
       // i.e first and last char can come after Widths arr
-      long widthsOffset = 0;
-      int widthsIndex = -1;
+      (int wIndex, int generation) widthIR = (-1, 0);
       int[] widthsArr;
       string tokenString = helper.GetNextToken();
       while (tokenString != "")
@@ -816,8 +821,7 @@ namespace Converter.Parsers.PDF
               fontInfo.Widths = widthsArr;
             } else if (char.IsDigit((char)helper._char))
             {
-              widthsIndex = helper.GetNextInt32();
-              widthsOffset = file.CrossReferenceEntries[widthsIndex].TenDigitValue;
+              widthIR = helper.GetNextIndirectReference();
             }
             else
             {
@@ -847,21 +851,19 @@ namespace Converter.Parsers.PDF
             }
             else
             {
-              (int objectIndex, int b) IR = helper.GetNextIndirectReference();
-              long objectByteOffset = file.CrossReferenceEntries[IR.objectIndex].TenDigitValue;
-              long objectLength = GetDistanceToNextObject(IR.objectIndex, objectByteOffset, file);
+              (int objIndex, int generation) IR = helper.GetNextIndirectReference();
+              PDF_CRefEntry xRefEntry = GetXrefEntry(file, IR.objIndex, IR.generation);
+              long objectLength = GetDistanceToNextNormalObject(file, ref xRefEntry);
+              Span<byte> irBuffer = xRefEntry.EntryType == PDF_XrefEntryType.COMPRESSED
+                ? GetCompressedObjBuffer(file, ref xRefEntry, out int offset, out int len).AsSpan(offset, len)
+                : xRefEntry.EntryType == PDF_XrefEntryType.NORMAL
+                  ? new byte[objectLength]
+                  : Array.Empty<byte>();
 
-              // use array pool
-              Span<byte> irBuffer = new byte[objectLength];
+              if (xRefEntry.EntryType == PDF_XrefEntryType.NORMAL)
+                GetNormalObjBuffer(file, xRefEntry, ref irBuffer);
 
-              long prevPos = file.Stream.Position;
-              file.Stream.Position = objectByteOffset;
-              bytesRead = file.Stream.Read(irBuffer);
-              // do i need this...?
-              if (irBuffer.Length != bytesRead)
-                throw new InvalidDataException("Invalid data");
               ParseFontEncodingDictionary(file, irBuffer, ref encodingData);
-              file.Stream.Position = prevPos;
             }
 
             fontInfo.EncodingData = encodingData;
@@ -889,17 +891,20 @@ namespace Converter.Parsers.PDF
       }
 
       //parse width if its IR
-      if (widthsOffset > 0)
+      if (widthIR.wIndex > -1)
       {
-        long objectLength = GetDistanceToNextObject(widthsIndex, widthsOffset, file);
-        Span<byte> irBuffer = new byte[objectLength];
+        PDF_CRefEntry xRefEntry = GetXrefEntry(file, widthIR.wIndex, widthIR.generation);
+        long objectLength = GetDistanceToNextNormalObject(file, ref xRefEntry);
+        Span<byte> irBuffer = xRefEntry.EntryType == PDF_XrefEntryType.COMPRESSED
+          ? GetCompressedObjBuffer(file, ref xRefEntry, out int offset, out int len).AsSpan(offset, len)
+          : xRefEntry.EntryType == PDF_XrefEntryType.NORMAL
+            ? new byte[objectLength]
+            : Array.Empty<byte>();
+
+        if (xRefEntry.EntryType == PDF_XrefEntryType.NORMAL)
+          GetNormalObjBuffer(file, xRefEntry, ref irBuffer);
+
         widthsArr = new int[fontInfo.LastChar - fontInfo.FirstChar + 1];
-        long currPos = file.Stream.Position;
-        file.Stream.Position = widthsOffset;
-        int bytesRead = file.Stream.Read(irBuffer);
-        if (bytesRead != objectLength)
-          throw new InvalidDataException("Invalid array for Widths field!");
-        file.Stream.Position = currPos;
         PDFSpanParseHelper irHelper = new PDFSpanParseHelper(ref irBuffer);
 
         irHelper.SkipNextToken(); // object id
@@ -986,17 +991,20 @@ namespace Converter.Parsers.PDF
 
     }
 
-    private void ParseFontDescriptor(PDFFile file, (int objectIndex, int _) objectPosition, ref PDF_FontDescriptor fontDescriptor)
+    private void ParseFontDescriptor(PDFFile file, (int objIndex, int generation) objectPosition, ref PDF_FontDescriptor fontDescriptor)
     {
-      int objectIndex = objectPosition.objectIndex;
-      long objectByteOffset = file.CrossReferenceEntries[objectIndex].TenDigitValue;
-      long objectLength = GetDistanceToNextObject(objectIndex, objectByteOffset, file);
-      Span<byte> buffer = new byte[objectLength];
+      PDF_CRefEntry xRefEntry = GetXrefEntry(file, objectPosition.objIndex, objectPosition.generation);
+      long objectLength = GetDistanceToNextNormalObject(file, ref xRefEntry);
+      Span<byte> buffer = xRefEntry.EntryType == PDF_XrefEntryType.COMPRESSED
+        ? GetCompressedObjBuffer(file, ref xRefEntry, out int offset, out int len).AsSpan(offset, len)
+        : xRefEntry.EntryType == PDF_XrefEntryType.NORMAL
+          ? new byte[objectLength]
+          : Array.Empty<byte>();
+
+      if (xRefEntry.EntryType == PDF_XrefEntryType.NORMAL)
+        GetNormalObjBuffer(file, xRefEntry, ref buffer);
+
       PDFSpanParseHelper helper = new PDFSpanParseHelper(ref buffer);
-      file.Stream.Position = objectByteOffset;
-      int readBytes = file.Stream.Read(buffer);
-      if (readBytes != objectLength)
-        throw new InvalidDataException("Invalid font descriptor dictionary.");
 
       bool dictStartFound = false;
       while (!dictStartFound)
@@ -1111,22 +1119,23 @@ namespace Converter.Parsers.PDF
 
     private void ParseRootPageTree(PDFFile file)
     {
-      int objectIndex = file.Catalog.PagesIR.Item1;
-      long objectByteOffset = file.CrossReferenceEntries[objectIndex].TenDigitValue;
-      long objectLength = GetDistanceToNextObject(objectIndex, objectByteOffset, file);
-      PDF_PageTree rootPageTree = new PDF_PageTree();
+      PDF_CRefEntry xRefEntry = GetXrefEntry(file, file.Catalog.PagesIR.Item1, file.Catalog.PagesIR.Item2);
+      long objectLength = GetDistanceToNextNormalObject(file, ref xRefEntry);
+      Span<byte> buffer = xRefEntry.EntryType == PDF_XrefEntryType.COMPRESSED
+        ? GetCompressedObjBuffer(file, ref xRefEntry, out int offset, out int len).AsSpan(offset, len)
+        : xRefEntry.EntryType == PDF_XrefEntryType.NORMAL
+          ? objectLength <= KB * 8 && file.Options.AllowStack
+            ? stackalloc byte[(int)objectLength]
+            : new byte[objectLength]
+          : Array.Empty<byte>();
 
-      Span<byte> buffer = objectLength <= KB * 8 ? stackalloc byte[(int)objectLength] : new byte[objectLength];
+      if (xRefEntry.EntryType == PDF_XrefEntryType.NORMAL)
+        GetNormalObjBuffer(file, xRefEntry, ref buffer);
 
+      PDFSpanParseHelper helper = new PDFSpanParseHelper(ref buffer);
       // make linked list or just flatten references????
       // ok for now just load all and store it, later be smarter
-      file.Stream.Position = objectByteOffset;
-      Span<byte> pageBuffer = stackalloc byte[(int)objectLength];
-      PDFSpanParseHelper helper = new PDFSpanParseHelper(ref pageBuffer);
-      int readBytes = file.Stream.Read(pageBuffer);
-      // do i need this...?
-      if (pageBuffer.Length != readBytes)
-        throw new InvalidDataException("Invalid data");
+      PDF_PageTree rootPageTree = new PDF_PageTree();
       FillRootPageTreeFrom(file, ref helper, ref rootPageTree);
     }
 
@@ -1192,20 +1201,20 @@ namespace Converter.Parsers.PDF
         throw new InvalidDataException("Invalid dictionary");
     }
     // THIS FILLS UP BOTH PAGEINFO AND PAGE TREE INFO
-    private void FillAllPageTreeAndInformation((int, int) kidPositionIR, List<PDF_PageTree> pageTrees, List<PDF_PageInfo> pages, PDFFile file)
+    private void FillAllPageTreeAndInformation((int objIndex, int generation) kidPositionIR, List<PDF_PageTree> pageTrees, List<PDF_PageInfo> pages, PDFFile file)
     {
-      long objectByteOffset = file.CrossReferenceEntries[kidPositionIR.Item1].TenDigitValue;
-      long objectLength = GetDistanceToNextObject(kidPositionIR.Item1, objectByteOffset, file);
+      PDF_CRefEntry xRefEntry = GetXrefEntry(file, kidPositionIR.objIndex, kidPositionIR.generation);
+      long objectLength = GetDistanceToNextNormalObject(file, ref xRefEntry);
+      Span<byte> buffer = xRefEntry.EntryType == PDF_XrefEntryType.COMPRESSED
+        ? GetCompressedObjBuffer(file, ref xRefEntry, out int offset, out int len).AsSpan(offset, len)
+        : xRefEntry.EntryType == PDF_XrefEntryType.NORMAL
+          ? new byte[objectLength]
+          : Array.Empty<byte>();
 
-      file.Stream.Position = objectByteOffset;
-      Span<byte> buffer = objectLength <= KB * 8 ? stackalloc byte[(int)objectLength] : new byte[objectLength];
-     
+      if (xRefEntry.EntryType == PDF_XrefEntryType.NORMAL)
+        GetNormalObjBuffer(file, xRefEntry, ref buffer);
+
       PDFSpanParseHelper helper = new PDFSpanParseHelper(ref buffer);
-      int readBytes = file.Stream.Read(buffer);
-      // do i need this...?
-      if (buffer.Length != readBytes)
-        throw new InvalidDataException("Invalid data");
-
       // start of dict
       bool dictStartFound = false;
       while (!dictStartFound)
@@ -1366,19 +1375,26 @@ namespace Converter.Parsers.PDF
     {
       // Instead of reading one by one to see where end is, get next object position and have that as length to load
       // Experimental!
-      int objectIndex = file.Trailer.RootIR.Item1;
-      long objectByteOffset = file.CrossReferenceEntries[objectIndex].TenDigitValue;
-      long objectLength = GetDistanceToNextObject(objectIndex, objectByteOffset, file);
+
+      PDF_CRefEntry xRefEntry = GetXrefEntry(file, file.Trailer.RootIR.Item1, file.Trailer.RootIR.Item2);
+      long objectLength = GetDistanceToNextNormalObject(file, ref xRefEntry);
+      Span<byte> buffer = xRefEntry.EntryType == PDF_XrefEntryType.COMPRESSED
+        ? GetCompressedObjBuffer(file, ref xRefEntry, out int offset, out int len).AsSpan(offset, len)
+        : xRefEntry.EntryType == PDF_XrefEntryType.NORMAL
+          ? objectLength <= KB * 8 && file.Options.AllowStack
+            ? stackalloc byte[(int)objectLength]
+            : new byte[objectLength]
+          : Array.Empty<byte>();
+
+      if (xRefEntry.EntryType == PDF_XrefEntryType.NORMAL)
+        GetNormalObjBuffer(file, xRefEntry, ref buffer);
+
+      PDFSpanParseHelper helper = new PDFSpanParseHelper(ref buffer);
+
       // if this is bigger 4096 or double that then do see to do some kind of different processing
       // I think that reading in bulk should be faster than reading 1 char by 1 from stream
       PDF_Catalog catalog = new PDF_Catalog();
-      file.Stream.Position = objectByteOffset;
-      Span<byte> buffer = objectLength <= KB * 8 ? stackalloc byte[(int)objectLength] : new byte[objectLength];
 
-      PDFSpanParseHelper helper = new PDFSpanParseHelper(ref buffer);
-      int readBytes = file.Stream.Read(buffer);
-      if (buffer.Length != readBytes)
-        throw new InvalidDataException("Invalid data");
       FillCatalog(ref helper, ref catalog);
 
       // we maybe read a bit more sicne we read last object diff so make sure we are in correct position
@@ -1542,18 +1558,27 @@ namespace Converter.Parsers.PDF
         entry = cRefEntries[i];
         entry.TenDigitValue = (long)ConvertBytesToUnsignedInt64(cRefEntryBuffer.Slice(0, 10));
         entry.GenerationNumber = ConvertBytesToUnsignedInt16(cRefEntryBuffer.Slice(11, 5));
+        entry.Index = i;
         byte entryType = cRefEntryBuffer[17];
         if (entryType != (byte)'n' && entryType != (byte)'f')
           throw new InvalidDataException("Invalid data");
-        entry.EntryType = entryType;
+        if (entryType == 'n')
+          entry.EntryType = PDF_XrefEntryType.NORMAL;
+        else
+          entry.EntryType = PDF_XrefEntryType.FREE;
         cRefEntries[i] = entry;
       }
 
       file.CrossReferenceEntries = cRefEntries;
     }
-    // TODO: test case when trailer is not complete ">>" can't be found after opening brackets
+    // TODO:   test case when trailer is not complete ">>" can't be found after opening brackets
     private void ParseTrailer(PDFFile file, ref PDFSpanParseHelper helper)
     {
+      // 1. Check if trailer exists
+      // 2. if its not found check at xref position if its cross reference stream
+      bool trailerFound = false;
+      List<PDF_CRefEntry> cRefEntry;
+      long xrefPos = 0;
       PDF_Trailer trailer = new PDF_Trailer();
 
       string tokenString = "-";
@@ -1561,6 +1586,7 @@ namespace Converter.Parsers.PDF
       {
         if (tokenString == "trailer")
         {
+          trailerFound = true;
           // is this needed, why dont I just get next token
           bool startOfDictFound = false;
           while (!startOfDictFound)
@@ -1570,6 +1596,7 @@ namespace Converter.Parsers.PDF
               startOfDictFound = helper.IsCurrentCharacterSameAsNext();
           }
           tokenString = helper.GetNextToken();
+          // put in separate function like parse TrailerDict or something similar
           while (tokenString != "")
           {
             switch (tokenString)
@@ -1606,11 +1633,177 @@ namespace Converter.Parsers.PDF
           if (tokenString == "")
             throw new InvalidDataException("Invalid dictionary");
           break;
-        }   
-        tokenString = helper.GetNextToken();
+        }
+        else if (tokenString == "startxref")
+        {
+          // should this be getnextlong?
+          xrefPos = helper.GetNextInt32();
+          break;
+        }
+        else
+        {
+          tokenString = helper.GetNextToken();
+        }
+          
       }
+
+      // trailer keyword not found, so that means its in cross-reference stream dictionary 7.5.8.1
+      if (!trailerFound)
+      {
+        if (xrefPos == 0)
+        {
+          ParseLastCrossRefByteOffset(file);
+          xrefPos = file.LastCrossReferenceOffset;
+        }
+        cRefEntry = new List<PDF_CRefEntry>();
+        ParseCrossReferenceStreamAndDict(file, xrefPos, ref trailer, cRefEntry);
+        file.CrossReferenceEntries = cRefEntry;
+      }
+
+      file.LastCrossReferenceOffset = xrefPos;
       file.Trailer = trailer;
     }
+
+    public void ParseCrossReferenceStreamAndDict(PDFFile file, long xrefOffset, ref PDF_Trailer trailer, List<PDF_CRefEntry> cRefEntry) 
+    {
+      // Load dict in stack buffer becuase i dont know how big content stream might be
+      
+      int sBufferSize = KB * 4;
+      Span<byte> buffer = stackalloc byte[sBufferSize];
+      file.Stream.Position = xrefOffset;
+      int bytesRead = file.Stream.Read(buffer);
+      PDFSpanParseHelper helper = new PDFSpanParseHelper(ref buffer);
+      bool startOfDictFound = false;
+      // This is data needed for parsing, no need to save it anywhere later
+      List<(int, int)> indexes = new List<(int, int)>();
+      int size = 0;
+      int prev;
+      // NOTE: this can be byte since values are low or simply 3 int variables
+      Span<int> W = stackalloc int[3]; // its always 3
+      PDF_CommonStreamDict commonStreamDict = new PDF_CommonStreamDict();
+
+      while (!startOfDictFound && helper._readPosition < buffer.Length)
+      {
+        helper.ReadUntilNonWhiteSpaceDelimiter();
+        if (helper._char == '<')
+          startOfDictFound = helper.IsCurrentCharacterSameAsNext();
+      }
+      
+      string tokenString = helper.GetNextToken();
+      while (tokenString != "")
+      {
+        switch (tokenString)
+        {
+          case "Size":
+            trailer.Size = helper.GetNextInt32();
+            size = trailer.Size;
+            break;
+          case "Root":
+            trailer.RootIR = helper.GetNextIndirectReference();
+            break;
+          case "Info":
+            trailer.InfoIR = helper.GetNextIndirectReference();
+            break;
+          case "Encrypt":
+            trailer.EncryptIR = helper.GetNextIndirectReference();
+            break;
+          case "Prev":
+            trailer.Prev = helper.GetNextInt32();
+            prev = trailer.Prev;
+            break;
+          case "ID":
+            trailer.ID = helper.GetNextArrayKnownLengthStrict(2);
+            break;
+          case "Index":
+            // these are not IR but pair of ints which is what this function parses efficiently
+            indexes = helper.GetNextListOfPairIntegers();
+            break;
+          case "W":
+            helper.SkipWhiteSpace();
+            // can be direct array or IR
+
+            if (helper._char == '[')
+            {
+              helper.ReadChar();
+              for (int i = 0; i < W.Length; i++)
+              {
+                W[i] = helper.GetNextInt32();
+              }
+              helper.ReadUntilNonWhiteSpaceDelimiter();
+              if (helper._char != ']')
+                throw new InvalidDataException("Invalid end of widths array!");
+              helper.ReadChar();
+            }
+            else
+              throw new InvalidDataException("Invalid W array!");
+            break;
+          default:
+            ParseCommonStreamDictAsExtension(file, ref helper, tokenString, ref commonStreamDict);
+            break;
+        }
+
+        helper.ReadUntilNonWhiteSpaceDelimiter();
+        if (helper._char == '>' && helper.IsCurrentCharacterSameAsNext())
+          break;
+        tokenString = helper.GetNextToken();
+      }
+      helper.SkipNextToken(); // skip 'stream'
+      helper.SkipWhiteSpace(); // skip new line
+      // set pos at start of the stream
+      long streamStartPos = xrefOffset + helper._position;
+      // parse stream 
+      buffer = new byte[commonStreamDict.Length];
+      file.Stream.Position = streamStartPos;
+      int readBytes = file.Stream.Read(buffer);
+      if (readBytes != buffer.Length)
+        throw new InvalidDataException("Invalid cross reference stream!");
+      byte[] decoded = DecodeFilter(ref buffer, commonStreamDict.Filters);
+
+      if (indexes.Count == 0)
+        indexes.Add((0, size));
+
+      buffer = decoded.AsSpan();
+      helper = new PDFSpanParseHelper(ref buffer);
+
+      int type;
+      int secondField;
+      int thirdField;
+      foreach((int start, int end) subSection in indexes)
+      {
+        for (int i = subSection.start; i <= subSection.end; i++)
+        {
+          type = helper.ReadSpecificSizeInt32(W[0]);
+          secondField = helper.ReadSpecificSizeInt32(W[1]);
+          thirdField = helper.ReadSpecificSizeInt32(W[2]);
+          PDF_CRefEntry entry = new PDF_CRefEntry();
+          if (type == 0)
+          {
+            entry.EntryType = PDF_XrefEntryType.FREE;
+            entry.GenerationNumber = (ushort)thirdField;
+          }
+          else if (type == 1)
+          {
+            entry.EntryType = PDF_XrefEntryType.NORMAL;
+            entry.TenDigitValue = secondField;
+            entry.GenerationNumber = (ushort)thirdField;
+            
+          }
+          else if (type == 2)
+          {
+            entry.EntryType = PDF_XrefEntryType.COMPRESSED;
+            entry.StreamIR = secondField;
+            entry.IndexInOS = thirdField;
+          }
+
+          entry.Index = i;
+          if (cRefEntry.Count > i)
+            cRefEntry[i] = entry;
+          else
+            cRefEntry.Insert(i, entry);
+        }
+      }
+    }
+
     // TODO: account for this later
     // Comment from spec:
     // Beginning with PDF 1.4, the VErsion entry in the document's catalog dictionary (lcoated via the Root entry in the file's trailer
@@ -1739,7 +1932,7 @@ namespace Converter.Parsers.PDF
     // https://stackoverflow.com/questions/11896858/does-the-eof-in-a-pdf-have-to-appear-within-the-last-1024-bytes-of-the-file
     // NOTE: according to specification for NON cross reference stream PDF files, max lengh for byteoffset is 10 digits so 10^10 bytes (10gb) so ulong will be more than enough
     // NOTE: i can't seem to find max lenght for cross refernce stream PDF files
-
+    // TODO: Fix whatever this is
     private void ParseLastCrossRefByteOffset(PDFFile file)
     {
       file.Stream.Seek(-6, SeekOrigin.End);
@@ -1817,6 +2010,75 @@ namespace Converter.Parsers.PDF
       return (ushort)res;
     }
 
+    // generation is always 0 for object streams
+    private void ParseObjectStream(PDFFile file, int objId, long offset, PDF_ObjectStream objStreamInfo)
+    {
+      file.Stream.Position = offset;
+      // preferably use stack here beacuse stream that we may read will be disposed becuase its decoded
+      // so we don't need another array to fit it in 
+      // NOTE: it should be optional and maybe allowed stack value to be configurable because we may not know what code 
+      // that calls this function does
+      Span<byte> buffer = file.Options.AllowStack ? stackalloc byte[KB * 8] : new byte[KB * 8];
+      int readBytes =file.Stream.Read(buffer);
+      PDFSpanParseHelper helper = new PDFSpanParseHelper(ref buffer);
+      bool res = helper.GoToStartOfDict();
+      if (!res)
+        throw new InvalidDataException("Can't find object stream dictionary!");
+
+      string tokenString = helper.GetNextToken();
+      PDF_CommonStreamDict commonStreamDict = new PDF_CommonStreamDict();
+      while (tokenString != string.Empty)
+      {
+        switch (tokenString)
+        {
+          case "N":
+            objStreamInfo.N = helper.GetNextInt32();
+            break;
+          case "First":
+            objStreamInfo.First = helper.GetNextInt32();
+            break;
+          case "Extends":
+            objStreamInfo.ExtendsIR = helper.GetNextIndirectReference();
+            break;
+          default:
+            ParseCommonStreamDictAsExtension(file, ref helper, tokenString, ref commonStreamDict);
+            break;
+        }
+
+        if (helper.IsEndOfDict())
+          break;
+
+        tokenString = helper.GetNextToken();
+      }
+      helper.SkipWhiteSpaceAndDelimiters(); // >>
+      helper.SkipNextToken(); // stream
+
+      // Parse stream
+      // check if we loaded stream in our 8k buffer
+      bool streamLoaded = commonStreamDict.Length < buffer.Length - helper._readPosition;
+      if (streamLoaded)
+        buffer = buffer.Slice(helper._readPosition, (int)commonStreamDict.Length);
+      else
+      {
+        // set correct position and read entire stream
+        buffer = new byte[commonStreamDict.Length];
+        helper = new PDFSpanParseHelper(ref buffer);
+      }
+      commonStreamDict.RawStreamData = DecodeFilter(ref buffer, commonStreamDict.Filters);
+      objStreamInfo.CommonStreamDict = commonStreamDict;
+
+      // Parse offsets
+      objStreamInfo.Offsets = new List<(int, int)>();
+      for (int i = 0; i < objStreamInfo.N; i++)
+      {
+        int objIdRef = helper.GetNextInt32();
+        int objOffset = helper.GetNextInt32();
+        // First is first byte of first object in the stream, because 'header' is filled with N * pairs of ints (offsets)
+        objStreamInfo.Offsets.Add((objIdRef, objStreamInfo.First + objOffset));
+      }
+      file.ObjectStreams.Add((objId, objStreamInfo));
+    }
+
     private ulong ConvertBytesToUnsignedInt64(Span<byte> buffer)
     {
       uint res = 0;
@@ -1832,14 +2094,25 @@ namespace Converter.Parsers.PDF
    
     // NOTE: THIS WILL count until next object start so it will count endobj and (i.e) 8 0 obj or longer byte, it should be ok for now
     // TODO: count until object end remove endobj 
-    private long GetDistanceToNextObject(int objectIndex, long rootByteOffset, PDFFile file)
+    /// <summary>
+    /// 
+    /// </summary>
+    /// <param name="objectIndex"></param>
+    /// <param name="rootByteOffset"></param>
+    /// <param name="file"></param>
+    /// <returns>If -1 is returned it means that object is compressed and that it GetObjBuffer should be called that will contain that decompressed buffer</returns>
+    private long GetDistanceToNextNormalObject(PDFFile file, ref PDF_CRefEntry entry)
     {
+      if (entry.EntryType == PDF_XrefEntryType.COMPRESSED)
+        return -1;
+      if (entry.EntryType == PDF_XrefEntryType.FREE)
+        return 0;
       long minPositiveDiff = long.MaxValue;
-      int index = objectIndex;
+      int index = entry.Index;
       long diff;
       for (int i = 0; i < file.CrossReferenceEntries.Count; i++)
       {
-        diff = file.CrossReferenceEntries[i].TenDigitValue - rootByteOffset;
+        diff = file.CrossReferenceEntries[i].TenDigitValue - entry.TenDigitValue;
         if (diff > 0 && diff < minPositiveDiff)
         {
           minPositiveDiff = diff;
@@ -1847,9 +2120,88 @@ namespace Converter.Parsers.PDF
         }
       }
       // means that this is last object so next object is assumed to be cross reference table
-      if (index == objectIndex)
-        return file.LastCrossReferenceOffset - rootByteOffset;
+      if (index == entry.Index)
+        return file.LastCrossReferenceOffset - entry.TenDigitValue;
       return minPositiveDiff;
+    }
+
+    // Wrap this and use otuside, because I'm not sure if this will change later, so its easier to refactor it if I wrap it
+    private PDF_CRefEntry GetXrefEntry(PDFFile file, int objIndex, int generation)
+    {
+      return file.CrossReferenceEntries[objIndex];
+    }
+
+    /// <summary>
+    /// Use only for Compressed obj buffer
+    /// Generation number of compressed objects is always 0, as well as the object strreams
+    /// </summary>
+    /// <param name="file"></param>
+    /// <param name="objInfo"></param>
+    /// <returns></returns>
+    /// <exception cref="InvalidDataException"></exception>
+    private byte[] GetCompressedObjBuffer(PDFFile file, ref PDF_CRefEntry entry, out int offset, out int len)
+    {
+      // TODO: Is this good idea?
+      if (entry.EntryType != PDF_XrefEntryType.COMPRESSED)
+        throw new InvalidDataException("Object type is not compressed!");
+      
+      // check if stream IR for this entry exists in object streams list
+      // if it exists
+      // return byte[] buffer and position of the object with the offset and length (next offset - curr offset)
+      // if doesnt parse it
+      PDF_ObjectStream info = null;
+      foreach ((int key, PDF_ObjectStream stream) in file.ObjectStreams)
+        if (key == entry.Index)
+          info = stream;
+
+      if (info is null)
+      {
+        // TODO: check if generation 0 is of objects in the stream or the stream itself
+        PDF_CRefEntry streamEntry = file.CrossReferenceEntries[entry.StreamIR];
+        info = new PDF_ObjectStream();
+        ParseObjectStream(file, entry.StreamIR, streamEntry.TenDigitValue, info);
+      }
+
+      for (int i = 0; i < info.Offsets.Count; i++)
+      {
+        if (info.Offsets[i].objId == entry.Index)
+        {
+          offset = info.Offsets[i].offset;
+          len = info.CommonStreamDict.RawStreamData.Length - offset;
+          // offsets are in increasing order, so to get object size we can just do next objcet offset - current offset
+          // unless we are at last index
+          if (i + 1 < info.Offsets.Count)
+            len = info.Offsets[i + 1].offset - offset;
+          return info.CommonStreamDict.RawStreamData;
+          break;
+        }
+      }
+
+      // TODO: Handle not found
+      offset = 0;
+      len = 0;
+      return new byte[0];
+    }
+    private void GetNormalObjBuffer(PDFFile file, PDF_CRefEntry entry, ref Span<byte> buffer)
+    {
+      // should ths point to null obj
+      if (entry.EntryType != PDF_XrefEntryType.NORMAL)
+        throw new InvalidDataException("Trying to access  not normal object");
+
+      // fail safe but should be caught in testing
+      // Not sure if this is good idea
+      if (buffer != null && buffer.Length == 0)
+      {
+        Debug.Assert(1 == 1, "buffer not alllocated when getting normal object");
+        int len = (int)GetDistanceToNextNormalObject(file, ref entry);
+        buffer = new byte[len];
+      }
+      long origPos = file.Stream.Position;
+      file.Stream.Position = entry.TenDigitValue;
+      int readBytes = file.Stream.Read(buffer);
+      if (readBytes != buffer.Length)
+        throw new InvalidDataException("Invalid data");
+      file.Stream.Position = origPos;
     }
   }
 }

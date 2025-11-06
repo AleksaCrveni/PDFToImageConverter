@@ -393,6 +393,25 @@ namespace Converter.Parsers.PDF
       
       return rect;
     }
+    public List<(int, int)> GetNextListOfPairIntegers()
+    {
+      List<(int, int)> list = new();
+      ReadUntilNonWhiteSpaceDelimiter();
+      if (_char != '[')
+        throw new InvalidDataException("Invalid Rectangle data. Expected [");
+      ReadChar();
+      SkipWhiteSpaceAndDelimiters();
+      (int a, int b) res;
+      while (_char != ']')
+      {
+        res.a = GetNextInt32();
+        res.b = GetNextInt32();
+        list.Add(res);
+        SkipWhiteSpace();
+      }
+      ReadChar();
+      return list;
+    }
 
     public List<(int, int)> GetNextIndirectReferenceList()
     {
@@ -496,6 +515,40 @@ namespace Converter.Parsers.PDF
       } while (!isMatched && nextStringInBytes.Length != 0);
 
       return isMatched;     
+    }
+
+    public bool GoToStartOfDict()
+    {
+      bool startOfDictFound = false;
+      while (!startOfDictFound && _readPosition < _buffer.Length)
+      {
+        ReadUntilNonWhiteSpaceDelimiter();
+        if (_char == '<')
+          startOfDictFound = IsCurrentCharacterSameAsNext();
+      }
+      return startOfDictFound;
+    }
+
+    public bool IsEndOfDict()
+    {
+      ReadUntilNonWhiteSpaceDelimiter();
+      if (_char == '>' && IsCurrentCharacterSameAsNext())
+        return true;
+      return false;
+    }
+    // don't do bounds checking, just expect that its right
+    // if its unbound underlying code will throw an exception and parsing will 
+    // TODO: This currently only works for little endian CPU , make it work for big endian too
+    public int ReadSpecificSizeInt32(int size)
+    {
+      int res = 0;
+
+      for (int i = 0; i < size; i++)
+        res = (res << 8) + _buffer[_readPosition + i];
+
+      _readPosition += size;
+      _position = _readPosition - 1;
+      return res;
     }
 
     // String literal

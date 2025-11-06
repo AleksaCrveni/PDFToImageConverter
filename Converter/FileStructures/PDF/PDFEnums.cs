@@ -35,6 +35,13 @@
     UseAttachments
   }
 
+  public enum PDF_XrefEntryType : byte
+  {
+    FREE, // f
+    NORMAL, // n
+    COMPRESSED // type 3 in cross reference streams 
+  }
+
   public enum PDF_Tabs
   {
     Null = 0,

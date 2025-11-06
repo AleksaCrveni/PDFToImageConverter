@@ -8,16 +8,23 @@ namespace Converter.FileStructures.PDF
     public PDF_Version PdfVersion { get; set; } = PDF_Version.Null;
     public long LastCrossReferenceOffset { get; set; }
     public PDF_Trailer Trailer { get; set; }
+    // List of generations where each generation has object
     public List<PDF_CRefEntry> CrossReferenceEntries { get; set; }
     public PDF_Catalog Catalog { get; set; }
     // 0 will be root
     public List<PDF_PageTree> PageTrees { get; set; }
     public List<PDF_PageInfo> PageInformation { get; set; }
     public Stream Stream { get; set; }
+    public List<(int key, PDF_ObjectStream data)> ObjectStreams { get; set; }
     public TargetConversion Target { get; set; } = TargetConversion.TIFF_GRAYSCALE;
+    public PDF_Options Options;
   }
 
- 
+  public struct PDF_Options
+  {
+    public PDF_Options() { }
+    public bool AllowStack = false;
+  }
   // Spec reference on page 51
   // Table 15
   public struct PDF_Trailer
@@ -39,9 +46,18 @@ namespace Converter.FileStructures.PDF
   // This should maybe be ref struct
   public struct PDF_CRefEntry
   {
+    public int Index; // may later be refactored not to use this
     public long TenDigitValue;
     public ushort GenerationNumber;
-    public byte EntryType;
+    public int StreamIR; // used only when its Indirect entry type
+    // Index in Object stream
+    public int IndexInOS; // used onlmy when its Indirect entry type
+    public PDF_XrefEntryType EntryType;
+    // this is cached because it maybe 
+    // this shouldn't be cached
+    // I should have some object stream list of cached decoded streams as they may contain multiple objcets
+    // and this should be index and position into there!
+    public byte[] Buffer; // used with indirect entry type
 
     public static bool operator ==(PDF_CRefEntry a, PDF_CRefEntry b)
     {
@@ -347,5 +363,13 @@ namespace Converter.FileStructures.PDF
     public double llY;
     public double urX;
     public double urY;
+  }
+  public class PDF_ObjectStream
+  {
+    public int N;
+    public int First;
+    public (int, int) ExtendsIR;
+    public PDF_CommonStreamDict CommonStreamDict;
+    public List<(int objId, int offset)> Offsets;
   }
 }
