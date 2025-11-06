@@ -19,6 +19,19 @@ namespace Tester
     }
 
     [TestMethod]
+    public void ReadSpecificSizeInt32Success()
+    {
+      Span<byte> buffer = new byte[2] { 16, 234 };
+      PDFSpanParseHelper helper = new PDFSpanParseHelper(ref buffer);
+      int res = helper.ReadSpecificSizeInt32(2);
+      Assert.IsTrue(res == 4330);
+
+      helper._readPosition = 0;
+      res = helper.ReadSpecificSizeInt32(1);
+      Assert.IsTrue(res == 16);
+    }
+
+    [TestMethod]
     public void GetNextTokenTest()
     {
       // tokens only gets characters between delimiters so urls in tests will look chopped but its ok
