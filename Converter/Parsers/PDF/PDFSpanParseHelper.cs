@@ -185,6 +185,16 @@ namespace Converter.Parsers.PDF
     {
       throw new NotImplementedException();
     }
+
+    public Dictionary<object, object> SkipNextDictOrIR()
+    {
+      ReadUntilNonWhiteSpaceDelimiter();
+      if (_char == '<' && IsCurrentCharacterSameAsNext())
+        return GetNextDict();
+      (_, _) = GetNextIndirectReference();
+      return new Dictionary<object, object>();
+    }
+
     // TODO: Add more limiters, first digit must be > 0, but second can be 0 higher
     public (int, int) GetNextIndirectReference()
     {
@@ -520,6 +530,13 @@ namespace Converter.Parsers.PDF
     public bool GoToStartOfDict()
     {
       bool startOfDictFound = false;
+      // Check first in case we already read into first char of start of the dict
+      if (_char == '<')
+        startOfDictFound = IsCurrentCharacterSameAsNext();
+
+      if (startOfDictFound)
+        return true;
+
       while (!startOfDictFound && _readPosition < _buffer.Length)
       {
         ReadUntilNonWhiteSpaceDelimiter();
@@ -622,13 +639,6 @@ namespace Converter.Parsers.PDF
       _position = _readPosition++;
     }
 
-    // I don't think if this is good idea
-    // Replace internal buffer and reset positions
-    public void ReplaceInternalSpan(Span<byte> buffer)
-    {
-      _buffer = buffer;
-      _position = 0;
-      _readPosition = 0;
-    }
+
   }
 }

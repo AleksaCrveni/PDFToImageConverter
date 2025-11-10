@@ -9,7 +9,7 @@ namespace Converter.FileStructures.PDF
     public long LastCrossReferenceOffset { get; set; }
     public PDF_Trailer Trailer { get; set; }
     // List of generations where each generation has object
-    public List<PDF_CRefEntry> CrossReferenceEntries { get; set; }
+    public List<PDF_XrefEntry> CrossReferenceEntries { get; set; }
     public PDF_Catalog Catalog { get; set; }
     // 0 will be root
     public List<PDF_PageTree> PageTrees { get; set; }
@@ -44,7 +44,7 @@ namespace Converter.FileStructures.PDF
 
   // Cross reference entry
   // This should maybe be ref struct
-  public struct PDF_CRefEntry
+  public struct PDF_XrefEntry
   {
     public int Index; // may later be refactored not to use this
     public long TenDigitValue;
@@ -59,7 +59,7 @@ namespace Converter.FileStructures.PDF
     // and this should be index and position into there!
     public byte[] Buffer; // used with indirect entry type
 
-    public static bool operator ==(PDF_CRefEntry a, PDF_CRefEntry b)
+    public static bool operator ==(PDF_XrefEntry a, PDF_XrefEntry b)
     {
       if (a.TenDigitValue != b.TenDigitValue)
         return false;
@@ -70,7 +70,7 @@ namespace Converter.FileStructures.PDF
 
       return true;
     }
-    public static bool operator !=(PDF_CRefEntry a, PDF_CRefEntry b)
+    public static bool operator !=(PDF_XrefEntry a, PDF_XrefEntry b)
     {
       if (a.TenDigitValue == b.TenDigitValue)
         return false;
