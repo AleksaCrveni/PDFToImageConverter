@@ -1571,24 +1571,6 @@ namespace Converter.Parsers.PDF
       return (false, allocator);
     }
 
-    /// <summary>
-    /// It moves current Helper if needed after reading next unspecified dict (when it can be IR or direct object)
-    /// Should always be called after ReadIntoDirectOrIndirectDict() with same helpers and result 
-    /// </summary>
-    /// <returns></returns>
-    public void MovePositionAfterReadingUnspecDict(bool isDirect, ref PDFSpanParseHelper currentHelper, ref PDFSpanParseHelper outHelper)
-    {
-      if (!isDirect)
-        return;
-
-      currentHelper._position += outHelper._position + 1;
-      currentHelper._readPosition += outHelper._position + 1;
-      if (currentHelper._readPosition < currentHelper._buffer.Length)
-        currentHelper._char = currentHelper._buffer[currentHelper._readPosition];
-      else
-        currentHelper._char = PDFConstants.NULL;
-    }
-
     // TODO: Use shared pool
     public void ParseCrossReferenceStreamAndDict(PDFFile file, long xrefOffset, ref PDF_Trailer trailer, List<PDF_XrefEntry> cRefEntry) 
     {
@@ -2264,8 +2246,8 @@ namespace Converter.Parsers.PDF
     }
 
     /// <summary>
-    /// Force creates array with specified size
-    /// Usually done whne itering over list of keys or indirect refences to create one array that can fit any obj from the list
+    /// Force creates array with specified size in shared array pool
+    /// Usually done whne itering over list of keys or indirect references to create one array that can fit any obj from the list
     /// </summary>
     /// <param name="size">Size of array that will be created</param>
     private void ForceCreateArrayInsharedPool(int size)
