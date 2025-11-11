@@ -4,9 +4,8 @@ using Converter.FileStructures.General;
 using Converter.FileStructures.PDF;
 using Converter.Rasterizers;
 using Converter.Writers.TIFF;
-using System;
 using System.Buffers;
-using System.Diagnostics.CodeAnalysis;
+using System.Diagnostics;
 using System.Globalization;
 using System.IO.Compression;
 using System.Text;
@@ -299,11 +298,8 @@ namespace Converter.Parsers.PDF
           break;
       }
     }
+
     private byte[] DecodeFilter(ref ReadOnlySpan<byte> inputSpan, List<PDF_Filter> filters)
-    {
-      return DecodeFilter(ref inputSpan, filters);
-    }
-    private byte[] DecodeFilter(ref Span<byte> inputSpan, List<PDF_Filter> filters)
     {
       // first just do single filter
       PDF_Filter f = filters[0];
@@ -586,8 +582,6 @@ namespace Converter.Parsers.PDF
       // so just get largest 'normal' size
       // but i think these should always be under 8k
 
-      
-      Span<byte> mainBuffer = new byte[KB * 8];
       long origPos = file.Stream.Position;
       List<(string key, (int objIndex, int generation) objPosition)> objPositions = new List<(string key, (int objIndex, int generation) objPosition)>();
       while (helper._char != '>' && !helper.IsCurrentCharacterSameAsNext())
@@ -598,11 +592,11 @@ namespace Converter.Parsers.PDF
           break;
         (int objIndex, int generation) IR = helper.GetNextIndirectReference();
         objPositions.Add((key, IR));
-
-        
         helper.ReadUntilNonWhiteSpaceDelimiter();
       }
-
+      // skip end of dict
+      helper.ReadChar();
+      helper.ReadChar();
       SharedAllocator allocator = null;
       ReadOnlySpan<byte> irBuffer;
       int largestObjectSize = GetBiggestObjectSizeFromList(file, objPositions);
@@ -621,9 +615,8 @@ namespace Converter.Parsers.PDF
         cs.Key = name;
         cs.ColorSpaceInfo = csInfo;
         csData.Add(cs);
+        FreeAllocator(allocator);
       }
-
-      FreeAllocator(allocator);
       return helper._position;
     }
 
@@ -656,8 +649,11 @@ namespace Converter.Parsers.PDF
         (int objIndex, int generation) IR = helper.GetNextIndirectReference();
 
         objPositions.Add((key, IR));
+        helper.ReadUntilNonWhiteSpaceDelimiter();
       }
-
+      // skip end of dict
+      helper.ReadChar();
+      helper.ReadChar();
       SharedAllocator allocator = null;
       ReadOnlySpan<byte> irBuffer;
       int largestObjectSize = GetBiggestObjectSizeFromList(file, objPositions);
@@ -680,12 +676,9 @@ namespace Converter.Parsers.PDF
         IRasterizer rasterizer = new TTFRasterizer(fontInfo.FontDescriptor.FontFile.CommonStreamInfo.RawStreamData, ref fontInfo);
         fd.Rasterizer = rasterizer;
         fontData.Add(fd);
-        helper.ReadUntilNonWhiteSpaceDelimiter();
+        FreeAllocator(allocator);
       }
-
-      FreeAllocator(allocator);
     }
-
 
     /// <summary>
     /// Parse FontDictioanry data for ResourceDict that is referenced in from ParseFontIRDictionary.
@@ -1577,9 +1570,11 @@ namespace Converter.Parsers.PDF
       // Load dict in stack buffer becuase i dont know how big content stream might be
       
       int sBufferSize = KB * 4;
-      Span<byte> buffer = new byte[sBufferSize];
+      byte[] arr = new byte[sBufferSize];
+      
       file.Stream.Position = xrefOffset;
-      int bytesRead = file.Stream.Read(buffer);
+      int bytesRead = file.Stream.Read(arr);
+      ReadOnlySpan<byte> buffer = arr.AsSpan();
       PDFSpanParseHelper helper = new PDFSpanParseHelper(ref buffer);
       bool startOfDictFound = false;
       // This is data needed for parsing, no need to save it anywhere later
@@ -1660,11 +1655,12 @@ namespace Converter.Parsers.PDF
       // set pos at start of the stream
       long streamStartPos = xrefOffset + helper._position;
       // parse stream 
-      buffer = new byte[commonStreamDict.Length];
+      arr = new byte[commonStreamDict.Length];
       file.Stream.Position = streamStartPos;
-      int readBytes = file.Stream.Read(buffer);
+      int readBytes = file.Stream.Read(arr);
       if (readBytes != buffer.Length)
         throw new InvalidDataException("Invalid cross reference stream!");
+      buffer = arr.AsSpan();
       byte[] decoded = DecodeFilter(ref buffer, commonStreamDict.Filters);
 
       if (indexes.Count == 0)
@@ -1927,8 +1923,9 @@ namespace Converter.Parsers.PDF
       // so we don't need another array to fit it in 
       // NOTE: it should be optional and maybe allowed stack value to be configurable because we may not know what code 
       // that calls this function does
-      Span<byte> buffer = new byte[KB * 8];
-      int readBytes =file.Stream.Read(buffer);
+      byte[] arr = new byte[KB * 8];
+      int readBytes =file.Stream.Read(arr);
+      ReadOnlySpan<byte> buffer = arr.AsSpan();
       PDFSpanParseHelper helper = new PDFSpanParseHelper(ref buffer);
       bool res = helper.GoToStartOfDict();
       if (!res)
@@ -1972,6 +1969,7 @@ namespace Converter.Parsers.PDF
         // set correct position and read entire stream
         buffer = new byte[commonStreamDict.Length];
         helper = new PDFSpanParseHelper(ref buffer);
+        // TODO: this isnt used
       }
       commonStreamDict.RawStreamData = DecodeFilter(ref buffer, commonStreamDict.Filters);
       objStreamInfo.CommonStreamDict = commonStreamDict;
@@ -2224,7 +2222,8 @@ namespace Converter.Parsers.PDF
 
       long origPos = file.Stream.Position;
       file.Stream.Position = entry.TenDigitValue;
-      len = file.Stream.Read(buffer);
+      len = file.Stream.Read(buffer, 0, objectLength);
+      Debug.Assert(len == objectLength);
       offset = 0;
       file.Stream.Position = origPos;
 
