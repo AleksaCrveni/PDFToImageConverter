@@ -188,7 +188,7 @@ namespace Converter.Parsers.PDF
 
     public Dictionary<object, object> SkipNextDictOrIR()
     {
-      ReadUntilNonWhiteSpaceDelimiter();
+      SkipWhiteSpace();
       if (_char == '<' && IsCurrentCharacterSameAsNext())
         return GetNextDict();
       (_, _) = GetNextIndirectReference();

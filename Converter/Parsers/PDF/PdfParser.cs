@@ -331,14 +331,18 @@ namespace Converter.Parsers.PDF
           byte b1 = inputSpan[1];
           // account for big/lttiel end
           // not sure if in deflate stream this can be first byte
-          if ((b0 & 15) == 8 && (b0 >> 4 & 15)  == 7)
+          if (arr.Length ==216)
+          {
+            int i = 0;
+          }
+          if (CompressionHelper.IsZlib(arr))
           {
             // ZLIB check (MSB is left)
             // CM 0-3 bits need to be 8
             // CMINFO 4-7 bits need to be 7
             decompressor = new ZLibStream(compressStream, CompressionMode.Decompress);
           }
-          else if (b0 == 31 && b1 == 139)
+          else if (CompressionHelper.IsGzip(arr))
           {
             // GZIP check (MSB is right)
             decompressor = new GZipStream(compressStream, CompressionMode.Decompress);
@@ -347,7 +351,10 @@ namespace Converter.Parsers.PDF
             decompressor = new DeflateStream(compressStream, CompressionMode.Decompress);
 
           MemoryStream stream = new MemoryStream();
+
           decompressor.CopyTo(stream);
+
+          
           // dispose streams
           compressStream.Dispose();
           decompressor.Dispose();
@@ -383,15 +390,19 @@ namespace Converter.Parsers.PDF
     }
 
   
-
     private void ParseResourceDictionary(PDFFile file, (int objIndex, int generation) objPosition, ref PDF_ResourceDict resourceDict)
     {
       SharedAllocator allocator = GetObjBuffer(file, objPosition);
       ReadOnlySpan<byte> buffer = allocator.Buffer.AsSpan(allocator.Range);
 
       PDFSpanParseHelper helper = new PDFSpanParseHelper(ref buffer);
+      ParseResourceDictionary(file, ref helper, true, ref resourceDict);
+      FreeAllocator(allocator);
+     }
 
-      bool dictStartFound = false;
+    private void ParseResourceDictionary(PDFFile file, ref PDFSpanParseHelper helper, bool isIndirect, ref PDF_ResourceDict resourceDict)
+    {
+      bool dictStartFound = !isIndirect;
       while (!dictStartFound)
       {
         helper.ReadUntilNonWhiteSpaceDelimiter();
@@ -464,13 +475,11 @@ namespace Converter.Parsers.PDF
         helper.ReadUntilNonWhiteSpaceDelimiter();
         if (helper._char == '>' && helper.IsCurrentCharacterSameAsNext())
           break;
-        tokenString = helper.GetNextToken();        
+        tokenString = helper.GetNextToken();
       }
 
       if (tokenString == "")
         throw new InvalidDataException("Invalid dictionary");
-
-      FreeAllocator(allocator);
     }
 
     private void ParseColorSpaceStreamAndDictionary(PDFFile file, (int objIndex, int generation) objPosition, ref PDF_ColorSpaceDictionary dict)
@@ -1163,7 +1172,17 @@ namespace Converter.Parsers.PDF
              break;
             case "Resources" :
               // this can be both
-              pageInfo.ResourcesIR = helper.GetNextIndirectReference();
+              // if its IR it will be parsed later
+              (bool isDirect, SharedAllocator? allocator) info = ReadIntoDirectOrIndirectDict(file, ref helper, false);
+              if (info.isDirect)
+              {
+                PDF_ResourceDict rDict = new PDF_ResourceDict();
+                ParseResourceDictionary(file, ref helper, false, ref rDict);
+                pageInfo.ResourceDict = rDict;
+              }
+              else 
+                pageInfo.ResourcesIR = helper.GetNextIndirectReference();
+              FreeAllocator(info.allocator);
               break;
             case "MediaBox" :
               pageInfo.MediaBox = helper.GetNextRectangle();
@@ -1550,7 +1569,7 @@ namespace Converter.Parsers.PDF
     /// <param name="file">PR</param>
     /// <param name="helper">Current helper </param>
     /// <returns>IsDirectObject is set to true if its direct object and allocator is null. Reversed if its indirect reference and allocator is used</returns>
-    public (bool isDirectObject, SharedAllocator? allocator) ReadIntoDirectOrIndirectDict(PDFFile file, ref PDFSpanParseHelper helper)
+    public (bool isDirectObject, SharedAllocator? allocator) ReadIntoDirectOrIndirectDict(PDFFile file, ref PDFSpanParseHelper helper, bool returnIRBuffer = true)
     {
       helper.SkipWhiteSpace();
       if (helper._char == '<' && helper.IsCurrentCharacterSameAsNext())
@@ -1558,6 +1577,9 @@ namespace Converter.Parsers.PDF
         helper.ReadChar();
         return (true, null);
       }
+      // shortcut
+      if (!returnIRBuffer)
+        return (false, new SharedAllocator());
 
       (int objIndex, int generation) IR = helper.GetNextIndirectReference();
       SharedAllocator allocator = GetObjBuffer(file, IR);
@@ -1658,7 +1680,7 @@ namespace Converter.Parsers.PDF
       arr = new byte[commonStreamDict.Length];
       file.Stream.Position = streamStartPos;
       int readBytes = file.Stream.Read(arr);
-      if (readBytes != buffer.Length)
+      if (readBytes != arr.Length)
         throw new InvalidDataException("Invalid cross reference stream!");
       buffer = arr.AsSpan();
       byte[] decoded = DecodeFilter(ref buffer, commonStreamDict.Filters);
