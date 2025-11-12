@@ -4,10 +4,6 @@
   {
     public static bool IsZlib(byte[] bytes)
     {
-      if (bytes[0] == 72)
-      {
-        int i = 0;
-      }
       byte CMF = bytes[0];
       byte FLG = bytes[1];
       byte CM = (byte)(CMF & 15);

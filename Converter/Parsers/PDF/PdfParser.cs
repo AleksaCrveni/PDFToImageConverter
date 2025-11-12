@@ -331,10 +331,6 @@ namespace Converter.Parsers.PDF
           byte b1 = inputSpan[1];
           // account for big/lttiel end
           // not sure if in deflate stream this can be first byte
-          if (arr.Length ==216)
-          {
-            int i = 0;
-          }
           if (CompressionHelper.IsZlib(arr))
           {
             // ZLIB check (MSB is left)
