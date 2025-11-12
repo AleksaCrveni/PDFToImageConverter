@@ -18,6 +18,11 @@ namespace Converter.FileStructures.PDF
     public List<(int key, PDF_ObjectStream data)> ObjectStreams { get; set; }
     public TargetConversion Target { get; set; } = TargetConversion.TIFF_GRAYSCALE;
     public PDF_Options Options;
+
+    public PDFFile()
+    {
+      ObjectStreams = new List<(int key, PDF_ObjectStream data)>();
+    }
   }
 
   public struct PDF_Options
