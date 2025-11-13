@@ -233,13 +233,15 @@ namespace Converter.FileStructures.PDF
     public PDF_FontDescriptor FontDescriptor;
     // can be name of dict, but just do enum for now
     public PDF_FontEncodingData EncodingData;
-    public byte[] ToUnicode;
+    // Type 0 only
+    public (int ojbIndex, int generation) DescendantFontsIR;
+    public (int objIndex, int generation) ToUnicodeIR;
   }
 
   // Table 114
   public class PDF_FontEncodingData
   {
-    public PDF_FontEncodingType BaseEncoding;
+    public string BaseEncoding;
     public List<(int code, string val)> Differences;
 
     public PDF_FontEncodingData()

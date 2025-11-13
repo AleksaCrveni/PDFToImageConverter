@@ -772,10 +772,7 @@ namespace Converter.Parsers.PDF
             PDF_FontEncodingData encodingData = new PDF_FontEncodingData();
             if (helper._char == '/')
             {
-              PDF_FontEncodingType encType = helper.GetNextName<PDF_FontEncodingType>();
-              if (encType == PDF_FontEncodingType.Null)
-                throw new InvalidDataException("Invalid encoding name!");
-              encodingData.BaseEncoding = encType;
+              encodingData.BaseEncoding = helper.GetNextToken();
             }
             else
             {
@@ -789,11 +786,11 @@ namespace Converter.Parsers.PDF
 
             fontInfo.EncodingData = encodingData;
             break;
+          case "DescendantFonts":
+            fontInfo.DescendantFontsIR = helper.GetNextIndirectReference();
+            break;
           case "ToUnicode":
-            //TODO: fix, this is actually IR to stream
-            //placeholder
-            (var _, var r) = helper.GetNextIndirectReference();
-            fontInfo.ToUnicode = new byte[1];
+            fontInfo.ToUnicodeIR = helper.GetNextIndirectReference();
             break;
           default:
             break;
@@ -805,10 +802,10 @@ namespace Converter.Parsers.PDF
         tokenString = helper.GetNextToken();
       }
 
-      if (fontInfo.EncodingData.BaseEncoding == PDF_FontEncodingType.Null)
+      if (fontInfo.EncodingData.BaseEncoding == string.Empty && fontInfo.SubType == PDF_FontType.TrueType)
       {
         if (!((fontInfo.FontDescriptor.Flags & PDF_FontFlags.Symbolic) == PDF_FontFlags.Symbolic))
-          fontInfo.EncodingData.BaseEncoding = PDF_FontEncodingType.StandardEncoding;
+          fontInfo.EncodingData.BaseEncoding = "StandardEncoding";
       }
 
       //parse width if its IR
@@ -853,7 +850,7 @@ namespace Converter.Parsers.PDF
       // default value is StandardFont for nonsymbolic and for symbolic fonts its fon's encoding
       // so set null if it ssymbolic and not defined and later checked to skip it
       // we will set correction in parent function because encoding might come before font dictionary
-      data.BaseEncoding = PDF_FontEncodingType.Null;
+      data.BaseEncoding = string.Empty;
       bool dictStartFound = false;
       PDFSpanParseHelper helper = new PDFSpanParseHelper(ref buffer);
       while (!dictStartFound)
@@ -869,7 +866,7 @@ namespace Converter.Parsers.PDF
         switch (tokenString)
         {
           case "BaseEncoding":
-            data.BaseEncoding = helper.GetNextName<PDF_FontEncodingType>();
+            data.BaseEncoding = helper.GetNextToken();
             break;
           case "Differences":
             helper.ReadUntilNonWhiteSpaceDelimiter();
@@ -1993,6 +1990,8 @@ namespace Converter.Parsers.PDF
       objStreamInfo.CommonStreamDict = commonStreamDict;
 
       // Parse offsets
+      buffer = objStreamInfo.CommonStreamDict.RawStreamData.AsSpan();
+      helper = new PDFSpanParseHelper(ref buffer);
       objStreamInfo.Offsets = new List<(int, int)>();
       for (int i = 0; i < objStreamInfo.N; i++)
       {

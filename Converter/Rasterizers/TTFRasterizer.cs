@@ -476,21 +476,21 @@ namespace Converter.Rasterizers
     {
       // CMAP SHOULD BE USED IF there is cmap dict and if there is encoidng then use encoding
       // set PDF_FontEncodingSource
-      if (_encodingData.BaseEncoding == PDF_FontEncodingType.WinAnsiEncoding)
+      if (_encodingData.BaseEncoding == "WinAnsiEncoding")
       {
         _encodingArray = PDFEncodings.WinAnsiEncoding; // shouldn't this be adobe encoding??
         _encodingSource = PDF_FontEncodingSource.ENCODING;
-      } else if (_encodingData.BaseEncoding == PDF_FontEncodingType.MacRomanEncoding)
+      } else if (_encodingData.BaseEncoding == "MacRomanEncoding")
       {
         _encodingArray = PDFEncodings.MacRomanEncoding;
         _encodingSource = PDF_FontEncodingSource.ENCODING;
-      } else if (_encodingData.BaseEncoding == PDF_FontEncodingType.Null)
+      } else if (_encodingData.BaseEncoding == string.Empty)
       {
         _encodingArray = new int[0];
         _encodingSource = PDF_FontEncodingSource.CMAP;
         // TODO: These should be some more work done with prepending cmap data with some bytes, but figure out that later
 
-      } else if (_encodingData.BaseEncoding == PDF_FontEncodingType.StandardEncoding)
+      } else if (_encodingData.BaseEncoding == "StandardEncoding")
       {
         _encodingArray = PDFEncodings.AdobeSandardEncoding;
         _encodingSource = PDF_FontEncodingSource.ENCODING;
