@@ -271,9 +271,15 @@ namespace Converter.StaticData
         (CFCharacterCollections.AdobeKorea1_2, PDF_Version.V1_5) } },
       // Generic
       { "Identity-H", new (CFCharacterCollections collection, PDF_Version version) [] {
-        (CFCharacterCollections.AdobeKorea1_2, PDF_Version.V1_5) } },
-      { "Identity-V", new (CFCharacterCollections collection, PDF_Version version) [] { 
-        (CFCharacterCollections.AdobeKorea1_2, PDF_Version.V1_5) } }
+        (CFCharacterCollections.Adobe_Identity_0, PDF_Version.V1_2),
+        (CFCharacterCollections.Adobe_Identity_0, PDF_Version.V1_3),
+        (CFCharacterCollections.Adobe_Identity_0, PDF_Version.V1_4),
+        (CFCharacterCollections.Adobe_Identity_0, PDF_Version.V1_5) } },
+      { "Identity-V", new (CFCharacterCollections collection, PDF_Version version) [] {
+        (CFCharacterCollections.Adobe_Identity_0, PDF_Version.V1_2),
+        (CFCharacterCollections.Adobe_Identity_0, PDF_Version.V1_3),
+        (CFCharacterCollections.Adobe_Identity_0, PDF_Version.V1_4),
+        (CFCharacterCollections.Adobe_Identity_0, PDF_Version.V1_5) } },
     };
     
   }
