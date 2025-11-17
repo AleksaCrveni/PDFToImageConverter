@@ -28,7 +28,6 @@ namespace Converter.Parsers.PDF
     // this is mostly used to get 'keys' in dictionaries
     // for values there will be specific functions called based on key
     public string GetNextToken()
-
     {
       SkipWhiteSpaceAndDelimiters();
       int starter = _position;
@@ -41,6 +40,18 @@ namespace Converter.Parsers.PDF
       return Encoding.Default.GetString(_buffer.Slice(starter, _position - starter));
     }
 
+    public string GetNextASCIIString()
+    {
+      SkipWhiteSpaceAndDelimiters();
+      int starter = _position;
+      // don't have to check if _char is 0 if we reach end of the buffer becaseu its cheked in IsCurrentCharPdfWhiteSpace
+      while (!IsCurrentCharPdfWhiteSpace() && !delimiters.Contains(_char) && _readPosition < _buffer.Length)
+      {
+        ReadChar();
+      }
+
+      return Encoding.ASCII.GetString(_buffer.Slice(starter, _position - starter));
+    }
     // this gives positions of start and end of next token
     public void GetNextTokenPositionInt32(ref int start, ref int end)
     {
@@ -575,11 +586,17 @@ namespace Converter.Parsers.PDF
       ReadUntilNonWhiteSpaceDelimiter();
       if (_char != '(')
         throw new InvalidDataException("String literal error. Expected (");
+      ReadChar();
+      int starter = _position;
+      while (_readPosition < _buffer.Length && _char != ')')
+      {
+        ReadChar();
+      }
 
-      string result = GetNextToken();
+      string result = Encoding.Default.GetString(_buffer.Slice(starter, _position - starter));
 
       if (_char != ')')
-        throw new InvalidDataException("String literal error. Expected (");
+        throw new InvalidDataException("String literal error. Expected )");
       ReadChar();
       return result;
     }

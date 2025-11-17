@@ -1,5 +1,8 @@
-﻿using Converter.FileStructures.General;
+﻿using Converter.FileStructures.CompositeFonts;
+using Converter.FileStructures.General;
 using Converter.Rasterizers;
+using System.Numerics;
+using System.Text;
 
 namespace Converter.FileStructures.PDF
 {
@@ -16,6 +19,7 @@ namespace Converter.FileStructures.PDF
     public List<PDF_PageInfo> PageInformation { get; set; }
     public Stream Stream { get; set; }
     public List<(int key, PDF_ObjectStream data)> ObjectStreams { get; set; }
+    //public List<CMAP> CMAPS; Global cmaps
     public TargetConversion Target { get; set; } = TargetConversion.TIFF_GRAYSCALE;
     public PDF_Options Options;
 
@@ -217,25 +221,58 @@ namespace Converter.FileStructures.PDF
     public IRasterizer Rasterizer;
   }
 
-  // Table 111
+  // Null unless FontInfo.Subtype is 'Type0'
+  // Type0 == Composite font
+  // TODO (@Aleksa): Change grahpics interpreter to have different encoding when creating a string depending on FontSubtype
+  // Change to Unicode(?) for Type0 and default for the rest
+  public class CompositeFontInfo()
+  {
+    // CompositeFontInfo Root;
+    public CIDFontDictionary DescendantDict; // PDF support only one descendant in Composite fonts, unlike PostScript
+    public PDF_CIDCMAP Cmap;
+  }
+
+  public class CIDSystemInfo()
+  {
+    public string Registry;
+    public string Ordering;
+    public int Supplement;
+  }
+
+  // Table 117
+  public class CIDFontDictionary()
+  {
+    public PDF_FontType Subtype;
+    public string BaseFont;
+    public CIDSystemInfo CIDSystemInfo;
+    public PDF_FontDescriptor FontDescriptor;
+    public int DW = 1000;
+    // Key => CID; Value => Char width
+    public Dictionary<int, int> W;
+    public int[] DW2 = [880, -1000];
+    public Dictionary<int, (Vector2 vDisplacement, Vector2 position)> W2;
+    public PDF_CommonStreamDict? CIDToGIDMap;
+    public CIDToGIDMap CIDToGIDMapName = CompositeFonts.CIDToGIDMap.IDENTITY;
+  }
+  // Table 111 + other Fonts tables
+  // This table contains all fields that appear in any of the /Font dictionaries 
+  // and are only filled based on subtype
   public struct PDF_FontInfo()
   {
     public PDF_FontType SubType;
     public string Name;
-    // postscript name of the font, can be parsed later if needed
-    // this is actually enum??
     public string BaseFont;
     public int FirstChar;
     public int LastChar;
-    // can be indirect val
     public int[] Widths;
-    // is IR
     public PDF_FontDescriptor FontDescriptor;
     // can be name of dict, but just do enum for now
     public PDF_FontEncodingData EncodingData;
+
     // Type 0 only
-    public (int ojbIndex, int generation) DescendantFontsIR;
-    public (int objIndex, int generation) ToUnicodeIR;
+    public (int ojbIndex, int generation) DescendantFontsIR = (-1, -1);
+    public (int objIndex, int generation) ToUnicodeIR = (-1, -1);
+    public CompositeFontInfo? CompositeFontInfo;
   }
 
   // Table 114
@@ -265,7 +302,7 @@ namespace Converter.FileStructures.PDF
   }
 
   // Table 122
-  public struct PDF_FontDescriptor
+  public class PDF_FontDescriptor
   {
     // should be same as FontInfo.BaseFont
     public string FontName;
@@ -313,7 +350,7 @@ namespace Converter.FileStructures.PDF
 
   // 7.4.1 & Table 5
   // TODO: Expand this
-  public struct PDF_CommonStreamDict 
+  public class PDF_CommonStreamDict 
   {
     public PDF_CommonStreamDict()
     {
@@ -324,6 +361,16 @@ namespace Converter.FileStructures.PDF
     public long Length;
     public List<PDF_Filter> Filters = new List<PDF_Filter>() { PDF_Filter.Null };
     public byte[] RawStreamData;
+  }
+
+  /// <summary>
+  /// Check cmap first, if not found check ligature cmap
+  /// This just because mos tof the time it should be one rune and i dont want to make bunch of lists with one array because it feels weird
+  /// </summary>
+  public class PDF_CIDCMAP
+  {
+    public Dictionary<ushort, Rune> Cmap = new Dictionary<ushort, Rune>();
+    public Dictionary<ushort, List<Rune>> LigatureCmap = new Dictionary<ushort, List<Rune>>(); 
   }
 
   // 7.9.5

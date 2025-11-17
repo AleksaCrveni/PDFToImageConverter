@@ -2,7 +2,7 @@
 {
   public class SharedAllocator
   {
-    public byte[] Buffer;
+    public byte[]? Buffer;
     public Range Range;
     public bool IsSharedArray;
 

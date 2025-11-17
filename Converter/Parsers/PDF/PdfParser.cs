@@ -2,12 +2,16 @@
 using Converter.Converters.Image.TIFF;
 using Converter.FileStructures.General;
 using Converter.FileStructures.PDF;
+using Converter.Parsers.Fonts;
 using Converter.Rasterizers;
 using Converter.Writers.TIFF;
 using System.Buffers;
 using System.Diagnostics;
 using System.Globalization;
 using System.IO.Compression;
+using System.Numerics;
+using System.Runtime.CompilerServices;
+using System.Security.AccessControl;
 using System.Text;
 namespace Converter.Parsers.PDF
 {
@@ -131,71 +135,33 @@ namespace Converter.Parsers.PDF
       }
     }
 
-    // TODO: for later, see we can decode withoutloading it all
-    private void ParsePageContents(PDFFile file, (int objectIndex, int) objectPosition, ref PDF_CommonStreamDict contentDict)
+    // Wrap for now if i have to do extra work later
+    private void ParsePageContents(PDFFile file, (int objIndex, int generation) objPosition, ref PDF_CommonStreamDict contentDict)
     {
-      int objectIndex = objectPosition.objectIndex;
-      long objectByteOffset = file.CrossReferenceEntries[objectIndex].TenDigitValue;
-      // allocate bigger so we can reuse it for content stream later
-      // but maybe allocate smaller just to get lenght and then see if it can fit everything in stack
-      // you can do some entire obj size - length to get stream dictionary size, but I am not sure if this would work\
-      // if streams are interrupted
-      // for now just expect that stream dict at least will fit in 8kb, later chang if needed when testing with big files
-      Span<byte> buffer = stackalloc byte[KB * 8];
+      ParseCommonStream(file, objPosition, ref contentDict);
+    }
+
+    private void ParseCommonStream(PDFFile file, (int objIndex, int generation) objPosition, ref PDF_CommonStreamDict dict)
+    {
+      SharedAllocator allocator = GetObjBuffer(file, objPosition);
+      ReadOnlySpan<byte> buffer = allocator.Buffer.AsSpan(allocator.Range);
       PDFSpanParseHelper helper = new PDFSpanParseHelper(ref buffer);
-      file.Stream.Position = objectByteOffset;
-      int readBytes = file.Stream.Read(buffer);
-      if (readBytes == 0)
-        throw new InvalidDataException("Unexpected EOS!");
 
-      bool startDictFound = false;
-      while (!startDictFound)
-      {
-        helper.ReadUntilNonWhiteSpaceDelimiter();
-        if (helper._char == '<')
-          startDictFound = helper.IsCurrentCharacterSameAsNext();
-      }
-
-      // TODO: expand this
+      helper.GoToStartOfDict();
       string tokenString = helper.GetNextToken();
-      while (tokenString != "")
+      while (tokenString != string.Empty)
       {
-        ParseCommonStreamDictAsExtension(file, ref helper, tokenString, ref contentDict);
+        ParseCommonStreamDictAsExtension(file, ref helper, tokenString, ref dict);
         helper.ReadUntilNonWhiteSpaceDelimiter();
-        if (helper._char == '>' && helper.IsCurrentCharacterSameAsNext())
+        if (helper.IsEndOfDict())
           break;
         tokenString = helper.GetNextToken();
       }
-
-      if (tokenString == "")
-        throw new InvalidDataException("Invalid dictionary");
-
-      tokenString = helper.GetNextToken();
-      if (tokenString != "stream")
-        throw new InvalidDataException("Expected stream!");
-
-      // Parse stream
-      long encodedStreamLen = contentDict.Length;
-      // do some checking to know entire stream is already loaded in buffer
-      if (encodedStreamLen + helper._position > buffer.Length)
-      {
-        // full stream isn't loaded in the buffer so we have to load it
-        if (encodedStreamLen > buffer.Length)
-        {
-          // heap alloc if we can't reuse existing buffer
-          buffer = new byte[encodedStreamLen];
-        }
-        // set position after stream dict
-        file.Stream.Position = objectByteOffset + helper._position;
-        readBytes = file.Stream.Read(buffer);
-        if (readBytes == 0)
-          throw new InvalidDataException("Unexpected EOS!");
-        helper._position = 0;
-      }
-      // go to next line
+      helper.SkipNextToken(); // stream
       helper.SkipWhiteSpace();
-      ReadOnlySpan<byte> encodedSpan = buffer.Slice(helper._position, (int)encodedStreamLen);
-      contentDict.RawStreamData = DecodeFilter(ref encodedSpan, contentDict.Filters);
+      ReadOnlySpan<byte> encodedSpan = buffer.Slice(helper._position, (int)dict.Length);
+      dict.RawStreamData = DecodeFilter(ref encodedSpan, dict.Filters);
+      FreeAllocator(allocator);
     }
 
     private void ParseFontFileDictAndStream(PDFFile file, (int objectIndex, int) objPosition, ref PDF_FontFileInfo fontFileInfo, ref PDF_CommonStreamDict commonStreamDict)
@@ -678,12 +644,26 @@ namespace Converter.Parsers.PDF
         // TODO: assume that data is filled ? 
         // TODO: create right rasterized based on subtype and fontfile // Do I still eneed to do this?
 
-        IRasterizer rasterizer = new TTFRasterizer(fontInfo.FontDescriptor.FontFile.CommonStreamInfo.RawStreamData, ref fontInfo);
+        
+
+        IRasterizer rasterizer = fontInfo.SubType switch
+        {
+          PDF_FontType.Null => throw new NotImplementedException(),
+          PDF_FontType.Type0 => throw new NotImplementedException(),
+          PDF_FontType.Type1 => throw new NotImplementedException(),
+          PDF_FontType.MMType1 => throw new NotImplementedException(),
+          PDF_FontType.Type3 => throw new NotImplementedException(),
+          PDF_FontType.TrueType => new TTFRasterizer(fontInfo.FontDescriptor.FontFile.CommonStreamInfo.RawStreamData, ref fontInfo),
+          PDF_FontType.CIDFontType0 => throw new NotImplementedException(),
+          PDF_FontType.CIDFontType2 => throw new NotImplementedException(),
+          PDF_FontType.OpenType => throw new NotImplementedException(),
+        };
         fd.Rasterizer = rasterizer;
         fontData.Add(fd);
         FreeAllocator(allocator);
       }
     }
+
 
     /// <summary>
     /// Parse FontDictioanry data for ResourceDict that is referenced in from ParseFontIRDictionary.
@@ -786,8 +766,14 @@ namespace Converter.Parsers.PDF
 
             fontInfo.EncodingData = encodingData;
             break;
-          case "DescendantFonts":
+          case "DescendantFonts": // Spec says its array, but i've seen examples where writers just slap IR without array
+            helper.SkipWhiteSpace();
+            if (helper._char == '[')
+              helper.ReadChar();
             fontInfo.DescendantFontsIR = helper.GetNextIndirectReference();
+            helper.SkipWhiteSpace();
+            if (helper._char == ']')
+              helper.ReadChar();
             break;
           case "ToUnicode":
             fontInfo.ToUnicodeIR = helper.GetNextIndirectReference();
@@ -840,9 +826,270 @@ namespace Converter.Parsers.PDF
         FreeAllocator(irAllocator);
       }
 
+      // check if its composite Font
+      if (fontInfo.SubType == PDF_FontType.Type0)
+      {
+        CompositeFontInfo cInfo = new CompositeFontInfo();
+        CIDFontDictionary CIDFontDictionary = new CIDFontDictionary();
+        
+        ParseCIDFontDictionary(file, fontInfo.DescendantFontsIR, CIDFontDictionary);
+        cInfo.DescendantDict = CIDFontDictionary;
+        
+        PDF_CIDCMAP cmap = new PDF_CIDCMAP();
+        ParseToUnicodeCMAP(file, fontInfo.ToUnicodeIR, cmap);
+        cInfo.Cmap = cmap;
+        fontInfo.CompositeFontInfo = cInfo;
+      }
 
       if (tokenString == "")
         throw new InvalidDataException("Invalid dictionary");
+    }
+
+    private void ParseToUnicodeCMAP(PDFFile file, (int objIndex, int generation) objPosition, PDF_CIDCMAP cmap)
+    {
+      SharedAllocator allocator = GetObjBuffer(file, objPosition);
+      ReadOnlySpan<byte> buffer = allocator.Buffer.AsSpan(allocator.Range);
+      PDF_CommonStreamDict dict = new PDF_CommonStreamDict();
+      ParseCommonStream(file, objPosition, ref dict);
+
+      buffer = dict.RawStreamData.AsSpan();
+      CIDCmapParserHelper helper = new CIDCmapParserHelper(ref buffer);
+      cmap = helper.Parse();
+    }
+
+    /// <summary>
+    /// Can be single element array [ IR ] or actual object?
+    /// </summary>
+    /// <param name="file"></param>
+    /// <param name="objPosition"></param>
+    private void ParseCIDFontDictionary(PDFFile file, (int objIndex, int generation) objPosition, CIDFontDictionary dict)
+    {
+      SharedAllocator allocator = GetObjBuffer(file, objPosition);
+      ReadOnlySpan<byte> buffer = allocator.Buffer.AsSpan(allocator.Range);
+      PDFSpanParseHelper helper = new PDFSpanParseHelper(ref buffer);
+      helper.SkipWhiteSpace();
+      if (helper._char == '[')
+      {
+        helper.ReadChar();
+        objPosition = helper.GetNextIndirectReference();
+        helper.SkipWhiteSpace();
+        helper.ReadChar(); // ]
+        FreeAllocator(allocator);
+        allocator = GetObjBuffer(file, objPosition);
+        buffer = allocator.Buffer.AsSpan(allocator.Range);
+        helper = new PDFSpanParseHelper(ref buffer);
+      }
+      ParseCIDFontDictionary(file, ref helper, dict); 
+      FreeAllocator(allocator);
+    }
+
+    private void ParseCIDFontDictionary(PDFFile file, ref PDFSpanParseHelper helper, CIDFontDictionary dict)
+    {
+      helper.GoToStartOfDict();
+      string tokenString = helper.GetNextToken();
+      while (tokenString != string.Empty)
+      {
+        switch (tokenString)
+        {
+          case "Subtype":
+            dict.Subtype = helper.GetNextName<PDF_FontType>();
+            break;
+          case "BaseFont":
+            dict.BaseFont = helper.GetNextToken();
+            break;
+          case "CIDSystemInfo":
+            CIDSystemInfo CIDSystemInfo = new CIDSystemInfo();
+            (bool isDirect, SharedAllocator? allocator) info = ReadIntoDirectOrIndirectDict(file, ref helper);
+            if (info.isDirect)
+            {
+              ParseCIDSystemInfo(file, ref helper, CIDSystemInfo);
+            }
+            else
+            {
+              ReadOnlySpan<byte> irBuffer = info.allocator.Buffer.AsSpan(info.allocator.Range);
+              PDFSpanParseHelper irHelper = new PDFSpanParseHelper(ref irBuffer);
+              ParseCIDSystemInfo(file, ref irHelper, CIDSystemInfo);
+            }
+            FreeAllocator(info.allocator);
+            dict.CIDSystemInfo = CIDSystemInfo;
+            break;
+          case "FontDescriptor":
+            (int objIndex, int generation) objPosition = helper.GetNextIndirectReference();
+            PDF_FontDescriptor fd = new PDF_FontDescriptor();
+            ParseFontDescriptor(file, objPosition, ref fd);
+            dict.FontDescriptor = fd;
+            break;
+          case "DW":
+            dict.DW = helper.GetNextInt32();
+            break;
+          case "DW2":
+            helper.SkipWhiteSpace();
+            helper.ReadChar(); // skip '['
+            dict.DW2[0] = helper.GetNextInt32();
+            dict.DW2[1] = helper.GetNextInt32();
+            helper.SkipWhiteSpace();
+            helper.ReadChar(); // skip ']'
+            break;
+          case "W":
+            // can this be IR?
+            Dictionary<int, int> widths = new  Dictionary<int, int>();
+            info = ReadIntoDirectOrIndirectArray(file, ref helper);
+            if (info.isDirect)
+            {
+              ParseCIDDictWArray(file, ref helper, widths);
+            }
+            else
+            {
+              ReadOnlySpan<byte> irBuffer = info.allocator.Buffer.AsSpan(info.allocator.Range);
+              PDFSpanParseHelper irHelper = new PDFSpanParseHelper(ref irBuffer);
+              ParseCIDDictWArray(file, ref irHelper, widths);
+            }
+            dict.W = widths;
+            break;
+          case "W2":
+            // vertical metrics
+            Dictionary<int, (Vector2 vDisplacement, Vector2 position)> widths2 = new Dictionary<int, (Vector2 vDisplacement, Vector2 position)>();
+            info = ReadIntoDirectOrIndirectArray(file, ref helper);
+            if (info.isDirect)
+            {
+              ParseCIDDictW2Array(file, ref helper, widths2);
+            }
+            else
+            {
+              ReadOnlySpan<byte> irBuffer = info.allocator.Buffer.AsSpan(info.allocator.Range);
+              PDFSpanParseHelper irHelper = new PDFSpanParseHelper(ref irBuffer);
+              ParseCIDDictW2Array(file, ref irHelper, widths2);
+            }
+            dict.W2 = widths2;
+            break;
+          case "CIDToGIDMap":
+            helper.SkipWhiteSpace();
+            if (helper._char == '/')
+            {
+              helper.SkipNextToken();
+              dict.CIDToGIDMapName = FileStructures.CompositeFonts.CIDToGIDMap.IDENTITY;
+            } else
+            {
+              PDF_CommonStreamDict CIDToGIDMapData = new PDF_CommonStreamDict();
+              objPosition = helper.GetNextIndirectReference();
+              ParseCommonStream(file, objPosition, ref CIDToGIDMapData);
+              dict.CIDToGIDMap = CIDToGIDMapData;
+            }
+            break;
+          default:
+            break;
+        }
+        if (helper.IsEndOfDict())
+          break;
+        tokenString = helper.GetNextToken();
+      }
+
+    }
+
+    public void ParseCIDDictW2Array(PDFFile file, ref PDFSpanParseHelper helper, Dictionary<int, (Vector2 vDisplacement, Vector2 position)> widths)
+    {
+      int CIDStart = 0;
+      double w1 = 0;
+      double posX = 0;
+      double posY = 0;
+      int CIDEnd = 0;
+      Vector2 vDisplacement;
+      Vector2 position;
+      while (helper._char != ']' && helper._readPosition < helper._buffer.Length)
+      {
+        CIDStart = helper.GetNextInt32();
+        helper.SkipWhiteSpace();
+        if (helper._char == '[')
+        {
+          helper.ReadChar(); // skip '['
+          while (helper._char != ']' && helper._readPosition < helper._buffer.Length)
+          {
+            w1 = helper.GetNextDouble();
+            posX = helper.GetNextDouble();
+            posY = helper.GetNextDouble();
+            vDisplacement = new Vector2(0, (float)w1);
+            position = new Vector2((float)posX, (float)posY);
+            widths.Add(CIDStart++, (vDisplacement, position));  
+            helper.SkipWhiteSpace();
+          }
+          helper.ReadChar(); // skip ']'
+        } else
+        {
+          CIDEnd = helper.GetNextInt32();
+          w1 = helper.GetNextDouble();
+          posX = helper.GetNextDouble();
+          posY = helper.GetNextDouble();
+          vDisplacement = new Vector2(0, (float)w1);
+          position = new Vector2((float)posX, (float)posY);
+
+          for (int i = CIDStart; i <= CIDEnd; i++)
+          {
+            widths.Add(i, (vDisplacement, position));
+          }
+        }
+      }
+
+      helper.ReadChar(); // ']'
+    }
+
+    public void ParseCIDDictWArray(PDFFile file, ref PDFSpanParseHelper helper, Dictionary<int, int> widths)
+    {
+      int CIDStart = 0;
+      int CIDEnd = 0;
+      int width = 0;
+      int value = 0;
+      while (helper._char != ']' && helper._readPosition < helper._buffer.Length)
+      {
+        CIDStart = helper.GetNextInt32();
+        helper.SkipWhiteSpace();
+        if (helper._char == '[')
+        {
+          helper.ReadChar(); // skip '['
+          while(helper._char != ']' && helper._readPosition < helper._buffer.Length)
+          {
+            value = helper.GetNextInt32();
+            widths.Add(CIDStart++, value);
+            helper.SkipWhiteSpace();
+          }
+          helper.ReadChar(); // skip ']'
+        } else
+        {
+          CIDEnd = helper.GetNextInt32();
+          value = helper.GetNextInt32();
+
+          for (int i = CIDStart; i <= CIDEnd; i++)
+          {
+            widths.Add(i, value);
+          }
+        }
+      }
+      helper.ReadChar(); // ']'
+    }
+
+    public void ParseCIDSystemInfo(PDFFile file, ref PDFSpanParseHelper helper, CIDSystemInfo info)
+    {
+      helper.GoToStartOfDict();
+      string tokenString = helper.GetNextToken();
+      while (tokenString != string.Empty)
+      {
+        switch (tokenString)
+        {
+          case "Registry":
+            info.Registry = helper.GetNextASCIIString();
+            break;
+          case "Ordering":
+            info.Ordering = helper.GetNextASCIIString();
+            break;
+          case "Supplement":
+            info.Supplement = helper.GetNextInt32();
+            break;
+          default:
+            break;
+        }
+        if (helper.IsEndOfDict())
+          break;
+        tokenString = helper.GetNextToken();
+      }
     }
 
     private void ParseFontEncodingDictionary(PDFFile file, ReadOnlySpan<byte> buffer, ref PDF_FontEncodingData data)
@@ -923,8 +1170,13 @@ namespace Converter.Parsers.PDF
           case "FontName":
             fontDescriptor.FontName = helper.GetNextToken();
             break;
+          // NOTE: Spec says that this is byte string, but i've seen it be string literal in examples as well, so support both
           case "FontFamily":
-            fontDescriptor.FontFamily = helper.GetNextByteString();
+            helper.SkipWhiteSpace();
+            if (helper._char == '<')
+              fontDescriptor.FontFamily = helper.GetNextByteString();
+            else
+              fontDescriptor.FontFamily = helper.GetNextTextString();
             break;
           case "FontStretch":
             fontDescriptor.FontStretch = helper.GetNextName<PDF_FontStretch>();
@@ -1550,6 +1802,22 @@ namespace Converter.Parsers.PDF
 
       file.LastCrossReferenceOffset = xrefPos;
       file.Trailer = trailer;
+    }
+
+    public (bool isDirectObject, SharedAllocator? allocator) ReadIntoDirectOrIndirectArray(PDFFile file, ref PDFSpanParseHelper helper, bool returnIRBuffer = true)
+    {
+      helper.SkipWhiteSpace();
+      if (helper._char == '[')
+      {
+        return (true, null);
+      }
+      // shortcut
+      if (!returnIRBuffer)
+        return (false, new SharedAllocator());
+
+      (int objIndex, int generation) IR = helper.GetNextIndirectReference();
+      SharedAllocator allocator = GetObjBuffer(file, IR);
+      return (false, allocator);
     }
 
 
@@ -2258,7 +2526,11 @@ namespace Converter.Parsers.PDF
         return;
 
       if (allocator.IsSharedArray)
-        ArrayPool<byte>.Shared.Return(allocator.Buffer);
+      {
+        ArrayPool<byte>.Shared.Return(allocator.Buffer!);
+        // not sure what happens if I return array to buffer but keep reference to it
+        allocator.Buffer = null;
+      }
     }
 
     /// <summary>
