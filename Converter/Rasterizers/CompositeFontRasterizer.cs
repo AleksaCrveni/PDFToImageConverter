@@ -1,9 +1,9 @@
 ﻿
 namespace Converter.Rasterizers
 {
-  public class PSTypeZeroRasterizer : STBRasterizer, IRasterizer
+  public class CompositeFontRasterizer : STBRasterizer, IRasterizer
   {
-    public PSTypeZeroRasterizer(byte[] rawFontBuffer) : base(rawFontBuffer)
+    public CompositeFontRasterizer(byte[] rawFontBuffer) : base(rawFontBuffer)
     {
     }
 
