@@ -164,7 +164,7 @@ namespace Converter.Parsers.Fonts
 
     private void SkipWhiteSpaceAndNewline()
     {
-      while (_char != PDFConstants.NULL && (_char == ' ' || _char == '\n'))
+      while (_char != PDFConstants.NULL && (_char == ' ' || _char == '\n' || _char == '\r'))
         ReadChar();
     }
 
@@ -174,7 +174,7 @@ namespace Converter.Parsers.Fonts
 
       int starter = _position;
       // don't have to check if _char is 0 if we reach end of the buffer becaseu its cheked in IsCurrentCharPdfWhiteSpace
-      while (_char != PDFConstants.NULL && _char != ' ' && _char != '\n')
+      while (_char != PDFConstants.NULL && _char != ' ' && _char != '\n' && _char != '\r')
         ReadChar();
       return Encoding.Default.GetString(_buffer.Slice(starter, _position - starter));
     }
