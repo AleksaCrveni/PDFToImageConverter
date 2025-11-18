@@ -48,8 +48,7 @@ namespace Converter.Parsers.Fonts
     private void ParseBfCharsRange(PDF_CIDCMAP cmap)
     {
       int n = Convert.ToInt32(_lastWord);
-      SkipToNextLine();
-      SkipWhiteSpaceOnly();
+      SkipWhiteSpaceAndNewline();
       ushort CIDStart = 0;
       ushort CIDEnd = 0;
       uint code = 0;
@@ -77,12 +76,13 @@ namespace Converter.Parsers.Fonts
           }
           ReadChar();
         }
-        
-        SkipToNextLine();
+
+        SkipWhiteSpaceAndNewline();
       }
     }
     private List<Rune> GetLigatureRunes()
     {
+      SkipWhiteSpaceAndNewline();
       ReadChar(); // '<'
       List<Rune> list = new List<Rune>();
       while (_char != '>')
@@ -98,7 +98,7 @@ namespace Converter.Parsers.Fonts
     private void ParseBfChars(PDF_CIDCMAP cmap)
     {
       int n = Convert.ToInt32(_lastWord);
-      SkipToNextLine();
+      SkipWhiteSpaceAndNewline();
       ushort CID = 0;
       Rune r;
       for (int i =0; i < n; i++)
@@ -106,7 +106,7 @@ namespace Converter.Parsers.Fonts
         CID = ReadUShortBE();
         r = ReadRune();
         cmap.Cmap.Add(CID, r);
-        SkipToNextLine();
+        SkipWhiteSpaceAndNewline();
       }
     }
 
@@ -154,13 +154,6 @@ namespace Converter.Parsers.Fonts
         uint code = 65_536 + (uint)((high - 55_296) * 1024) + (uint)(low - 56_320);
         return new Rune(code);
       }
-    }
-
-    public void SkipToNextLine()
-    {
-      while (_char != PDFConstants.NULL && _char != '\n')
-        ReadChar();
-      ReadChar(); // skip \n
     }
 
     private void SkipWhiteSpaceOnly()
