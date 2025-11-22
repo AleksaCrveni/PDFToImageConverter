@@ -42,6 +42,18 @@
     COMPRESSED // type 3 in cross reference streams 
   }
 
+  // Table 122
+  // FontFile -> One
+  // FontFile2 -> Two
+  // FontFile3 -> Three
+  public enum PDF_FontFileType
+  {
+    NULL,
+    One,
+    Two,
+    Three
+  }
+
   public enum PDF_Tabs
   {
     Null = 0,
@@ -60,13 +72,6 @@
     SymbolSetEncoding
   }
 
-  // Table 122
-  public enum PDF_FontFileType
-  {
-    FontFile,
-    FontFil2,
-    FontFile3
-  }
 
   // Table 123
   [Flags]

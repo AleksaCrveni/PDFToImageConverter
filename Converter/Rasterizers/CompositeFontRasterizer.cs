@@ -1,10 +1,14 @@
 ﻿
+using Converter.FileStructures.PDF;
+
 namespace Converter.Rasterizers
 {
   public class CompositeFontRasterizer : STBRasterizer, IRasterizer
   {
-    public CompositeFontRasterizer(byte[] rawFontBuffer) : base(rawFontBuffer)
+    private IRasterizer _actualRasterizer;
+    public CompositeFontRasterizer(byte[] rawFontBuffer, ref PDF_FontInfo fontInfo) : base(rawFontBuffer)
     {
+      //fontInfo.CompositeFontInfo.DescendantDict.BaseFont
     }
 
     public (int glyphIndex, string glyphName) GetGlyphInfo(char c)

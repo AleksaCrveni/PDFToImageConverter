@@ -229,7 +229,7 @@ namespace Converter.FileStructures.PDF
   {
     // CompositeFontInfo Root;
     public CIDFontDictionary DescendantDict; // PDF support only one descendant in Composite fonts, unlike PostScript
-    public PDF_CIDCMAP Cmap;
+    public PDF_CID_CMAP Cmap;
   }
 
   public class CIDSystemInfo()
@@ -330,6 +330,22 @@ namespace Converter.FileStructures.PDF
     public PDF_FontType FontType;
     // byte string
     public string CharSet;
+    public PDF_CID_Style Style;
+    public string Lang;
+    public PDF_CID_FD FD;
+    public PDF_CommonStreamDict CIDSet;
+
+  }
+
+
+  public class PDF_CID_Style
+  {
+
+  }
+
+  public class PDF_CID_FD
+  {
+
   }
 
   // Table5  + Table 127
@@ -346,6 +362,7 @@ namespace Converter.FileStructures.PDF
     public int Length3;
     public PDF_FontFileSubtype Subtype;
     public byte[] Metadata;
+    public PDF_FontFileType Type = PDF_FontFileType.NULL;
   }
 
   // 7.4.1 & Table 5
@@ -367,7 +384,7 @@ namespace Converter.FileStructures.PDF
   /// Check cmap first, if not found check ligature cmap
   /// This just because mos tof the time it should be one rune and i dont want to make bunch of lists with one array because it feels weird
   /// </summary>
-  public class PDF_CIDCMAP
+  public class PDF_CID_CMAP
   {
     public Dictionary<ushort, Rune> Cmap = new Dictionary<ushort, Rune>();
     public Dictionary<ushort, List<Rune>> LigatureCmap = new Dictionary<ushort, List<Rune>>(); 

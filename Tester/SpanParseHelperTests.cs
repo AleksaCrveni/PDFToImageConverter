@@ -1,5 +1,9 @@
 ﻿using Converter.FileStructures.PDF;
 using Converter.Parsers.PDF;
+using Newtonsoft.Json.Converters;
+using System.Buffers.Binary;
+using System.ComponentModel;
+using System.Globalization;
 
 namespace Tester
 {

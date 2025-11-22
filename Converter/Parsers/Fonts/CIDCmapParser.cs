@@ -17,9 +17,9 @@ namespace Converter.Parsers.Fonts
     }
 
     // TODO: Optimize this
-    public PDF_CIDCMAP Parse()
+    public PDF_CID_CMAP Parse()
     {
-      PDF_CIDCMAP cmap = new PDF_CIDCMAP();
+      PDF_CID_CMAP cmap = new PDF_CID_CMAP();
       string token = GetNextToken();
       while (token != "endcmap" && token != string.Empty)
       {
@@ -45,7 +45,7 @@ namespace Converter.Parsers.Fonts
       return cmap;
     }
 
-    private void ParseBfCharsRange(PDF_CIDCMAP cmap)
+    private void ParseBfCharsRange(PDF_CID_CMAP cmap)
     {
       int n = Convert.ToInt32(_lastWord);
       SkipWhiteSpaceAndNewline();
@@ -95,7 +95,7 @@ namespace Converter.Parsers.Fonts
       return list;
     }
 
-    private void ParseBfChars(PDF_CIDCMAP cmap)
+    private void ParseBfChars(PDF_CID_CMAP cmap)
     {
       int n = Convert.ToInt32(_lastWord);
       SkipWhiteSpaceAndNewline();

@@ -644,21 +644,20 @@ namespace Converter.Parsers.PDF
         // TODO: assume that data is filled ? 
         // TODO: create right rasterized based on subtype and fontfile // Do I still eneed to do this?
 
-        
 
-        IRasterizer rasterizer = fontInfo.SubType switch
-        {
-          PDF_FontType.Null => throw new NotImplementedException(),
-          PDF_FontType.Type0 => throw new NotImplementedException(),
-          PDF_FontType.Type1 => throw new NotImplementedException(),
-          PDF_FontType.MMType1 => throw new NotImplementedException(),
-          PDF_FontType.Type3 => throw new NotImplementedException(),
-          PDF_FontType.TrueType => new TTFRasterizer(fontInfo.FontDescriptor.FontFile.CommonStreamInfo.RawStreamData, ref fontInfo),
-          PDF_FontType.CIDFontType0 => throw new NotImplementedException(),
-          PDF_FontType.CIDFontType2 => throw new NotImplementedException(),
-          PDF_FontType.OpenType => throw new NotImplementedException(),
-        };
-        fd.Rasterizer = rasterizer;
+        //IRasterizer rasterizer = fontInfo.SubType switch
+        //{
+        //  PDF_FontType.Null => throw new NotImplementedException(),
+        //  PDF_FontType.Type0 => new CompositeFontRasterizer(fontInfo.CompositeFontInfo.DescendantDict.FontDescriptor.FontFile.CommonStreamInfo.RawStreamData, ref fontInfo),
+        //  PDF_FontType.Type1 => throw new NotImplementedException(),
+        //  PDF_FontType.MMType1 => throw new NotImplementedException(),
+        //  PDF_FontType.Type3 => throw new NotImplementedException(),
+        //  PDF_FontType.TrueType => new TTFRasterizer(fontInfo.FontDescriptor.FontFile.CommonStreamInfo.RawStreamData, ref fontInfo),
+        //  PDF_FontType.CIDFontType0 => throw new NotImplementedException(),
+        //  PDF_FontType.CIDFontType2 => throw new NotImplementedException(),
+        //  PDF_FontType.OpenType => throw new NotImplementedException(),
+        //};
+       // fd.Rasterizer = rasterizer;
         fontData.Add(fd);
         FreeAllocator(allocator);
       }
@@ -835,7 +834,7 @@ namespace Converter.Parsers.PDF
         ParseCIDFontDictionary(file, fontInfo.DescendantFontsIR, CIDFontDictionary);
         cInfo.DescendantDict = CIDFontDictionary;
         
-        PDF_CIDCMAP cmap = new PDF_CIDCMAP();
+        PDF_CID_CMAP cmap = new PDF_CID_CMAP();
         ParseToUnicodeCMAP(file, fontInfo.ToUnicodeIR, cmap);
         cInfo.Cmap = cmap;
         fontInfo.CompositeFontInfo = cInfo;
@@ -845,7 +844,7 @@ namespace Converter.Parsers.PDF
         throw new InvalidDataException("Invalid dictionary");
     }
 
-    private void ParseToUnicodeCMAP(PDFFile file, (int objIndex, int generation) objPosition, PDF_CIDCMAP cmap)
+    private void ParseToUnicodeCMAP(PDFFile file, (int objIndex, int generation) objPosition, PDF_CID_CMAP cmap)
     {
       SharedAllocator allocator = GetObjBuffer(file, objPosition);
       ReadOnlySpan<byte> buffer = allocator.Buffer.AsSpan(allocator.Range);
@@ -1250,8 +1249,16 @@ namespace Converter.Parsers.PDF
           case "FontFile":
           case "FontFile2":
           case "FontFile3":
-            (int objectIndex, int generation) fontFileIR = helper.GetNextIndirectReference();
             PDF_FontFileInfo fontFileInfo = new PDF_FontFileInfo();
+            fontFileInfo.Type = tokenString switch
+            {
+              "FontFile"  => PDF_FontFileType.One,
+              "FontFile2" => PDF_FontFileType.Two,
+              "FontFile3" => PDF_FontFileType.Three,
+              _           => PDF_FontFileType.NULL
+            };
+            (int objectIndex, int generation) fontFileIR = helper.GetNextIndirectReference();
+
             PDF_CommonStreamDict commonStreamDict = new PDF_CommonStreamDict();
             ParseFontFileDictAndStream(file, fontFileIR, ref fontFileInfo, ref commonStreamDict);
             fontFileInfo.CommonStreamInfo = commonStreamDict;
@@ -1259,6 +1266,21 @@ namespace Converter.Parsers.PDF
             break;
           case "CharSet":
             fontDescriptor.CharSet = helper.GetNextToken();
+            break;
+          case "Style": // CID Only
+            throw new NotImplementedException();
+            break;
+          case "Lang":
+            throw new NotImplementedException();
+            break;
+          case "FD":
+            throw new NotImplementedException();
+            break;
+          case "CIDSet":
+            objPosition = helper.GetNextIndirectReference();
+            PDF_CommonStreamDict CIDSetDict = new PDF_CommonStreamDict();
+            ParseCommonStream(file, objPosition, ref CIDSetDict);
+            fontDescriptor.CIDSet = CIDSetDict;
             break;
           default:
             break;
