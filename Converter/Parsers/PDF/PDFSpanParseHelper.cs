@@ -1,4 +1,5 @@
 ﻿using Converter.FileStructures.PDF;
+using Converter.StaticData;
 using System.Globalization;
 using System.Text;
 
@@ -608,13 +609,7 @@ namespace Converter.Parsers.PDF
         ReadChar();
       }
     }
-    // can this be inlined?
-    public bool IsByteDigit(byte b)
-    {
-      if (b < 48 || b > 57)
-        return false;
-      return true;
-    }
+
     public bool IsCurrentByteDigit()
     {
       if (_char < 48 || _char > 57)
@@ -655,7 +650,5 @@ namespace Converter.Parsers.PDF
       // set curr and go next
       _position = _readPosition++;
     }
-
-
   }
 }
