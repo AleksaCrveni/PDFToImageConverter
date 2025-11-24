@@ -189,7 +189,7 @@ namespace Converter.FileStructures.PDF
     public Dictionary<object, object> XObject;
     // key is arbitary so it has to be a string and its used to reference this fonts
     public List<PDF_FontData> Font;
-    public List<string> ProcSet;
+    public List<PDF_ProcedureSet> ProcSets;
     public Dictionary<object, object> Properties;
   }
 
@@ -264,7 +264,7 @@ namespace Converter.FileStructures.PDF
     public string BaseFont;
     public int FirstChar;
     public int LastChar;
-    public int[] Widths;
+    public double[] Widths;
     public PDF_FontDescriptor FontDescriptor;
     // can be name of dict, but just do enum for now
     public PDF_FontEncodingData EncodingData;
@@ -350,7 +350,7 @@ namespace Converter.FileStructures.PDF
 
   // Table5  + Table 127
   // Length + Filter  + Table 127
-  public struct PDF_FontFileInfo
+  public class PDF_FontFileInfo
   {
     public PDF_CommonStreamDict CommonStreamInfo;
     public PDF_FontFileInfo()

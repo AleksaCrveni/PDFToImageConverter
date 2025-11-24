@@ -38,7 +38,7 @@ namespace Converter.Converters.Image.TIFF
       //workaround, use IRasterizer in covnerter
       PDF_FontData fd = GetFontDataFromKey(fontKey);
       IRasterizer activeParser = fd.Rasterizer;
-      int[] activeWidths = fd.FontInfo.Widths;
+      double[] activeWidths = fd.FontInfo.Widths;
       // skip for now 
       //if (fd.Key == "F2.0")
       //  return;
@@ -66,7 +66,7 @@ namespace Converter.Converters.Image.TIFF
         int idx = (int)c - fd.FontInfo.FirstChar;
         float width = 0;
         if (idx < activeWidths.Length)
-          width = activeWidths[idx] / 1000f;
+          width = (float)activeWidths[idx] / 1000f;
         else
           width = fd.FontInfo.FontDescriptor.MissingWidth / 1000f;
 

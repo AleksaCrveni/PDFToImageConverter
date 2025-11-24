@@ -165,4 +165,14 @@
     CMAP
   }
 
+  public enum PDF_ProcedureSet
+  {
+    NULL,
+    PDF,
+    TEXT,
+    IMAGEB,
+    IMAGEC,
+    IMAGEL
+  }
+
 }

@@ -4,6 +4,7 @@ using Converter.FileStructures.General;
 using Converter.FileStructures.PDF;
 using Converter.Parsers.Fonts;
 using Converter.Rasterizers;
+using Converter.StaticData;
 using Converter.Writers.TIFF;
 using System.Buffers;
 using System.Diagnostics;
@@ -425,7 +426,7 @@ namespace Converter.Parsers.PDF
             resourceDict.Font = fontData;
             break;
           case "ProcSet":
-            resourceDict.ProcSet = helper.GetNextArrayStrict();
+            resourceDict.ProcSets = helper.GetListOfNames<PDF_ProcedureSet>();
             break;
           case "Properties":
             resourceDict.Properties = helper.GetNextDict();
@@ -644,20 +645,19 @@ namespace Converter.Parsers.PDF
         // TODO: assume that data is filled ? 
         // TODO: create right rasterized based on subtype and fontfile // Do I still eneed to do this?
 
-
-        //IRasterizer rasterizer = fontInfo.SubType switch
-        //{
-        //  PDF_FontType.Null => throw new NotImplementedException(),
-        //  PDF_FontType.Type0 => new CompositeFontRasterizer(fontInfo.CompositeFontInfo.DescendantDict.FontDescriptor.FontFile.CommonStreamInfo.RawStreamData, ref fontInfo),
-        //  PDF_FontType.Type1 => throw new NotImplementedException(),
-        //  PDF_FontType.MMType1 => throw new NotImplementedException(),
-        //  PDF_FontType.Type3 => throw new NotImplementedException(),
-        //  PDF_FontType.TrueType => new TTFRasterizer(fontInfo.FontDescriptor.FontFile.CommonStreamInfo.RawStreamData, ref fontInfo),
-        //  PDF_FontType.CIDFontType0 => throw new NotImplementedException(),
-        //  PDF_FontType.CIDFontType2 => throw new NotImplementedException(),
-        //  PDF_FontType.OpenType => throw new NotImplementedException(),
-        //};
-       // fd.Rasterizer = rasterizer;
+        IRasterizer rasterizer = fontInfo.SubType switch
+        {
+          PDF_FontType.Null => throw new NotImplementedException(),
+          PDF_FontType.Type0 => new CompositeFontRasterizer(fontInfo.CompositeFontInfo.DescendantDict.FontDescriptor.FontFile.CommonStreamInfo.RawStreamData, ref fontInfo),
+          PDF_FontType.Type1 => new Type1Rasterizer(fontInfo.FontDescriptor.FontFile.CommonStreamInfo.RawStreamData, ref fontInfo),
+          PDF_FontType.MMType1 => throw new NotImplementedException(),
+          PDF_FontType.Type3 => throw new NotImplementedException(),
+          PDF_FontType.TrueType => new TTFRasterizer(fontInfo.FontDescriptor.FontFile.CommonStreamInfo.RawStreamData, ref fontInfo),
+          PDF_FontType.CIDFontType0 => throw new NotImplementedException(),
+          PDF_FontType.CIDFontType2 => throw new NotImplementedException(),
+          PDF_FontType.OpenType => throw new NotImplementedException(),
+        };
+        fd.Rasterizer = rasterizer;
         fontData.Add(fd);
         FreeAllocator(allocator);
       }
@@ -688,7 +688,7 @@ namespace Converter.Parsers.PDF
       // because it seems that data at IR can depend on that that comes after indirect refernce in parent dictionary
       // i.e first and last char can come after Widths arr
       (int wIndex, int generation) widthIR = (-1, 0);
-      int[] widthsArr;
+      double[] widthsArr;
       string tokenString = helper.GetNextToken();
       while (tokenString != "")
       {
@@ -715,11 +715,11 @@ namespace Converter.Parsers.PDF
             
             if (helper._char == '[')
             {
-              widthsArr = new int[fontInfo.LastChar - fontInfo.FirstChar + 1];
+              widthsArr = new double[fontInfo.LastChar - fontInfo.FirstChar + 1];
               helper.ReadChar();
               for (int i = 0; i < widthsArr.Length; i++)
               {
-                widthsArr[i] = helper.GetNextInt32();
+                widthsArr[i] = helper.GetNextDouble();
               }
               helper.ReadUntilNonWhiteSpaceDelimiter();
               if (helper._char != ']')
@@ -787,7 +787,7 @@ namespace Converter.Parsers.PDF
         tokenString = helper.GetNextToken();
       }
 
-      if (fontInfo.EncodingData.BaseEncoding == string.Empty && fontInfo.SubType == PDF_FontType.TrueType)
+      if (fontInfo.SubType == PDF_FontType.TrueType && fontInfo.EncodingData.BaseEncoding == string.Empty)
       {
         if (!((fontInfo.FontDescriptor.Flags & PDF_FontFlags.Symbolic) == PDF_FontFlags.Symbolic))
           fontInfo.EncodingData.BaseEncoding = "StandardEncoding";
@@ -799,13 +799,18 @@ namespace Converter.Parsers.PDF
         SharedAllocator irAllocator = GetObjBuffer(file, widthIR);
         ReadOnlySpan<byte> irBuffer = irAllocator.Buffer.AsSpan(irAllocator.Range);
 
-        widthsArr = new int[fontInfo.LastChar - fontInfo.FirstChar + 1];
+        widthsArr = new double[fontInfo.LastChar - fontInfo.FirstChar + 1];
         PDFSpanParseHelper irHelper = new PDFSpanParseHelper(ref irBuffer);
+        // NOTE: sometime obj can be without obj num and other stuff, maybe when its compressed it doesnt have that?
+        irHelper.ReadChar();
+        if (irHelper._char != '[')
+        {
+          irHelper.SkipNextToken(); // object id
+          irHelper.SkipNextToken(); // seocnd number
+          irHelper.SkipNextToken(); // 'obj'
+          irHelper.ReadUntilNonWhiteSpaceDelimiter();
+        }
 
-        irHelper.SkipNextToken(); // object id
-        irHelper.SkipNextToken(); // seocnd number
-        irHelper.SkipNextToken(); // 'obj'
-        irHelper.ReadUntilNonWhiteSpaceDelimiter();
         while (irHelper._char != '[')
         {
           irHelper.ReadChar();
@@ -814,7 +819,7 @@ namespace Converter.Parsers.PDF
 
         for (int i = 0; i < widthsArr.Length; i++)
         {
-          widthsArr[i] = irHelper.GetNextInt32();
+          widthsArr[i] = irHelper.GetNextDouble();
         }
 
         irHelper.ReadUntilNonWhiteSpaceDelimiter();
