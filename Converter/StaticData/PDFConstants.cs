@@ -1,4 +1,4 @@
-﻿namespace Converter.FileStructures.PDF
+﻿namespace Converter.StaticData
 {
   public static class PDFConstants
   {
