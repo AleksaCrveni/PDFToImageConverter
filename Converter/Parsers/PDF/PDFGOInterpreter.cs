@@ -1,10 +1,7 @@
 ﻿using Converter.Converters;
 using Converter.FileStructures.PDF;
 using Converter.FileStructures.PDF.GraphicsInterpreter;
-using Converter.FileStructures.TTF;
-using Converter.Rasterizers;
 using Converter.StaticData;
-using System.Diagnostics;
 using System.Globalization;
 using System.Text;
 

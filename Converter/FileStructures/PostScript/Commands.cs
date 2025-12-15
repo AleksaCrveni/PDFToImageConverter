@@ -1,0 +1,3 @@
+﻿namespace Converter.FileStructures.PostScript
+{
+}

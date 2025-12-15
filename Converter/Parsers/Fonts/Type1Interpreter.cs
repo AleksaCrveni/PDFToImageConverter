@@ -1,7 +1,10 @@
 ﻿using Converter.FileStructures.PDF;
 using Converter.FileStructures.Type1;
 using Converter.Parsers.PDF;
+using Converter.Parsers.PostScript;
 using Converter.StaticData;
+using System;
+using System.Diagnostics;
 using System.Globalization;
 using System.Text;
 
@@ -12,36 +15,12 @@ namespace Converter.Parsers.Fonts
   /// Font in font file. First only suppport non CFF font file data i.e 
   /// This is stack based interpreter
   /// </summary>
-  public ref struct Type1Interpreter
+  public class Type1Interpreter : PSInterpreter
   {
-    public ReadOnlySpan<byte> _buffer;
     private PDF_FontFileInfo _ffInfo;
-    public int _position = 0; // current posion
-    public int _readPosition = 0; // next position
-    public byte _char; // current char
-    private Stack<OperandType> operandTypes;
-    private Stack<double> realOperands;
-    private Stack<string> stringOperands;
-    private Stack<int> arrayLengths;
-    private static readonly byte[] delimiters = [
-      TYPE1Constants.LEFT_BRACKET,
-      TYPE1Constants.RIGHT_BRACKET,
-      TYPE1Constants.LEFT_PARENTHESIS,
-      TYPE1Constants.RIGHT_PARENTHESIS,
-      TYPE1Constants.SLASH,
-      TYPE1Constants.LESS_THAN,
-      TYPE1Constants.MORE_THAN
-      ];
 
-    public Type1Interpreter(ref Span<byte> buffer, ref PDF_FontFileInfo ffInfo)
+    public Type1Interpreter(byte[] buffer, PDF_FontFileInfo ffInfo) : base(buffer)
     {
-      _buffer = (ReadOnlySpan<byte>)buffer;
-      _ffInfo = ffInfo;
-    }
-
-    public Type1Interpreter(ref ReadOnlySpan<byte> buffer, ref PDF_FontFileInfo ffInfo)
-    {
-      _buffer = buffer;
       _ffInfo = ffInfo;
     }
 
@@ -55,53 +34,153 @@ namespace Converter.Parsers.Fonts
 
     private void Interpreter(TYPE1_Font font)
     {
-      string token = ProcessNextToken();
+      // skip header for now
+      SkipUntilAfterString("dict".AsSpan());
+      SkipNextString(); // begin
+
+      ParseFontDictionary(font);
+
+
+    }
+    public override bool IsCurrentCharPartOfOperator()
+    {
+      if ((__char >= 65 && __char <= 90) || (__char >= 97 && __char <= 122) || __char == '\'' || __char == '\"')
+        return true;
+      return false;
+    }
+    private void ParseFontDictionary(TYPE1_Font font)
+    {
+      font.FontDict = new();
+      font.FontDict.FontInfo = new();
+      string token = GetNextString();
       while (token != string.Empty)
       {
         switch (token)
         {
-          case "":
+          case "/FontType":
+            // get numbers like this now or create new function
+            GetNumber();
+            font.FontDict.FontType = (int)PopNumber();
+            // for now
+            Debug.Assert(font.FontDict.FontType == 1);
+            break;
+          case "/FontMatrix":
+            SkipWhiteSpace();
+            ReadChar();
+            GetNumber();
+            double a = PopNumber();
+            GetNumber();
+            double b = PopNumber();
+            GetNumber();
+            double c = PopNumber();
+            GetNumber();
+            double d = PopNumber();
+            GetNumber();
+            double e = PopNumber();
+            GetNumber();
+            double f = PopNumber();
+            ReadChar();
+            font.FontDict.FontMatrix = new double[3, 3] { { a, b, 0 }, { c, d, 0 }, { e, f, 0 } };
+
+            break;
+          case "/FontName":
+            font.FontDict.FontName = GetNextString();
+            break;
+          case "/FontBBox":
+            SkipWhiteSpace();
+            ReadChar();
+            GetNumber();
+            a = PopNumber();
+            GetNumber();
+            b = PopNumber();
+            GetNumber();
+            c = PopNumber();
+            GetNumber();
+            d = PopNumber();
+            PDF_Rect rect = new PDF_Rect();
+            rect.FillRect(a, b, c, d);
+            font.FontDict.FontBBox = rect;
+            ReadChar();
+            break;
+          case "/FontFamily":
+            font.FontDict.FontInfo.FamilyName= GetNextString();
+            break;
+          case "/Weight":
+            font.FontDict.FontInfo.Weight = GetNextString();
+            break;
+          case "/ItalicAngle":
+            GetNumber();
+            font.FontDict.FontInfo.ItalicAngle = PopNumber();
+            break;
+          case "/isFixedPitch":
+            font.FontDict.FontInfo.IsFixedPitch = GetNextString() == "true";
+            break;
+          case "/UnderlinePosition":
+            GetNumber();
+            font.FontDict.FontInfo.UnderlinePosition = PopNumber();
+            break;
+          case "/UnderlineThickness":
+            GetNumber();
+            font.FontDict.FontInfo.UnderlineThickness = PopNumber();
+            break;
+          case "/Encoding":
+            SkipWhiteSpace();
+            if (__char == 'S')
+            {
+              token = GetNextString();
+              Debug.Assert(token == "StandardEncoding");
+              SkipNextString();
+              // TODO: Is this right or should this be int[] like ADobeStandardGlyphs that index into this
+              // either way if its latter i can just refer to it since its static 
+              font.FontDict.Encoding = PDFEncodings.StandardGlyphNames;
+            } else
+            {
+
+            }
+            
             break;
           default:
-            stringOperands.Push(token);
-            operandTypes.Push(OperandType.STRING);
             break;
         }
+        SkipUntilAfterString("def".AsSpan());
         token = ProcessNextToken();
       }
     }
-  
+    
+
+
     private string ProcessNextToken()
     {
       SkipWhiteSpace();
       string tok = string.Empty;
-      if (IsCurrentCharDigit() || _char == '-')
+      if (IsCurrentCharDigit() || __char == '-')
       {
         GetNumber();
         return tok;
       }
 
-      int starter = _position;
+      int starter = __position;
 
-      while (!IsCurrentCharSpaceOrNull() && !delimiters.Contains(_char))
+      while (!IsCurrentCharWhiteSpace() && !__delimiters.Contains(__char))
         ReadChar();
-      tok =  Encoding.Default.GetString(_buffer.Slice(starter, _position - starter));
+      tok =  Encoding.Default.GetString(__buffer.AsSpan().Slice(starter, __position - starter));
       return tok;
     }
 
     private void ParseHeader(TYPE1_Font info)
     {
       // For now skip header
-      SkipUntilAfter("%%EndComments".AsSpan());
+      SkipUntilAfterString("%%EndComments".AsSpan());
     }
 
     // NOTE: Use only when you know str encoding
-    private void SkipUntilAfter(ReadOnlySpan<char> strToCmp)
+    // This DOES NOT match sbustrings, it merely checks if current string is same as strToCmp
+    private void SkipUntilAfterString(ReadOnlySpan<char> strToCmp)
     {
       ReadOnlySpan<byte> token = new ReadOnlySpan<byte>();
       GetNextStringAsSpan(ref token);
       bool found = false;
-      while (token.Length != 0 || !found)
+      while (token.Length != 0 && !found)
       {
         // we can do this because we know encoding of text we are searching for
         if (strToCmp.Length == token.Length)
@@ -123,93 +202,12 @@ namespace Converter.Parsers.Fonts
       SkipWhiteSpace();
     }
 
-    private void GetNextStringAsSpan(ref ReadOnlySpan<byte> span)
+    private double PopNumber()
     {
-      SkipWhiteSpace();
-      int start = _position;
-      while (!IsCurrentCharSpaceOrNull())
-        ReadChar();
-      span = _buffer.Slice(start, _position - start);
+      __operandTypes.Pop();
+      return __numberOperands.Pop();
     }
 
-    private void SkipWhiteSpaceAndDelimiters()
-    {
-      while (IsCurrentCharSpaceOrNull() || delimiters.Contains(_char))
-        ReadChar();
-    }
-    
-    private void SkipWhiteSpace()
-    {
-      while (IsCurrentCharSpaceOrNull())
-        ReadChar();
-    }
-
-    private bool IsCurrentCharSpaceOrNull()
-    {
-      if (_char == PDFConstants.SP || _char == PDFConstants.HT || _char == PDFConstants.LF || _char == PDFConstants.NULL)
-        return true;
-      return false;
-    }
-
-    private bool IsCurrentCharDigit()
-    {
-      if (_char < 48 || _char > 57)
-        return false;
-      return true;
-    }
-
-    private void ReadChar()
-    {
-      if (_readPosition >= _buffer.Length)
-        _char = PDFConstants.NULL;
-      else
-        _char = _buffer[_readPosition];
-
-      // set curr and go next
-      _position = _readPosition++;
-    }
-
-
-    private void GetNumber()
-    {
-      int startPos = _position;
-      int negativeMulti = 1;
-      if (_char == '-')
-      {
-        negativeMulti = -1;
-        ReadChar();
-      }
-
-      int integer = 0;
-      int baseIndex = -1;
-      while ((IsCurrentCharDigit() || _char == '.') && !IsCurrentCharSpaceOrNull())
-      {
-        if (_char == '.')
-        {
-          baseIndex = _position - startPos;
-          ReadChar();
-          continue;
-        }
-
-        integer = integer * 10 + CharUnicodeInfo.GetDecimalDigitValue((char)_char);
-        ReadChar();
-      }
-
-      if (baseIndex == -1)
-      {
-        // number is integer
-        realOperands.Push(integer * negativeMulti);
-      }
-      else
-      {
-        // number has no decimals but is expected to be double
-        // i.e 253.0
-        if (_position - baseIndex - startPos == 1)
-          realOperands.Push((double)(integer * negativeMulti));
-        else
-          realOperands.Push((integer / Math.Pow(10, _position - baseIndex - startPos - 1)) * negativeMulti);
-      }
-      operandTypes.Push(OperandType.DOUBLE);
-    }
+   
   }
 }

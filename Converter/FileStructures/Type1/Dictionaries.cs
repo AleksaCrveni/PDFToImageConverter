@@ -1,15 +1,17 @@
-﻿namespace Converter.FileStructures.Type1
+﻿using Converter.FileStructures.PDF;
+
+namespace Converter.FileStructures.Type1
 {
   public class TYPE1_FontDict
   {
     public TYPE1_FontInfo FontInfo;
     // enum
     public object FontName;
-    public object[] Encoding;
+    public string[] Encoding;
     // public int PaintType; Not used in PDF
     public int FontType;
-    public object[] FontMatrix;
-    public object[] FontBBox;
+    public double[,] FontMatrix;
+    public PDF_Rect FontBBox;
     public int UniqueID;
     public Dictionary<object, object> Metrics;
     public double StrokeWidth;
