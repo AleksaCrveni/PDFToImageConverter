@@ -1,11 +1,14 @@
 ﻿using BenchAndSmallTests;
 using BenchmarkDotNet.Running;
 using Converter;
+using Converter.FileStructures.PDF;
 using Converter.Parsers.PDF;
 using Converter.Rasterizers;
 using Converter.Writers;
 using Converter.Writers.TIFF;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.Diagnostics.Tracing.Parsers.MicrosoftWindowsWPF;
+using System.Security.Cryptography.X509Certificates;
 //int count1 = 0b_0000_0001;
 //int count2 = 0b_1110_0010;
 
@@ -90,89 +93,128 @@ using Microsoft.Diagnostics.Tracing.Parsers.MicrosoftWindowsWPF;
 
 // TODO: SEE WHY ASSERTS GET TRIGGERED SOMETIMES
 
-STBTrueType parser = new STBTrueType();
-byte[] arr = File.ReadAllBytes(@"W:\\PDFToImageConverter\\Files\\F1.0FontInfoSample.txt");
-parser.Init(ref arr);
-int bitmapWidth = 612;
-int bitmapHeight = 792;
-int lineHeight = 36;
-parser.InitFont(); // required
-byte[] bitmap = new byte[bitmapHeight * bitmapWidth];
-float scaleFactor = parser.ScaleForPixelHeight(lineHeight);
-string textToTranslate = "Sample PDF";
-int x = 0;
-// ascent and descent are defined in font descriptor, use those I think over getting i from  the font
-int ascent = 0;
-int descent = 0;
-int lineGap = 0;
-parser.GetFontVMetrics(ref ascent, ref descent, ref lineGap);
-ascent = (int)MathF.Round(ascent * scaleFactor);
-descent = (int)MathF.Round(descent * scaleFactor);
-int baseline = 0;
+//STBTrueType parser = new STBTrueType();
+//byte[] arr = File.ReadAllBytes(@"W:\\PDFToImageConverter\\Files\\F1.0FontInfoSample.txt");
+//parser.Init(ref arr);
+//int bitmapWidth = 612;
+//int bitmapHeight = 792;
+//int lineHeight = 36;
+//parser.InitFont(); // required
+//byte[] bitmap = new byte[bitmapHeight * bitmapWidth];
+//float scaleFactor = parser.ScaleForPixelHeight(lineHeight);
+//string textToTranslate = "Sample PDF";
+//int x = 0;
+//// ascent and descent are defined in font descriptor, use those I think over getting i from  the font
+//int ascent = 0;
+//int descent = 0;
+//int lineGap = 0;
+//parser.GetFontVMetrics(ref ascent, ref descent, ref lineGap);
+//ascent = (int)MathF.Round(ascent * scaleFactor);
+//descent = (int)MathF.Round(descent * scaleFactor);
+//int baseline = 0;
 
-for (int i = 0; i < textToTranslate.Length; i++)
-{
-  int ax = 0; // charatcter width
-  int lsb = 0; // left side bearing
+//for (int i = 0; i < textToTranslate.Length; i++)
+//{
+//  int ax = 0; // charatcter width
+//  int lsb = 0; // left side bearing
 
-  parser.GetCodepointHMetrics(textToTranslate[i], ref ax, ref lsb);
-  //stbtt_GetGlyphHMetrics(&info, )
+//  parser.GetCodepointHMetrics(textToTranslate[i], ref ax, ref lsb);
+//  //stbtt_GetGlyphHMetrics(&info, )
 
-  int c_x0 = 0;
-  int c_y0 = 0;
-  int c_x1 = 0;
-  int c_y1 = 0;
-  parser.GetCodepointBitmapBox(textToTranslate[i], scaleFactor, scaleFactor, ref c_x0, ref c_y0, ref c_x1, ref c_y1);
+//  int c_x0 = 0;
+//  int c_y0 = 0;
+//  int c_x1 = 0;
+//  int c_y1 = 0;
+//  parser.GetCodepointBitmapBox(textToTranslate[i], scaleFactor, scaleFactor, ref c_x0, ref c_y0, ref c_x1, ref c_y1);
 
-  // char height
-  int y = ascent + c_y0 + baseline;
+//  // char height
+//  int y = ascent + c_y0 + baseline;
 
-  int byteOffset = x + (int)MathF.Round(lsb * scaleFactor) + (y * bitmapWidth);
-  // BUG IS THAT I AM NOT ACCOUNTI)NG BYTE OFFSET??
-  parser.MakeCodepointBitmap(ref bitmap, byteOffset, c_x1 - c_x0, c_y1 - c_y0, bitmapWidth, scaleFactor, scaleFactor, textToTranslate[i]);
-  for (int ss = 0; ss < bitmap.Length;ss++)
-    if (bitmap[ss] > 0)
-    {
-      int sdasd = ss;
-    }
-  // advance x
-  x += (int)Math.Round(ax * scaleFactor);
+//  int byteOffset = x + (int)MathF.Round(lsb * scaleFactor) + (y * bitmapWidth);
+//  // BUG IS THAT I AM NOT ACCOUNTI)NG BYTE OFFSET??
+//  parser.MakeCodepointBitmap(ref bitmap, byteOffset, c_x1 - c_x0, c_y1 - c_y0, bitmapWidth, scaleFactor, scaleFactor, textToTranslate[i]);
+//  for (int ss = 0; ss < bitmap.Length;ss++)
+//    if (bitmap[ss] > 0)
+//    {
+//      int sdasd = ss;
+//    }
+//  // advance x
+//  x += (int)Math.Round(ax * scaleFactor);
 
-  // kerning
+//  // kerning
 
-  //int kern;
-  //kern = parser.GetCodepointKernAdvance(textToTranslate[i], textToTranslate[i + 1]);
-  //x += (int)Math.Round(kern * scaleFactor);
-}
+//  //int kern;
+//  //kern = parser.GetCodepointKernAdvance(textToTranslate[i], textToTranslate[i + 1]);
+//  //x += (int)Math.Round(kern * scaleFactor);
+//}
 
-List<string> ints = new();
-for (int i = 0; i < bitmap.Length; i++)
-{
-  if (bitmap[i] > 0)
-    ints.Add($"{i.ToString()} ");
-}
+//List<string> ints = new();
+//for (int i = 0; i < bitmap.Length; i++)
+//{
+//  if (bitmap[i] > 0)
+//    ints.Add($"{i.ToString()} ");
+//}
 
-List<string> lines = new List<string>();
-File.WriteAllLines(@"W:\PDFToImageConverter\Files\program.txt", ints.ToArray());
+//List<string> lines = new List<string>();
+//File.WriteAllLines(@"W:\PDFToImageConverter\Files\program.txt", ints.ToArray());
 
-TIFFGrayscaleWriter writer = new TIFFGrayscaleWriter("RasterizationTest.tiff");
-var options = new TIFFWriterOptions()
-{
-  Width = bitmapWidth,
-  Height = bitmapHeight
-};
-bool hasOne = false;
-for (int i = 0; i < bitmap.Length; i++)
-  if (bitmap[i] == 1)
-    hasOne = true;
+//TIFFGrayscaleWriter writer = new TIFFGrayscaleWriter("RasterizationTest.tiff");
+//var options = new TIFFWriterOptions()
+//{
+//  Width = bitmapWidth,
+//  Height = bitmapHeight
+//};
+//bool hasOne = false;
+//for (int i = 0; i < bitmap.Length; i++)
+//  if (bitmap[i] == 1)
+//    hasOne = true;
 
-if (!hasOne)
-  throw new Exception("Something went wrong, bitmap empty!");
+//if (!hasOne)
+//  throw new Exception("Something went wrong, bitmap empty!");
 
 //bitmap = new byte[bitmapWidth * bitmapHeight];
 //Array.Fill<byte>(bitmap, 255);
-writer.WriteImageWithBuffer(ref options, bitmap);
+
+//int bitmapWidth = 595;
+//int bitmapHeight = 842;
+//byte[] bitmap = new byte[bitmapHeight * bitmapWidth];
+
+////127.74350017309189 u
+////137.34650045633316 s
+////144.67250055074692 k
+////157.493000715971 P
+
+
+//float x1 = 127.74350017309189f;
+//float x2 = 137.34650045633316f;
+//float x3 = 144.67250055074692f;
+//float x4 = 157.493000715971f;
+
+
+//TIFFGrayscaleWriter writer = new TIFFGrayscaleWriter($"W:\\PDFToImageConverter\\Files\\lines.tiff");
+//var options = new TIFFWriterOptions()
+//{
+//  Width = bitmapWidth,
+//  Height = bitmapHeight
+//};
+
+//for (int i = 0; i < bitmapHeight; i++)
+//{
+//  bitmap[(int)x1 + i * bitmapWidth] = 64;
+//  bitmap[(int)x2 + i * bitmapWidth] = 64;
+//  bitmap[(int)x3 + i * bitmapWidth] = 64;
+//  bitmap[(int)x4 + i * bitmapWidth] = 64;
+
+//}
+
+//writer.WriteImageWithBuffer(ref options, bitmap);
+
 
 //PdfParser pdfParser = new PdfParser();
 //pdfParser.Parse(Files.BaseDocFilePath);
 //var runner = BenchmarkRunner.Run<MyBenches>();
+
+
+PdfParser parser = new PdfParser();
+PDF_Options options = new PDF_Options();
+parser.Parse(Files.RootFolder + "\\Prijemni-1.pdf", ref options);
