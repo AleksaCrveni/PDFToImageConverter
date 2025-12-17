@@ -151,6 +151,7 @@ namespace Converter.Parsers.PostScript
 
     public virtual void GetNumber()
     {
+      SkipWhiteSpace();
       int startPos = __position;
       int negativeMulti = 1;
       if (__char == '-')
@@ -206,6 +207,7 @@ namespace Converter.Parsers.PostScript
     }
     public virtual void GetName()
     {
+      SkipWhiteSpace();
       ReadChar();
       int startPos = __position;
       while (!IsCurrentCharWhiteSpace() && __char != PDFConstants.NULL)
@@ -233,7 +235,7 @@ namespace Converter.Parsers.PostScript
 
     public void SkipWhiteSpace()
     {
-      while (IsCurrentCharWhiteSpace())
+      while (IsCurrentCharWhiteSpace() && __char != PDFConstants.NULL)
         ReadChar();
     }
 

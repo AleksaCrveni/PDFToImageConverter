@@ -25,8 +25,7 @@ namespace Converter.Rasterizers
 
     protected override void InitFont()
     {
-      ReadOnlySpan<byte> buffer = _buffer.AsSpan();
-      Type1Interpreter interpreter = new Type1Interpreter(ref buffer, _fontInfo.FontDescriptor.FontFile);
+      Type1Interpreter interpreter = new Type1Interpreter(_buffer, _fontInfo.FontDescriptor.FontFile);
       interpreter.LoadFont();
     }
   }

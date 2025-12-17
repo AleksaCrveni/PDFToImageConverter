@@ -1,11 +1,8 @@
 ﻿using Converter.FileStructures.PDF;
 using Converter.FileStructures.Type1;
-using Converter.Parsers.PDF;
 using Converter.Parsers.PostScript;
 using Converter.StaticData;
-using System;
 using System.Diagnostics;
-using System.Globalization;
 using System.Text;
 
 namespace Converter.Parsers.Fonts
@@ -29,8 +26,8 @@ namespace Converter.Parsers.Fonts
       TYPE1_Font font = new TYPE1_Font();
       ParseHeader(font);
       Interpreter(font);
-      return null;
-    }
+      return font;
+    } 
 
     private void Interpreter(TYPE1_Font font)
     {
@@ -39,21 +36,34 @@ namespace Converter.Parsers.Fonts
       SkipNextString(); // begin
 
       ParseFontDictionary(font);
-
-
+      DecryptEEXEC();
     }
+
     public override bool IsCurrentCharPartOfOperator()
     {
       if ((__char >= 65 && __char <= 90) || (__char >= 97 && __char <= 122) || __char == '\'' || __char == '\"')
         return true;
       return false;
     }
+
+    // this should probably be virtual as well as font dict
+    public void DecryptEEXEC()
+    {
+      SkipUntilAfterString("eexec".AsSpan());
+      if (__char == PDFConstants.NULL)
+        return;
+      SkipWhiteSpace();
+      ReadOnlySpan<byte> encryptedPortion = __buffer.AsSpan().Slice(__position);
+      byte[] decrypted = DecompressionHelper.DecodeFilter(ref encryptedPortion, _ffInfo.CommonStreamInfo.Filters);
+      int i = 0;
+    }
     private void ParseFontDictionary(TYPE1_Font font)
     {
       font.FontDict = new();
       font.FontDict.FontInfo = new();
       string token = GetNextString();
-      while (token != string.Empty)
+      // this is gargabe and this file specific, fix it all later
+      while (token != string.Empty && token != "currentdict")
       {
         switch (token)
         {
@@ -135,19 +145,37 @@ namespace Converter.Parsers.Fonts
               font.FontDict.Encoding = PDFEncodings.StandardGlyphNames;
             } else
             {
+              GetNumber();
+              int len = (int)PopNumber();
+              string[] encodings = new string[len];
+              for (int i = 0; i < encodings.Length; i++)
+                encodings[i] = ".notdef";
+              SkipUntilAfterString("for".AsSpan());
+              token = GetNextString();
+              while (token != string.Empty && __char != 'r')
+              {
+                SkipNextString(); // dup
+                GetNumber();
+                int ind = (int)PopNumber();
+                GetName();
+                string charName = PopString();
+                encodings[ind] = charName;
+                SkipNextString(); // put
+                SkipWhiteSpace();
+              }
 
+              if (token == "readonly")
+                SkipNextString();
+              font.FontDict.Encoding = encodings;
             }
-            
             break;
           default:
             break;
         }
-        SkipUntilAfterString("def".AsSpan());
-        token = ProcessNextToken();
+        //SkipUntilAfterString("def".AsSpan());
+        token = GetNextString();
       }
     }
-    
-
 
     private string ProcessNextToken()
     {
@@ -208,6 +236,11 @@ namespace Converter.Parsers.Fonts
       return __numberOperands.Pop();
     }
 
+    private string PopString()
+    {
+      __operandTypes.Pop();
+      return __stringOperands.Pop();
+    }
    
   }
 }
