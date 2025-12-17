@@ -1,7 +1,7 @@
 ﻿using Converter.FileStructures.PDF;
 using System.IO.Compression;
 
-namespace Converter
+namespace Converter.Utils
 {
   public static class DecompressionHelper
   {

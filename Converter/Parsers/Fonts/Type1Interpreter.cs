@@ -2,6 +2,7 @@
 using Converter.FileStructures.Type1;
 using Converter.Parsers.PostScript;
 using Converter.StaticData;
+using Converter.Utils;
 using System.Diagnostics;
 using System.Text;
 

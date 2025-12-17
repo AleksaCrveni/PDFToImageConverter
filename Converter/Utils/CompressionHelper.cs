@@ -1,4 +1,4 @@
-﻿namespace Converter
+﻿namespace Converter.Utils
 {
   public static class CompressionHelper
   {
@@ -10,7 +10,7 @@
       byte CINFO = (byte)(CMF >> 4 & 15);
 
       // Fixed
-      if ((CM == 8 && CINFO <= 7 && CINFO > 0) &&
+      if (CM == 8 && CINFO <= 7 && CINFO > 0 &&
         ((ushort)(CMF * 256) + FLG) % 31 == 0)
           return true;
       

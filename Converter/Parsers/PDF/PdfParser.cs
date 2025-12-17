@@ -5,6 +5,7 @@ using Converter.FileStructures.PDF;
 using Converter.Parsers.Fonts;
 using Converter.Rasterizers;
 using Converter.StaticData;
+using Converter.Utils;
 using Converter.Writers.TIFF;
 using System.Buffers;
 using System.Diagnostics;
