@@ -37,7 +37,7 @@ namespace Converter.Parsers.Fonts
       SkipNextString(); // begin
 
       ParseFontDictionary(font);
-      DecryptEEXEC();
+      DecryptPrivateDictionary();
     }
 
     public override bool IsCurrentCharPartOfOperator()
@@ -48,15 +48,14 @@ namespace Converter.Parsers.Fonts
     }
 
     // this should probably be virtual as well as font dict
-    public void DecryptEEXEC()
+    public void DecryptPrivateDictionary()
     {
       SkipUntilAfterString("eexec".AsSpan());
       if (__char == PDFConstants.NULL)
         return;
       SkipWhiteSpace();
       ReadOnlySpan<byte> encryptedPortion = __buffer.AsSpan().Slice(__position);
-      byte[] decrypted = DecompressionHelper.DecodeFilter(ref encryptedPortion, _ffInfo.CommonStreamInfo.Filters);
-      int i = 0;
+      byte[] decrypted = DecryptionHelper.DecryptAdobeType1Encryption(encryptedPortion);
     }
     private void ParseFontDictionary(TYPE1_Font font)
     {
