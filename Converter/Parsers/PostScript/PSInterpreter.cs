@@ -129,7 +129,7 @@ namespace Converter.Parsers.PostScript
     
     public virtual void GetArray()
     {
-      ReadChar();
+      SkipWhiteSpaceAndDelimiters();
       int count = 0;
       SkipWhiteSpace();
       while (__char != ']' && __char != '}' && __char != PDFConstants.NULL)
@@ -207,8 +207,7 @@ namespace Converter.Parsers.PostScript
     }
     public virtual void GetName()
     {
-      SkipWhiteSpace();
-      ReadChar();
+      SkipWhiteSpaceAndDelimiters();
       int startPos = __position;
       while (!IsCurrentCharWhiteSpace() && __char != PDFConstants.NULL)
       {
@@ -227,15 +226,54 @@ namespace Converter.Parsers.PostScript
         ReadChar();
     }
 
-    public void SkipWhiteSpaceAndDelimiters()
+    public string GetNextTokenString()
     {
-      while (IsCurrentCharWhiteSpace() || __delimiters.Contains(__char))
+      return GetNextTokenString(Encoding.Default);
+    }
+    /// <summary>
+    /// Diffference compared to GetNextSTring() is that this function will stop not only at whitespace but if delimiter is met as well
+    /// </summary>
+    /// <returns></returns>
+    public string GetNextTokenString(Encoding enc)
+    {
+      SkipWhiteSpaceAndDelimiters();
+      int start = __position;
+      while (!IsCurrentCharWhiteSpace() && __delimiters.Contains(__char))
         ReadChar();
+      return enc.GetString(__buffer.AsSpan().Slice(start, __position - start));
     }
 
+    public string GetNextProcedureAsString()
+    {
+      return GetNextProcedureAsString(Encoding.Default);
+    }
+    public string GetNextProcedureAsString(Encoding enc)
+    {
+      int depth = 1;
+      SkipWhiteSpace();
+      if (__char == '{')
+        ReadChar();
+      // track depth because procedure can be another procedure
+      int start = __position;
+      while (depth != 0)
+      {
+        ReadChar();
+        if (__char == '{')
+          depth++;
+        else if (__char == '}')
+          depth--;
+      }
+      ReadChar(); // have to move off '}'
+      return enc.GetString(__buffer.AsSpan().Slice(start, __position - start - 1);
+    }
     public void SkipWhiteSpace()
     {
       while (IsCurrentCharWhiteSpace() && __char != PDFConstants.NULL)
+        ReadChar();
+    }
+    public void SkipWhiteSpaceAndDelimiters()
+    {
+      while (IsCurrentCharWhiteSpace() && __char != PDFConstants.NULL && __delimiters.Contains(__char))
         ReadChar();
     }
 

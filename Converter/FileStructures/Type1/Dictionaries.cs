@@ -22,28 +22,29 @@ namespace Converter.FileStructures.Type1
 
   public class TYPE1_Private
   {
-    public object RDProc;
-    public object NDProc;
-    public object NPProc;
+    public string RDProc;
+    public string NDProc;
+    public string NPProc;
     public object[] Subrs;
     public object[] OtherSubrs;
     public int UniqueID;
-    public object[] BlueValues;
-    public object[] OtherBlues;
-    public object[] FamilyBlues;
+    public double[] BlueValues;
+    public double[] OtherBlues;
+    public double[] FamilyBlues;
     public object[] FamilyOtherBlues;
     public double BlueScale;
-    public int BlueShift;
-    public int BlueFuzz;
-    public object[] StdHW;
-    public object[] StdVW;
-    public object[] StemSnapH;
-    public object[] StemSnapV;
+    public double BlueShift;
+    public double BlueFuzz;
+    public double[] StdHW;
+    public double[] StdVW;
+    public double[] StemSnapH;
+    public double[] StemSnapV;
     public bool ForceBold;
     public int LanguageGroup;
-    public int Password;
+    public string Password;
     public int LenIV;
-    public object[] MinFeature;
+    [Obsolete("Docs say that its obsolete and that values are always 16 16")]
+    public (int a, int b) MinFeature = (16, 16);
     public bool RndStemUp;
   }
 

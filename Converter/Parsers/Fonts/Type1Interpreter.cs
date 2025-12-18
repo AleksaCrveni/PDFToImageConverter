@@ -37,7 +37,8 @@ namespace Converter.Parsers.Fonts
       SkipNextString(); // begin
 
       ParseFontDictionary(font);
-      DecryptPrivateDictionary();
+      byte[] privateDictRaw = DecryptPrivateDictionary();
+      
     }
 
     public override bool IsCurrentCharPartOfOperator()
@@ -48,33 +49,136 @@ namespace Converter.Parsers.Fonts
     }
 
     // this should probably be virtual as well as font dict
-    public void DecryptPrivateDictionary()
+    public byte[] DecryptPrivateDictionary()
     {
       SkipUntilAfterString("eexec".AsSpan());
       if (__char == PDFConstants.NULL)
-        return;
+        return Array.Empty<byte>();
       SkipWhiteSpace();
       ReadOnlySpan<byte> encryptedPortion = __buffer.AsSpan().Slice(__position);
-      byte[] decrypted = DecryptionHelper.DecryptAdobeType1Encryption(encryptedPortion);
+      return DecryptionHelper.DecryptAdobeType1Encryption(encryptedPortion);
     }
+    private void ParsePrivateDictionary(TYPE1_Font font, byte[] input)
+    {
+      font.FontDict.Private = new();
+      if (input.Length == 0)
+        return;
+      // idk if this is ok workaround, this really is just just some kind of parser helper that shares common functions
+      Type1Interpreter helper = new Type1Interpreter(input, _ffInfo);
+      string token = helper.GetNextTokenString();
+      while (token != string.Empty)
+      {
+         switch (token)
+        {
+          case "RD":
+            font.FontDict.Private.RDProc = GetNextProcedureAsString();
+            break;
+          case "ND":
+            font.FontDict.Private.NDProc = GetNextProcedureAsString();
+            break;
+          case "NP":
+            font.FontDict.Private.NPProc = GetNextProcedureAsString();
+            break;
+          case "password":
+            font.FontDict.Private.Password = GetNextString();
+            break;
+          case "BlueValues":
+            GetArray();
+            int len = __arrayLengths.Pop();
+            __operandTypes.Pop();
+            double[] arr = new double[len];
+            for (int i = len; i >= 0; i--)
+              arr[i] = PopNumber();
+            font.FontDict.Private.BlueValues = arr;
+            break;
+          case "OtherBlues":
+            GetArray();
+            len = __arrayLengths.Pop();
+            __operandTypes.Pop();
+            arr = new double[len];
+            for (int i = len; i >= 0; i--)
+              arr[i] = PopNumber();
+            font.FontDict.Private.OtherBlues = arr;
+            break;
+          case "BlueScale":
+            GetNumber();
+            font.FontDict.Private.BlueScale = PopNumber();
+            break;
+          case "BlueShift":
+            GetNumber();
+            font.FontDict.Private.BlueShift = PopNumber();
+            break;
+          case "BlueFuzz":
+            GetNumber();
+            font.FontDict.Private.BlueFuzz = PopNumber();
+            break;
+          case "StdHW":
+            GetArray();
+            len = __arrayLengths.Pop();
+            __operandTypes.Pop();
+            arr = new double[len];
+            for (int i = len; i >= 0; i--)
+              arr[i] = PopNumber();
+            font.FontDict.Private.StdHW = arr;
+            break;
+          case "StdVW":
+            GetArray();
+            len = __arrayLengths.Pop();
+            __operandTypes.Pop();
+            arr = new double[len];
+            for (int i = len; i >= 0; i--)
+              arr[i] = PopNumber();
+            font.FontDict.Private.StdVW = arr;
+            break;
+          case "ForceBold":
+            string val = GetNextString();
+            font.FontDict.Private.ForceBold = val == "true";
+            break;
+          case "StemSnapH":
+            GetArray();
+            len = __arrayLengths.Pop();
+            __operandTypes.Pop();
+            arr = new double[len];
+            for (int i = len; i >= 0; i--)
+              arr[i] = PopNumber();
+            font.FontDict.Private.StemSnapH = arr;
+            break;
+          case "StemSnapV":
+            GetArray();
+            len = __arrayLengths.Pop();
+            __operandTypes.Pop();
+            arr = new double[len];
+            for (int i = len; i >= 0; i--)
+              arr[i] = PopNumber();
+            font.FontDict.Private.StemSnapV = arr;
+            break;
+          case "OtherSubrs":
+
+            break;
+          default:
+            break;
+        }
+      }
+    }
+
     private void ParseFontDictionary(TYPE1_Font font)
     {
       font.FontDict = new();
       font.FontDict.FontInfo = new();
-      string token = GetNextString();
+      string token = GetNextTokenString();
       // this is gargabe and this file specific, fix it all later
       while (token != string.Empty && token != "currentdict")
       {
         switch (token)
         {
-          case "/FontType":
+          case "FontType":
             // get numbers like this now or create new function
             GetNumber();
             font.FontDict.FontType = (int)PopNumber();
             // for now
             Debug.Assert(font.FontDict.FontType == 1);
             break;
-          case "/FontMatrix":
+          case "FontMatrix":
             SkipWhiteSpace();
             ReadChar();
             GetNumber();
@@ -93,10 +197,10 @@ namespace Converter.Parsers.Fonts
             font.FontDict.FontMatrix = new double[3, 3] { { a, b, 0 }, { c, d, 0 }, { e, f, 0 } };
 
             break;
-          case "/FontName":
+          case "FontName":
             font.FontDict.FontName = GetNextString();
             break;
-          case "/FontBBox":
+          case "FontBBox":
             SkipWhiteSpace();
             ReadChar();
             GetNumber();
@@ -112,28 +216,28 @@ namespace Converter.Parsers.Fonts
             font.FontDict.FontBBox = rect;
             ReadChar();
             break;
-          case "/FontFamily":
+          case "FontFamily":
             font.FontDict.FontInfo.FamilyName= GetNextString();
             break;
-          case "/Weight":
+          case "Weight":
             font.FontDict.FontInfo.Weight = GetNextString();
             break;
-          case "/ItalicAngle":
+          case "ItalicAngle":
             GetNumber();
             font.FontDict.FontInfo.ItalicAngle = PopNumber();
             break;
-          case "/isFixedPitch":
+          case "isFixedPitch":
             font.FontDict.FontInfo.IsFixedPitch = GetNextString() == "true";
             break;
-          case "/UnderlinePosition":
+          case "UnderlinePosition":
             GetNumber();
             font.FontDict.FontInfo.UnderlinePosition = PopNumber();
             break;
-          case "/UnderlineThickness":
+          case "UnderlineThickness":
             GetNumber();
             font.FontDict.FontInfo.UnderlineThickness = PopNumber();
             break;
-          case "/Encoding":
+          case "Encoding":
             SkipWhiteSpace();
             if (__char == 'S')
             {
@@ -173,7 +277,7 @@ namespace Converter.Parsers.Fonts
             break;
         }
         //SkipUntilAfterString("def".AsSpan());
-        token = GetNextString();
+        token = GetNextTokenString();
       }
     }
 
