@@ -3,6 +3,7 @@ using Converter.FileStructures.Type1;
 using Converter.Parsers.PostScript;
 using Converter.StaticData;
 using Converter.Utils;
+using System;
 using System.Diagnostics;
 using System.Text;
 
@@ -38,6 +39,7 @@ namespace Converter.Parsers.Fonts
 
       ParseFontDictionary(font);
       byte[] privateDictRaw = DecryptPrivateDictionary();
+      ParsePrivateDictionary(font, privateDictRaw);
       
     }
 
@@ -68,96 +70,88 @@ namespace Converter.Parsers.Fonts
       string token = helper.GetNextTokenString();
       while (token != string.Empty)
       {
-         switch (token)
+        switch (token)
         {
-          case "RD":
-            font.FontDict.Private.RDProc = GetNextProcedureAsString();
-            break;
-          case "ND":
-            font.FontDict.Private.NDProc = GetNextProcedureAsString();
-            break;
-          case "NP":
-            font.FontDict.Private.NPProc = GetNextProcedureAsString();
-            break;
+          //case "RD":
+          //  font.FontDict.Private.RDProc = helper.GetNextProcedureAsString();
+          //  break;
+          //case "ND":
+          //  font.FontDict.Private.NDProc = helper.GetNextProcedureAsString();
+          //  break;
+          //case "NP":
+          //  font.FontDict.Private.NPProc = helper.GetNextProcedureAsString();
+          //  break;
           case "password":
-            font.FontDict.Private.Password = GetNextString();
+            font.FontDict.Private.Password = helper.GetNextString();
             break;
           case "BlueValues":
-            GetArray();
-            int len = __arrayLengths.Pop();
-            __operandTypes.Pop();
-            double[] arr = new double[len];
-            for (int i = len; i >= 0; i--)
-              arr[i] = PopNumber();
-            font.FontDict.Private.BlueValues = arr;
+            helper.GetArray();
+            font.FontDict.Private.BlueValues = helper.PopNumberArray();
             break;
           case "OtherBlues":
-            GetArray();
-            len = __arrayLengths.Pop();
-            __operandTypes.Pop();
-            arr = new double[len];
-            for (int i = len; i >= 0; i--)
-              arr[i] = PopNumber();
-            font.FontDict.Private.OtherBlues = arr;
+            helper.GetArray();
+            font.FontDict.Private.OtherBlues = helper.PopNumberArray();
             break;
           case "BlueScale":
-            GetNumber();
-            font.FontDict.Private.BlueScale = PopNumber();
+            helper.GetNumber();
+            font.FontDict.Private.BlueScale = helper.PopNumber();
             break;
           case "BlueShift":
-            GetNumber();
-            font.FontDict.Private.BlueShift = PopNumber();
+            helper.GetNumber();
+            font.FontDict.Private.BlueShift = helper.PopNumber();
             break;
           case "BlueFuzz":
-            GetNumber();
-            font.FontDict.Private.BlueFuzz = PopNumber();
+            helper.GetNumber();
+            font.FontDict.Private.BlueFuzz = helper.PopNumber();
             break;
           case "StdHW":
-            GetArray();
-            len = __arrayLengths.Pop();
-            __operandTypes.Pop();
-            arr = new double[len];
-            for (int i = len; i >= 0; i--)
-              arr[i] = PopNumber();
-            font.FontDict.Private.StdHW = arr;
+            helper.GetArray();
+            font.FontDict.Private.StdHW = helper.PopNumberArray();
             break;
           case "StdVW":
-            GetArray();
-            len = __arrayLengths.Pop();
-            __operandTypes.Pop();
-            arr = new double[len];
-            for (int i = len; i >= 0; i--)
-              arr[i] = PopNumber();
-            font.FontDict.Private.StdVW = arr;
+            helper.GetArray();
+            font.FontDict.Private.StdVW = helper.PopNumberArray();
             break;
           case "ForceBold":
-            string val = GetNextString();
+            string val = helper.GetNextString();
             font.FontDict.Private.ForceBold = val == "true";
             break;
           case "StemSnapH":
-            GetArray();
-            len = __arrayLengths.Pop();
-            __operandTypes.Pop();
-            arr = new double[len];
-            for (int i = len; i >= 0; i--)
-              arr[i] = PopNumber();
-            font.FontDict.Private.StemSnapH = arr;
+            helper.GetArray();
+            font.FontDict.Private.StemSnapH = helper.PopNumberArray();
             break;
           case "StemSnapV":
-            GetArray();
-            len = __arrayLengths.Pop();
-            __operandTypes.Pop();
-            arr = new double[len];
-            for (int i = len; i >= 0; i--)
-              arr[i] = PopNumber();
-            font.FontDict.Private.StemSnapV = arr;
+            helper.GetArray();
+            font.FontDict.Private.StemSnapV = helper.PopNumberArray();
             break;
-          case "OtherSubrs":
+          case "Subrs":
+            helper.GetNumber();
+            int len = (int)helper.PopNumber();
+            helper.SkipNextString();
+            List<string> decrypted = new List<string>();
+            ReadOnlySpan<byte> buff = new ReadOnlySpan<byte>();
+            for (int i = 0; i < len; i++)
+            {
+              //dup 0 15 RD �1p|=-�D\�R NP
+              //dup 0 15 {string currentfile exch readstring pop} �1p|=-�D\�R
+              helper.SkipNextString(); // dup
+              helper.GetNumber();
+              int ind = (int)helper.PopNumber();
+              helper.GetNumber();
+              int second = (int)helper.PopNumber();
+              helper.SkipWhiteSpace(); // RD
+              helper.GetNextEncryptedSpan(ref buff);
+              helper.SkipNextString();
+              byte[] decStr = DecryptionHelper.DecryptAdobeType1Encryption(buff);
+              decrypted.Add($"dup {ind} {second} {font.FontDict.Private.RDProc} {Encoding.Default.GetString(decStr)} {font.FontDict.Private.NDProc}");
+            }
 
+            File.WriteAllLines(Files.RootFolder + @"\decryptedSubrs.txt", decrypted);
             break;
           default:
             break;
         }
+        token = helper.GetNextTokenString();
       }
     }
 
@@ -293,7 +287,7 @@ namespace Converter.Parsers.Fonts
 
       int starter = __position;
 
-      while (!IsCurrentCharWhiteSpace() && !__delimiters.Contains(__char))
+      while (!IsCurrentCharWhiteSpaceOrNull() && !__delimiters.Contains(__char))
         ReadChar();
       tok =  Encoding.Default.GetString(__buffer.AsSpan().Slice(starter, __position - starter));
       return tok;

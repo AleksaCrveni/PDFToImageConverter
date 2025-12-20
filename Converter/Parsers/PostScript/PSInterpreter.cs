@@ -1,6 +1,9 @@
 ﻿using Converter.Parsers.PDF;
 using Converter.StaticData;
+using System;
 using System.Globalization;
+using System.Numerics;
+using System.Runtime.CompilerServices;
 using System.Text;
 
 namespace Converter.Parsers.PostScript
@@ -22,13 +25,19 @@ namespace Converter.Parsers.PostScript
       __buffer = buffer;
       __position = 0;
       __readPosition = 0;
-      __char = PDFConstants.SP;
+      ReadChar();
       __numberOperands = new Stack<double>();
       __stringOperands = new Stack<string>();
       __operandTypes = new Stack<OperandType>();
       __arrayLengths = new Stack<int>();
       // I understand the warning, in this case its fine since im changing abstract class field only once
-      InitDelimiters(); 
+      InitDelimiters();
+      SkipNulls();
+    }
+    public void SkipNulls()
+    {
+      while (__char == PDFConstants.NULL)
+        ReadChar();
     }
 
     public abstract bool IsCurrentCharPartOfOperator();
@@ -48,6 +57,15 @@ namespace Converter.Parsers.PostScript
       };
     }
     
+    // Use this for encrypted stuff, i am not sure if encr thing can be 0 , but i think now because it might not be able to be decrypted, just use for now......
+    public void GetNextEncryptedSpan(ref ReadOnlySpan<byte> span)
+    {
+      SkipWhiteSpace();
+      int start = __position;
+      while (!IsCurrentCharWhiteSpace() && __readPosition <= __buffer.Length)
+        ReadChar();
+      span = __buffer.AsSpan().Slice(start, __position - start);
+    }
 
     /// <summary>
     /// Read to next byte and see if its:
@@ -108,7 +126,7 @@ namespace Converter.Parsers.PostScript
     {
       SkipWhiteSpace();
       int start = __position;
-      while (!IsCurrentCharWhiteSpace())
+      while (!IsCurrentCharWhiteSpaceOrNull())
         ReadChar();
       span = __buffer.AsSpan().Slice(start, __position - start);
     }
@@ -122,16 +140,45 @@ namespace Converter.Parsers.PostScript
     {
       SkipWhiteSpace();
       int start = __position;
-      while (!IsCurrentCharWhiteSpace())
+      while (!IsCurrentCharWhiteSpaceOrNull())
         ReadChar();
       return enc.GetString(__buffer.AsSpan().Slice(start, __position - start));
     }
-    
+
+    public string[] PopStringArray()
+    {
+      int len = __arrayLengths.Pop();
+      __operandTypes.Pop();
+
+      string[] arr = new string[len];
+
+      // traverse from back because its stack 
+      OperandType t;
+      for (int i = len - 1; i >= 0; i--)
+        arr[i] = PopString();
+
+      return arr;
+    }
+
+    public double[] PopNumberArray()
+    {
+      int len = __arrayLengths.Pop();
+      __operandTypes.Pop();
+
+      double[] arr = new double[len];
+
+      // traverse from back because its stack 
+      OperandType t;
+      for (int i = len - 1; i >= 0; i--)
+        arr[i] = PopNumber();
+
+      return arr;
+    }
+
     public virtual void GetArray()
     {
       SkipWhiteSpaceAndDelimiters();
       int count = 0;
-      SkipWhiteSpace();
       while (__char != ']' && __char != '}' && __char != PDFConstants.NULL)
       {
         if (IsCurrentCharDigit() || __char == '-')
@@ -162,7 +209,7 @@ namespace Converter.Parsers.PostScript
 
       int integer = 0;
       int baseIndex = -1;
-      while ((IsCurrentCharDigit() || __char == '.') && !IsCurrentCharWhiteSpace())
+      while ((IsCurrentCharDigit() || __char == '.') && !IsCurrentCharWhiteSpaceOrNull())
       {
         if (__char == '.')
         {
@@ -209,7 +256,7 @@ namespace Converter.Parsers.PostScript
     {
       SkipWhiteSpaceAndDelimiters();
       int startPos = __position;
-      while (!IsCurrentCharWhiteSpace() && __char != PDFConstants.NULL)
+      while (!IsCurrentCharWhiteSpaceOrNull() && __char != PDFConstants.NULL)
       {
         ReadChar();
       }
@@ -222,7 +269,7 @@ namespace Converter.Parsers.PostScript
     public void SkipNextString()
     {
       SkipWhiteSpace();
-      while (!IsCurrentCharWhiteSpace())
+      while (!IsCurrentCharWhiteSpaceOrNull())
         ReadChar();
     }
 
@@ -238,7 +285,7 @@ namespace Converter.Parsers.PostScript
     {
       SkipWhiteSpaceAndDelimiters();
       int start = __position;
-      while (!IsCurrentCharWhiteSpace() && __delimiters.Contains(__char))
+      while (!IsCurrentCharWhiteSpaceOrNull() && !__delimiters.Contains(__char))
         ReadChar();
       return enc.GetString(__buffer.AsSpan().Slice(start, __position - start));
     }
@@ -264,26 +311,35 @@ namespace Converter.Parsers.PostScript
           depth--;
       }
       ReadChar(); // have to move off '}'
-      return enc.GetString(__buffer.AsSpan().Slice(start, __position - start - 1);
+      return enc.GetString(__buffer.AsSpan().Slice(start, __position - start - 1));
     }
     public void SkipWhiteSpace()
     {
-      while (IsCurrentCharWhiteSpace() && __char != PDFConstants.NULL)
+      while (IsCurrentCharWhiteSpaceOrNull() && __char != PDFConstants.NULL)
         ReadChar();
     }
     public void SkipWhiteSpaceAndDelimiters()
     {
-      while (IsCurrentCharWhiteSpace() && __char != PDFConstants.NULL && __delimiters.Contains(__char))
+      while ((IsCurrentCharWhiteSpaceOrNull() && __char != PDFConstants.NULL) || __delimiters.Contains(__char))
         ReadChar();
     }
 
-    public virtual bool IsCurrentCharWhiteSpace()
+    public virtual bool IsCurrentCharWhiteSpaceOrNull()
     {
       if (__char == PDFConstants.SP ||
           __char == PDFConstants.HT ||
           __char == PDFConstants.LF ||
           __char == PDFConstants.CR ||
           __char == PDFConstants.NULL) 
+        return true;
+      return false;
+    }
+    public virtual bool IsCurrentCharWhiteSpace()
+    {
+      if (__char == PDFConstants.SP ||
+          __char == PDFConstants.HT ||
+          __char == PDFConstants.LF ||
+          __char == PDFConstants.CR)
         return true;
       return false;
     }
@@ -303,6 +359,17 @@ namespace Converter.Parsers.PostScript
       if (__char < 48 || __char > 57)
         return false;
       return true;
+    }
+    
+    public double PopNumber()
+    {
+      __operandTypes.Pop();
+      return __numberOperands.Pop();
+    }
+    public string PopString()
+    {
+      __operandTypes.Pop();
+      return __stringOperands.Pop();
     }
   }
 }
