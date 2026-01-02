@@ -1,4 +1,4 @@
-﻿// This file is used by Code Analysis to maintain SuppressMessage
+// This file is used by Code Analysis to maintain SuppressMessage
 // attributes that are applied to this project.
 // Project-level suppressions either have no target or are given
 // a specific target and scoped to a namespace, type, member, etc.
@@ -15,3 +15,4 @@ using System.Diagnostics.CodeAnalysis;
 [assembly: SuppressMessage("Major Code Smell", "S3358:Ternary operators should not be nested", Justification = "<Pending>", Scope = "member", Target = "~M:Converter.Parsers.PDF.PdfParser.FillAllPageTreeAndInformation(System.ValueTuple{System.Int32,System.Int32},System.Collections.Generic.List{Converter.FileStructures.PDF.PDF_PageTree},System.Collections.Generic.List{Converter.FileStructures.PDF.PDF_PageInfo},Converter.FileStructures.PDF.PDFFile)")]
 [assembly: SuppressMessage("Major Code Smell", "S3358:Ternary operators should not be nested", Justification = "<Pending>", Scope = "member", Target = "~M:Converter.Parsers.PDF.PdfParser.ParseCatalogDictionary(Converter.FileStructures.PDF.PDFFile)")]
 [assembly: SuppressMessage("Major Code Smell", "S3358:Ternary operators should not be nested", Justification = "<Pending>", Scope = "member", Target = "~M:Converter.Parsers.PDF.PdfParser.ParseFontDictionary(Converter.FileStructures.PDF.PDFFile,System.ReadOnlySpan{System.Byte},Converter.FileStructures.PDF.PDF_FontInfo@)")]
+[assembly: SuppressMessage("Style", "IDE0011:Add braces", Justification = "It randomly bugged out and enabled this as errors in intellisense, so i am disabling it forcefuly.", Scope = "module")]
