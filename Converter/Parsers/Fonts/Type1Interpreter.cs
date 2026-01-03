@@ -38,9 +38,11 @@ namespace Converter.Parsers.Fonts
       SkipNextString(); // begin
 
       ParseFontDictionary(font);
+      // we can skip to this by offseting with Length1 (length of clear  portion of the program)
+      // length of it is Length2
+      // TODO: Apparently this can be ascii string as well, look into this
       byte[] privateDictRaw = DecryptPrivateDictionary();
       ParsePrivateDictionary(font, privateDictRaw);
-      
     }
 
     public override bool IsCurrentCharPartOfOperator()
@@ -139,11 +141,11 @@ namespace Converter.Parsers.Fonts
               int ind = (int)helper.PopNumber();
               helper.GetNumber();
               int second = (int)helper.PopNumber();
-              helper.SkipWhiteSpace(); // RD
+              helper.SkipNextString(); // RD
               helper.GetNextEncryptedSpan(ref buff);
               helper.SkipNextString();
               byte[] decStr = DecryptionHelper.DecryptAdobeType1Encryption(buff);
-              decrypted.Add($"dup {ind} {second} {font.FontDict.Private.RDProc} {Encoding.Default.GetString(decStr)} {font.FontDict.Private.NDProc}");
+              decrypted.Add($"dup {ind} {second} {Encoding.Default.GetString(decStr)}");
             }
 
             File.WriteAllLines(Files.RootFolder + @"\decryptedSubrs.txt", decrypted);
@@ -232,6 +234,7 @@ namespace Converter.Parsers.Fonts
             font.FontDict.FontInfo.UnderlineThickness = PopNumber();
             break;
           case "Encoding":
+            // TODO: Refactor all of this code, this all sucks
             SkipWhiteSpace();
             if (__char == 'S')
             {
@@ -248,8 +251,11 @@ namespace Converter.Parsers.Fonts
               string[] encodings = new string[len];
               for (int i = 0; i < encodings.Length; i++)
                 encodings[i] = ".notdef";
+              // this might not be good idea
+              // TODO: i should be reading each string and search for dup and then do it based on that
               SkipUntilAfterString("for".AsSpan());
-              token = GetNextString();
+              // just put w/e so skip next string doesnt skip over dup 
+              token = "placeholder";
               while (token != string.Empty && __char != 'r')
               {
                 SkipNextString(); // dup
@@ -326,19 +332,6 @@ namespace Converter.Parsers.Fonts
           GetNextStringAsSpan(ref token);
       }
       SkipWhiteSpace();
-    }
-
-    private double PopNumber()
-    {
-      __operandTypes.Pop();
-      return __numberOperands.Pop();
-    }
-
-    private string PopString()
-    {
-      __operandTypes.Pop();
-      return __stringOperands.Pop();
-    }
-   
+    }  
   }
 }
