@@ -25,7 +25,7 @@ namespace Converter.Rasterizers
 
     protected override void InitFont()
     {
-      Type1Interpreter interpreter = new Type1Interpreter(_buffer, _fontInfo.FontDescriptor.FontFile);
+      Type1Interpreter interpreter = new Type1Interpreter(_buffer, _fontInfo);
       interpreter.LoadFont();
     }
   }

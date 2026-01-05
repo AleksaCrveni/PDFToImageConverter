@@ -57,14 +57,15 @@ namespace Converter.Parsers.PostScript
       };
     }
     
-    // Use this for encrypted stuff, i am not sure if encr thing can be 0 , but i think now because it might not be able to be decrypted, just use for now......
-    public void GetNextEncryptedSpan(ref ReadOnlySpan<byte> span)
+    // Can be used to get encrypted portion of charstring because we know length of it
+    public void GetNextNBytes(ref ReadOnlySpan<byte> span, int count)
     {
-      SkipWhiteSpace();
       int start = __position;
-      while (!IsCurrentCharWhiteSpace() && __readPosition <= __buffer.Length)
+      // TODO: ideally we could just check len and slice but then we have to set correct pos, add this function later
+      while (count-- > 0)
         ReadChar();
       span = __buffer.AsSpan().Slice(start, __position - start);
+      ReadChar(); // move of to next character after N 
     }
 
     /// <summary>

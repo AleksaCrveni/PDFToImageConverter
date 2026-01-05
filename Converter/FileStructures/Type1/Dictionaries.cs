@@ -42,7 +42,7 @@ namespace Converter.FileStructures.Type1
     public bool ForceBold;
     public int LanguageGroup;
     public string Password;
-    public int LenIV;
+    public ushort LenIV = 4;
     [Obsolete("Docs say that its obsolete and that values are always 16 16")]
     public (int a, int b) MinFeature = (16, 16);
     public bool RndStemUp;

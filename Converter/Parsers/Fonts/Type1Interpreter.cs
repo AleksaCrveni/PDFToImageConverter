@@ -5,6 +5,7 @@ using Converter.StaticData;
 using Converter.Utils;
 using System;
 using System.Diagnostics;
+using System.Runtime.CompilerServices;
 using System.Text;
 
 namespace Converter.Parsers.Fonts
@@ -16,9 +17,9 @@ namespace Converter.Parsers.Fonts
   /// </summary>
   public class Type1Interpreter : PSInterpreter
   {
-    private PDF_FontFileInfo _ffInfo;
+    private PDF_FontInfo _ffInfo;
 
-    public Type1Interpreter(byte[] buffer, PDF_FontFileInfo ffInfo) : base(buffer)
+    public Type1Interpreter(byte[] buffer, PDF_FontInfo ffInfo) : base(buffer)
     {
       _ffInfo = ffInfo;
     }
@@ -42,6 +43,7 @@ namespace Converter.Parsers.Fonts
       // length of it is Length2
       // TODO: Apparently this can be ascii string as well, look into this
       byte[] privateDictRaw = DecryptPrivateDictionary();
+      File.WriteAllBytes(Files.RootFolder + @$"\{_ffInfo.FontDescriptor.FontName}-decryptedEEXEC.txt", privateDictRaw);
       ParsePrivateDictionary(font, privateDictRaw);
     }
 
@@ -59,8 +61,10 @@ namespace Converter.Parsers.Fonts
       if (__char == PDFConstants.NULL)
         return Array.Empty<byte>();
       SkipWhiteSpace();
+      // TODO: len of this shouldn't go to the end of the file but can be calcualted based on
+      // Lenght2 and Length1
       ReadOnlySpan<byte> encryptedPortion = __buffer.AsSpan().Slice(__position);
-      return DecryptionHelper.DecryptAdobeType1Encryption(encryptedPortion);
+      return DecryptionHelper.DecryptAdobeType1EEXEC(encryptedPortion);
     }
     private void ParsePrivateDictionary(TYPE1_Font font, byte[] input)
     {
@@ -126,10 +130,14 @@ namespace Converter.Parsers.Fonts
             helper.GetArray();
             font.FontDict.Private.StemSnapV = helper.PopNumberArray();
             break;
+          case "lenIV":
+            helper.GetNumber();
+            font.FontDict.Private.LenIV = (ushort)helper.PopNumber();
+            break;
           case "Subrs":
             helper.GetNumber();
             int len = (int)helper.PopNumber();
-            helper.SkipNextString();
+            helper.SkipNextString(); // array
             List<string> decrypted = new List<string>();
             ReadOnlySpan<byte> buff = new ReadOnlySpan<byte>();
             for (int i = 0; i < len; i++)
@@ -140,15 +148,16 @@ namespace Converter.Parsers.Fonts
               helper.GetNumber();
               int ind = (int)helper.PopNumber();
               helper.GetNumber();
-              int second = (int)helper.PopNumber();
+              int charStringLength = (int)helper.PopNumber();
               helper.SkipNextString(); // RD
-              helper.GetNextEncryptedSpan(ref buff);
+              helper.ReadChar(); // skip one space
+              helper.GetNextNBytes(ref buff, charStringLength);
               helper.SkipNextString();
-              byte[] decStr = DecryptionHelper.DecryptAdobeType1Encryption(buff);
-              decrypted.Add($"dup {ind} {second} {Encoding.Default.GetString(decStr)}");
+              byte[] decStr = DecryptionHelper.DecryptAdobeType1CharString(buff, Convert.ToUInt16(font.FontDict.Private.Password), font.FontDict.Private.LenIV);
+              decrypted.Add($"dup {ind} {charStringLength} {Encoding.Default.GetString(decStr)}");
             }
 
-            File.WriteAllLines(Files.RootFolder + @"\decryptedSubrs.txt", decrypted);
+            File.WriteAllLines(Files.RootFolder + @$"\{_ffInfo.FontDescriptor.FontName}"+ @"-decryptedSubrs.txt", decrypted);
             break;
           default:
             break;
@@ -332,6 +341,6 @@ namespace Converter.Parsers.Fonts
           GetNextStringAsSpan(ref token);
       }
       SkipWhiteSpace();
-    }  
+    }
   }
 }
