@@ -8,11 +8,11 @@ namespace Converter.Utils
     public static readonly ushort CHARSTRING_CONST_PWD = 4330;
     public static byte[] DecryptAdobeType1CharString(ReadOnlySpan<byte> encrypted)
     {
-      return DecryptAdobeType1CharString(encrypted, CHARSTRING_CONST_PWD, 4);
+      return DecryptAdobeType1Encryption(encrypted, CHARSTRING_CONST_PWD, 4);
     }
-    public static byte[] DecryptAdobeType1CharString(ReadOnlySpan<byte> encrypted, ushort pwd, ushort lenIV)
+    public static byte[] DecryptAdobeType1CharString(ReadOnlySpan<byte> encrypted, ushort lenIV)
     {
-      return DecryptAdobeType1Encryption(encrypted, pwd, lenIV);
+      return DecryptAdobeType1Encryption(encrypted, CHARSTRING_CONST_PWD, lenIV);
     }
     public static byte[] DecryptAdobeType1EEXEC(ReadOnlySpan<byte> encrypted)
     {
