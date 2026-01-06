@@ -25,7 +25,7 @@ namespace Converter.FileStructures.Type1
     public string RDProc;
     public string NDProc;
     public string NPProc;
-    public List<byte[]> Subrs;
+    public byte[][] Subrs;
     public object[] OtherSubrs;
     public int UniqueID;
     public double[] BlueValues;
@@ -46,6 +46,7 @@ namespace Converter.FileStructures.Type1
     [Obsolete("Docs say that its obsolete and that values are always 16 16")]
     public (int a, int b) MinFeature = (16, 16);
     public bool RndStemUp;
+    public Dictionary<string, byte[]> CharStrings;
   }
 
   public class TYPE1_FontInfo

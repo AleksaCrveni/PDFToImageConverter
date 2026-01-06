@@ -135,33 +135,10 @@ namespace Converter.Parsers.Fonts
             font.FontDict.Private.LenIV = (ushort)helper.PopNumber();
             break;
           case "Subrs":
-            helper.GetNumber();
-            int len = (int)helper.PopNumber();
-            helper.SkipNextString(); // array
-            List<string> decrypted = new List<string>(); // debug only remove later
-            ReadOnlySpan<byte> buff = new ReadOnlySpan<byte>();
-            if (font.FontDict.Private.Subrs == null)
-              font.FontDict.Private.Subrs = new List<byte[]>();
-
-            for (int i = 0; i < len; i++)
-            {
-              //dup 0 15 RD �1p|=-�D\�R NP
-              //dup 0 15 {string currentfile exch readstring pop} �1p|=-�D\�R
-              helper.SkipNextString(); // dup
-              helper.GetNumber();
-              int ind = (int)helper.PopNumber();
-              helper.GetNumber();
-              int charStringLength = (int)helper.PopNumber();
-              helper.SkipNextString(); // RD
-              helper.ReadChar(); // skip one space
-              helper.GetNextNBytes(ref buff, charStringLength);
-              helper.SkipNextString();
-              byte[] decr = DecryptionHelper.DecryptAdobeType1CharString(buff, font.FontDict.Private.LenIV);
-              decrypted.Add($"dup {ind} {charStringLength} {Encoding.Default.GetString(decr)}");
-              font.FontDict.Private.Subrs.Add(decr);
-            }
-
-            File.WriteAllLines(Files.RootFolder + @$"\{_ffInfo.FontDescriptor.FontName}"+ @"-decryptedSubrs.txt", decrypted);
+            helper.ParseSubrs(font);
+            break;
+          case "CharStrings":
+            helper.ParseCharStrings(font);
             break;
           default:
             break;
@@ -292,6 +269,67 @@ namespace Converter.Parsers.Fonts
         //SkipUntilAfterString("def".AsSpan());
         token = GetNextTokenString();
       }
+    }
+    private void ParseSubrs(TYPE1_Font font)
+    {
+      GetNumber();
+      int len = (int)PopNumber();
+      SkipNextString(); // array
+      List<string> decrypted = new List<string>(); // debug only remove later
+      ReadOnlySpan<byte> buff = new ReadOnlySpan<byte>();
+      if (font.FontDict.Private.Subrs == null)
+        font.FontDict.Private.Subrs = new byte[len][];
+
+      for (int i = 0; i < len; i++)
+      {
+        //dup 0 15 RD �1p|=-�D\�R NP
+        //dup 0 15 {string currentfile exch readstring pop} �1p|=-�D\�R
+        SkipNextString(); // dup
+        GetNumber();
+        int ind = (int)PopNumber();
+        GetNumber();
+        int charStringLength = (int)PopNumber();
+        SkipNextString(); // RD
+        ReadChar(); // skip one space
+        GetNextNBytes(ref buff, charStringLength);
+        SkipNextString();
+        byte[] decr = DecryptionHelper.DecryptAdobeType1CharString(buff, font.FontDict.Private.LenIV);
+        decrypted.Add($"dup {ind} {charStringLength} {Encoding.Default.GetString(decr)}");
+        font.FontDict.Private.Subrs[ind] = decr;
+      }
+
+      File.WriteAllLines(Files.RootFolder + @$"\{_ffInfo.FontDescriptor.FontName}" + @"-decryptedSubrs.txt", decrypted);
+    }
+    private void ParseCharStrings(TYPE1_Font font)
+    {
+      GetNumber();
+      int len = (int)PopNumber();
+      SkipNextString(); // dict
+      SkipNextString(); // dup
+      SkipNextString(); // begin
+      List<string> decrypted = new List<string>(); // debug only remove later
+      ReadOnlySpan<byte> buff = new ReadOnlySpan<byte>();
+      if (font.FontDict.Private.CharStrings == null)
+        font.FontDict.Private.CharStrings = new Dictionary<string, byte[]>();
+
+      for (int i = 0; i < len; i++)
+      {
+        //dup 0 15 RD �1p|=-�D\�R NP
+        //dup 0 15 {string currentfile exch readstring pop} �1p|=-�D\�R
+        GetName();
+        string key = PopString();
+        GetNumber();
+        int charStringLength = (int)PopNumber();
+        SkipNextString(); // RD
+        ReadChar(); // skip one space
+        GetNextNBytes(ref buff, charStringLength);
+        SkipNextString(); // ND
+        byte[] decr = DecryptionHelper.DecryptAdobeType1CharString(buff, font.FontDict.Private.LenIV);
+        decrypted.Add($"dup {key} {charStringLength} {Encoding.Default.GetString(decr)}");
+        font.FontDict.Private.CharStrings[key] = decr;
+      }
+
+      File.WriteAllLines(Files.RootFolder + @$"\{_ffInfo.FontDescriptor.FontName}" + @"-decryptedCharStrings.txt", decrypted);
     }
 
     private string ProcessNextToken()
