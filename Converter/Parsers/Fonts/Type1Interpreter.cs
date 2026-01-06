@@ -138,8 +138,11 @@ namespace Converter.Parsers.Fonts
             helper.GetNumber();
             int len = (int)helper.PopNumber();
             helper.SkipNextString(); // array
-            List<string> decrypted = new List<string>();
+            List<string> decrypted = new List<string>(); // debug only remove later
             ReadOnlySpan<byte> buff = new ReadOnlySpan<byte>();
+            if (font.FontDict.Private.Subrs == null)
+              font.FontDict.Private.Subrs = new List<byte[]>();
+
             for (int i = 0; i < len; i++)
             {
               //dup 0 15 RD �1p|=-�D\�R NP
@@ -153,8 +156,9 @@ namespace Converter.Parsers.Fonts
               helper.ReadChar(); // skip one space
               helper.GetNextNBytes(ref buff, charStringLength);
               helper.SkipNextString();
-              byte[] decStr = DecryptionHelper.DecryptAdobeType1CharString(buff, Convert.ToUInt16(font.FontDict.Private.Password), font.FontDict.Private.LenIV);
-              decrypted.Add($"dup {ind} {charStringLength} {Encoding.Default.GetString(decStr)}");
+              byte[] decr = DecryptionHelper.DecryptAdobeType1CharString(buff, font.FontDict.Private.LenIV);
+              decrypted.Add($"dup {ind} {charStringLength} {Encoding.Default.GetString(decr)}");
+              font.FontDict.Private.Subrs.Add(decr);
             }
 
             File.WriteAllLines(Files.RootFolder + @$"\{_ffInfo.FontDescriptor.FontName}"+ @"-decryptedSubrs.txt", decrypted);

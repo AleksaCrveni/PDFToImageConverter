@@ -25,7 +25,7 @@ namespace Converter.FileStructures.Type1
     public string RDProc;
     public string NDProc;
     public string NPProc;
-    public object[] Subrs;
+    public List<byte[]> Subrs;
     public object[] OtherSubrs;
     public int UniqueID;
     public double[] BlueValues;
