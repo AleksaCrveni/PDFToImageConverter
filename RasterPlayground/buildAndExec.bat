@@ -1,0 +1,1 @@
+cd "bin\\Debug\\net8.0" & pwd & mkdir Single & RasterPlayground.exe

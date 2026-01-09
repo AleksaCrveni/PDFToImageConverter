@@ -1,0 +1,2 @@
+Simple playground to quickly write code and run it automatically after it builds
+Its setup like this so output can be used by other app to display results quickly without needing to run application from Visual studio, because it makes it much slower for some reason
