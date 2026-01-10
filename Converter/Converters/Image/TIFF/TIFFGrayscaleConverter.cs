@@ -25,7 +25,9 @@ namespace Converter.Converters.Image.TIFF
         _options.Height = height;
 
       _outputBuffer = new byte[_options.Height * _options.Width];
-      _writer = new TIFFGrayscaleWriter("convertTest.tiff");
+      // temp workaround to allow multiple test results to be ran at the same time
+      long rnd = Random.Shared.NextInt64();
+      _writer = new TIFFGrayscaleWriter($"{rnd}_convertTest.tiff");
       TIFFWriterOptions tiffOptions = new TIFFWriterOptions()
       {
         Width = _options.Width,
