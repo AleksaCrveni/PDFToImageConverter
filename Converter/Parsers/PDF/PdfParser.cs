@@ -414,9 +414,10 @@ namespace Converter.Parsers.PDF
       helper.SkipWhiteSpace(); // skip LF
       ReadOnlySpan<byte> encodedSpan = buffer.Slice(helper._position, (int)commonStreamDict.Length);
       commonStreamDict.RawStreamData = DecompressionHelper.DecodeFilter(ref encodedSpan, commonStreamDict.Filters);
-#if DEBUG
-      File.WriteAllBytes(Path.Join(Files.RootFolder, "ColorSpaceDecodedSample.txt"), commonStreamDict.RawStreamData);
-#endif
+// this is interfering with tests, it should be appended with fontname and logged outside of this function 
+//#if DEBUG
+//      File.WriteAllBytes(Path.Join(Files.RootFolder, "-ColorSpaceDecodedSample.txt"), commonStreamDict.RawStreamData);
+//#endif
       dict.CommonStreamDict = commonStreamDict;
       FreeAllocator(allocator);
     }
@@ -558,7 +559,7 @@ namespace Converter.Parsers.PDF
         fd.FontInfo = fontInfo;
         // TODO: assume that data is filled ? 
         // TODO: create right rasterized based on subtype and fontfile // Do I still eneed to do this?
-
+        File.WriteAllBytes(Files.RootFolder + @$"\{fontInfo.FontDescriptor.FontName}" + @"-fontFile.txt", fontInfo.FontDescriptor.FontFile.CommonStreamInfo.RawStreamData);
         IRasterizer rasterizer = fontInfo.SubType switch
         {
           PDF_FontType.Null => throw new NotImplementedException(),
