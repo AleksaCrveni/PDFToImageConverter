@@ -332,10 +332,12 @@ void RenderWeirdGradient(win32_offscreen_buffer *Buffer, int BlueOffset, int Gre
 	}
 	
 }
+// Side note, issue with fread before was that i was reading file with only
+// "r" file mod and since target file can be just random bytes that have 0s,
+// it would falsely detect EOF and return.
+// I checked that with ieof
 void HotLoadBuffer(win32_offscreen_buffer *Buffer)
 {
-	
-
 	ifstream file(filePath, ios::binary | ios::ate);
 
 	if (!file.is_open())
@@ -357,6 +359,8 @@ void HotLoadBuffer(win32_offscreen_buffer *Buffer)
 	}
 	ShouldRender = false;
 	file.read((char*)Buffer->Memory, ourBufferLen);
+	file.close();
+	
 	ShouldRender = true;
 }
 win32_window_dimension Win32GetWindowDimension(HWND Window)
