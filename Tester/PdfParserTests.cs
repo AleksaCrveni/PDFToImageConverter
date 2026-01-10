@@ -10,10 +10,15 @@ namespace Tester
     /// <summary>
     /// Here we wil just try to parse some files and visually check them if they pass
     /// I tried writing unit tests for all pdf properties but amount of time its needed to collect right information and increasing difficulting to do so with bigger and compressed files is not worth it
+    /// TODO: It still has some issues with concurency when savinga  file but w/e it will be fixed soon
     /// </summary>
     public PdfParserTests()
     {
-      
+      string dirName = "TestOutput";
+      if (Directory.Exists(dirName))
+        Directory.Delete(dirName, true);
+
+      Directory.CreateDirectory(dirName);
     }
 
     [TestMethod]
