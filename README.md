@@ -29,10 +29,13 @@ Rasterizer is currently C# rewrite of public domain single header STBTrueType.h 
 *Any 3rd party libraries that are used are by other projects for easier testing and comparing results, converter library itself doesn't have any 3rd party libraries.
 
 # 3rd Party libraries
-OpenPDF in Java, MuPDF and Dynamic PDF for conversion comparison
-BenchmarkDotNet for micro benchmark tests
-MSTest for testing
-STB libraries for comparing rasterzation of my rewrite in .NET and original implementation
+OpenPDF in Java, MuPDF and Dynamic PDF for conversion comparison.
+
+BenchmarkDotNet for micro benchmark tests.
+
+MSTest for testing.
+
+STB libraries for comparing rasterzation of my rewrite in .NET and original implementation.
 
 # Usage
 API is very simple, still heavily under development and *unstable* at the moment. (I understand that you can't specify destination yet...). In the future you will be able to simply provide buffer or stream that result can be written into and it doesn't have to touch the disk
