@@ -5,6 +5,7 @@ There are 2 goals for this project:
   - .NET doesn't really have PDF Converter that is free, open source and that doesn't use any 3rd party library (this isn't really a goal I guess just random observation)
 
 PDF 2.0 is currently not supported and is not in the current scope
+Reason as to why there is *lot* of c code is that for some testing I am using stb_truetype.h or modifications of the same
 
 # Development
 My rough *overestimate* is that this project is only 10% done as there are so many things to implement and support due to PDF specification being so large.
