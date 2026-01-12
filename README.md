@@ -38,10 +38,10 @@ STB libraries for comparing rasterzation of my rewrite in .NET and original impl
 API is very simple, still heavily under development and *unstable* at the moment. (I understand that you can't specify destination yet...). In the future you will be able to simply provide buffer or stream that result can be written into and it doesn't have to touch the disk
 
 Firstly import Converter project 
-\n
+<code>
 PdfParser parser = new PdfParser();
 PDF_Options options = new PDF_Options();
 parser.Parse(filePath, ref options);
-\n
+</code>
 
 
