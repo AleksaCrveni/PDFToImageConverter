@@ -4,7 +4,7 @@ using System;
 
 namespace Converter.Rasterizers
 {
-  internal class Type1Rasterizer : STBRasterizer, IRasterizer
+  public class Type1Rasterizer : STBRasterizer, IRasterizer
   {
     private PDF_FontInfo _fontInfo;
     public Type1Rasterizer(byte[] rawFontBuffer, ref PDF_FontInfo fontInfo) : base(rawFontBuffer)

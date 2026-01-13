@@ -1,4 +1,5 @@
-﻿using Converter.Parsers.PDF;
+﻿using Converter.FileStructures.Type1;
+using Converter.Parsers.PDF;
 using Converter.StaticData;
 using System;
 using System.Globalization;
@@ -41,6 +42,8 @@ namespace Converter.Parsers.PostScript
     }
 
     public abstract bool IsCurrentCharPartOfOperator();
+    public abstract void InterpretCharString(TYPE1_Font font, string name);
+
     public virtual void InitDelimiters()
     {
       __delimiters = new byte[]

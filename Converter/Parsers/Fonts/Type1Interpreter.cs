@@ -3,9 +3,8 @@ using Converter.FileStructures.Type1;
 using Converter.Parsers.PostScript;
 using Converter.StaticData;
 using Converter.Utils;
-using System;
+using System.Buffers.Binary;
 using System.Diagnostics;
-using System.Runtime.CompilerServices;
 using System.Text;
 
 namespace Converter.Parsers.Fonts
@@ -52,6 +51,105 @@ namespace Converter.Parsers.Fonts
       if ((__char >= 65 && __char <= 90) || (__char >= 97 && __char <= 122) || __char == '\'' || __char == '\"')
         return true;
       return false;
+    }
+
+    // 6.2 Charstring Number Encoding Adobe Type1 Font Specification
+    // TODO optimize if checks and can shift right by 8 instead of multipyling by 256
+    public override void InterpretCharString(TYPE1_Font font, string name)
+    {
+      byte[] rawData = font.FontDict.Private.CharStrings.GetValueOrDefault(name, null);
+      if (rawData == null)
+        return;
+      // Separate operand stack independed of PS stack
+      // So called Type 1 Build-Char operand stack and can hold up to 24 numeric values
+      // This might be an array considering we have to take from top and bottom
+      Stack<float> opStack = new Stack<float>(24);
+      ReadOnlySpan<byte> buffer = rawData.AsSpan();
+      byte v = 0;
+      int num = 0;
+      for (int i = 0; i < buffer.Length; i++)
+      {
+        v = buffer[i];
+        if (v >= 32 && v <= 246)
+        {
+          num = v - 139;
+        }
+        else if (v >= 247 && v <= 250)
+        {
+          num = ((v - 247) * 256) + buffer[++i] + 108;
+        }
+        else if (v >= 251 && v <= 254)
+        {
+          num = (-((v - 251) * 256)) - buffer[++i] - 108;
+        }
+        else if (v == 255)
+        {
+          num = BinaryPrimitives.ReadInt32BigEndian(buffer.Slice(++i, 4));
+        }
+        else
+        {
+          // Char commands
+          switch (v)
+          {
+            case 1: // hstem
+              break; 
+            case 3: // vstem
+              break;
+            case 4: // vmoveto
+              break;
+            case 5: // rlineto
+              break;
+            case 6: // hlineto
+              break;
+            case 7: // vlineto
+              break;
+            case 8: // rrcurveto
+              break;
+            case 9: // closepath
+              break;
+            case 10: // callsubr
+              break;
+            case 11: // return
+              break;
+            case 12: // escape
+              switch (buffer[++i])
+              {
+                case 0: // dotsection
+                  break;
+                case 1: // vstem3
+                  break;
+                case 2: // hstem3
+                  break;
+                case 6: // seac
+                  break;
+                case 7: // sbw
+                  break;
+                case 12:
+                  break;
+                case 16:
+                  break;
+                case 17:
+                  break;
+                case 33:
+                  break;
+              }
+              break;
+            case 13:
+              break;
+            case 14:
+              break;
+            case 21:
+              break;
+            case 22:
+              break;
+            case 30:
+              break;
+            case 31:
+              break;
+
+          }
+        }
+      }
     }
 
     // this should probably be virtual as well as font dict
@@ -270,6 +368,7 @@ namespace Converter.Parsers.Fonts
         token = GetNextTokenString();
       }
     }
+    // TODO: Not sure if ParseSubrs and PArseCharStrings should be in PSIntrepreter class
     private void ParseSubrs(TYPE1_Font font)
     {
       GetNumber();
@@ -330,7 +429,7 @@ namespace Converter.Parsers.Fonts
       }
 
       File.WriteAllLines(Files.RootFolder + @$"\{_ffInfo.FontDescriptor.FontName}" + @"-decryptedCharStrings.txt", decrypted);
-    }
+    } 
 
     private string ProcessNextToken()
     {
