@@ -1,10 +1,13 @@
 ﻿using Converter.FileStructures.PDF;
 using Converter.FileStructures.Type1;
 using Converter.Parsers.PostScript;
+using Converter.Rasterizers;
 using Converter.StaticData;
 using Converter.Utils;
 using System.Buffers.Binary;
 using System.Diagnostics;
+using System.Drawing;
+using System.Numerics;
 using System.Text;
 
 namespace Converter.Parsers.Fonts
@@ -62,29 +65,32 @@ namespace Converter.Parsers.Fonts
         return;
       // Separate operand stack independed of PS stack
       // So called Type 1 Build-Char operand stack and can hold up to 24 numeric values
-      // This might be an array considering we have to take from top and bottom
+      // This might be an array considering we have to clear stack often
       Stack<float> opStack = new Stack<float>(24);
       ReadOnlySpan<byte> buffer = rawData.AsSpan();
+      TYPE1_Point2D width = new TYPE1_Point2D();
+      TYPE1_Point2D lsb = new TYPE1_Point2D();
+      TYPE1_Point2D currPoint = new TYPE1_Point2D();
+      Shape s = new Shape();
       byte v = 0;
-      int num = 0;
       for (int i = 0; i < buffer.Length; i++)
       {
         v = buffer[i];
         if (v >= 32 && v <= 246)
         {
-          num = v - 139;
+          opStack.Push(v - 139);
         }
         else if (v >= 247 && v <= 250)
         {
-          num = ((v - 247) * 256) + buffer[++i] + 108;
+          opStack.Push(((v - 247) * 256) + buffer[++i] + 108);
         }
         else if (v >= 251 && v <= 254)
         {
-          num = (-((v - 251) * 256)) - buffer[++i] - 108;
+          opStack.Push((-((v - 251) * 256)) - buffer[++i] - 108);
         }
         else if (v == 255)
         {
-          num = BinaryPrimitives.ReadInt32BigEndian(buffer.Slice(++i, 4));
+          opStack.Push(BinaryPrimitives.ReadInt32BigEndian(buffer.Slice(++i, 4)));
         }
         else
         {
@@ -92,18 +98,46 @@ namespace Converter.Parsers.Fonts
           switch (v)
           {
             case 1: // hstem
+              opStack.Clear();
               break; 
             case 3: // vstem
+              opStack.Clear();
               break;
             case 4: // vmoveto
+              currPoint.Y += opStack.Pop();
+              s.MoveTo(currPoint.X, currPoint.Y);
+              opStack.Clear();
               break;
             case 5: // rlineto
+              currPoint.Y += opStack.Pop();
+              currPoint.X += opStack.Pop();
+              s.LineTo(currPoint.X, currPoint.Y);
+              opStack.Clear();
               break;
             case 6: // hlineto
+              currPoint.X += opStack.Pop();
+              s.LineTo(currPoint.X, currPoint.Y);
+              opStack.Clear();
               break;
             case 7: // vlineto
+              currPoint.Y += opStack.Pop();
+              s.LineTo(currPoint.X, currPoint.Y);
+              opStack.Clear();
               break;
             case 8: // rrcurveto
+              float dy3 = opStack.Pop();
+              float dx3 = opStack.Pop();
+
+              float dy2 = opStack.Pop();
+              float dx2 = opStack.Pop();
+
+              float dy1 = opStack.Pop();
+              float dx1 = opStack.Pop();
+
+              s.CurveTo(dx1, dy1, dx2, dy2, dx3, dy3);
+              currPoint.X += dx1 + dx2 + dx3;
+              currPoint.Y += dy1 + dy2 + dy3;
+              opStack.Clear();
               break;
             case 9: // closepath
               break;
@@ -115,43 +149,110 @@ namespace Converter.Parsers.Fonts
               switch (buffer[++i])
               {
                 case 0: // dotsection
+                  opStack.Clear();
                   break;
                 case 1: // vstem3
+                  opStack.Clear();
                   break;
                 case 2: // hstem3
+                  opStack.Clear();
                   break;
-                case 6: // seac
+                case 6: // seac - standard encoding accented character
+                  float x0 = opStack.Pop();
+                  float y0 = opStack.Pop();
+                  float x1 = opStack.Pop();
+                  float y1 = opStack.Pop();
+                  float x2 = opStack.Pop();
+                  float y2 = opStack.Pop();
+
+                  // do something
+                  opStack.Pop();
+                  opStack.Clear();
                   break;
                 case 7: // sbw
+                  width.Y = opStack.Pop();
+                  width.X = opStack.Pop();
+                  currPoint.Y = opStack.Pop();
+                  currPoint.X = opStack.Pop();
+                  lsb.X = currPoint.X;
+                  lsb.Y = currPoint.Y;
+                  opStack.Clear();
                   break;
-                case 12:
+                case 12: // div
+                  float num1 = opStack.Pop();
+                  float num2 = opStack.Pop();
+                  opStack.Push(num1 / num2);
                   break;
-                case 16:
+                case 16: // callothersubr
                   break;
-                case 17:
+                case 17: // pop
+                  float num = (float)PopNumber();
+                  opStack.Push(num);
                   break;
-                case 33:
+                case 33: // setcurrentpoint
+                  currPoint.Y = opStack.Pop();
+                  currPoint.X = opStack.Pop();
+                  // even tho docs say not to do this, we have to so that we know what to do when we are drawing
+                  s.MoveTo(currPoint.X, currPoint.Y);
+                  opStack.Clear();
                   break;
+                default:
+                  throw new InvalidDataException($"Invalid command: {v}");
               }
               break;
-            case 13:
+            case 13: // hsbw - horizontal side beararing and width
+              width.X = opStack.Pop();
+              currPoint.X = opStack.Pop();
+              lsb.X = currPoint.X;
+              opStack.Clear();
               break;
-            case 14:
+            case 14: // endchar
               break;
-            case 21:
+            case 21: // rmoveto
+              currPoint.Y += opStack.Pop();
+              currPoint.X += opStack.Pop();
+              s.MoveTo(currPoint.X, currPoint.Y);
+              opStack.Clear();
               break;
-            case 22:
+            case 22: // hmoveto
+              currPoint.X += opStack.Pop();
+              s.MoveTo(currPoint.X, currPoint.Y);
+              opStack.Clear();
               break;
-            case 30:
-              break;
-            case 31:
-              break;
+            case 30: // vhcurveto
+              dx3 = opStack.Pop();
+              dy2 = opStack.Pop();
+              dx2 = opStack.Pop();
+              dy1 = opStack.Pop();
 
+              s.CurveTo(currPoint.X, currPoint.Y + dy1,
+                currPoint.X + dx2, currPoint.Y + dy2,
+                currPoint.X + dx3, currPoint.Y);
+
+              currPoint.X += dx2 + dx3;
+              currPoint.Y += dy1 + dy2;
+              opStack.Clear();
+              break;
+            case 31: // hvcurveto
+              dy3 = opStack.Pop();
+              dy2 = opStack.Pop();
+              dx2 = opStack.Pop();
+              dx1 = opStack.Pop();
+
+              s.CurveTo(currPoint.X + dx1, currPoint.Y,
+                currPoint.X + dx2, currPoint.Y + dy2,
+                currPoint.X, currPoint.Y + dy3);
+
+              currPoint.X += dx1 + dx2;
+              currPoint.Y += dy2 + dy3;
+              opStack.Clear();
+              break;
+            default:
+              throw new InvalidDataException($"Invalid command: {v}");
           }
         }
       }
     }
-
     // this should probably be virtual as well as font dict
     public byte[] DecryptPrivateDictionary()
     {
