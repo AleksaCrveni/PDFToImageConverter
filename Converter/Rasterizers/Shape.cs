@@ -1,4 +1,5 @@
 ﻿using Converter.FileStructures.PostScript;
+using System.Reflection.Metadata.Ecma335;
 
 namespace Converter.Rasterizers
 {
@@ -8,7 +9,7 @@ namespace Converter.Rasterizers
   public class Shape
   {
     public List<PS_COMMAND> _moves;
-    public List<float> _shapePoints; 
+    public List<float> _shapePoints;
     public Shape()
     {
 

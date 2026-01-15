@@ -6,8 +6,6 @@ using Converter.StaticData;
 using Converter.Utils;
 using System.Buffers.Binary;
 using System.Diagnostics;
-using System.Drawing;
-using System.Numerics;
 using System.Text;
 
 namespace Converter.Parsers.Fonts
@@ -79,18 +77,22 @@ namespace Converter.Parsers.Fonts
         if (v >= 32 && v <= 246)
         {
           opStack.Push(v - 139);
+          Log(v.ToString());
         }
         else if (v >= 247 && v <= 250)
         {
           opStack.Push(((v - 247) * 256) + buffer[++i] + 108);
+          Log(v.ToString());
         }
         else if (v >= 251 && v <= 254)
         {
           opStack.Push((-((v - 251) * 256)) - buffer[++i] - 108);
+          Log(v.ToString());
         }
         else if (v == 255)
         {
           opStack.Push(BinaryPrimitives.ReadInt32BigEndian(buffer.Slice(++i, 4)));
+          Log(v.ToString());
         }
         else
         {
@@ -99,30 +101,36 @@ namespace Converter.Parsers.Fonts
           {
             case 1: // hstem
               opStack.Clear();
+              Log("hstem");
               break; 
             case 3: // vstem
               opStack.Clear();
+              Log("vstem");
               break;
             case 4: // vmoveto
               currPoint.Y += opStack.Pop();
               s.MoveTo(currPoint.X, currPoint.Y);
               opStack.Clear();
+              Log("vmoveto");
               break;
             case 5: // rlineto
               currPoint.Y += opStack.Pop();
               currPoint.X += opStack.Pop();
               s.LineTo(currPoint.X, currPoint.Y);
               opStack.Clear();
+              Log("rlineto");
               break;
             case 6: // hlineto
               currPoint.X += opStack.Pop();
               s.LineTo(currPoint.X, currPoint.Y);
               opStack.Clear();
+              Log("hlineto");
               break;
             case 7: // vlineto
               currPoint.Y += opStack.Pop();
               s.LineTo(currPoint.X, currPoint.Y);
               opStack.Clear();
+              Log("vlineto");
               break;
             case 8: // rrcurveto
               float dy3 = opStack.Pop();
@@ -138,24 +146,31 @@ namespace Converter.Parsers.Fonts
               currPoint.X += dx1 + dx2 + dx3;
               currPoint.Y += dy1 + dy2 + dy3;
               opStack.Clear();
+              Log("rrcurveto");
               break;
             case 9: // closepath
+              Log("closepath");
               break;
             case 10: // callsubr
+              Log("callsubr");
               break;
             case 11: // return
+              Log("return");
               break;
             case 12: // escape
               switch (buffer[++i])
               {
                 case 0: // dotsection
                   opStack.Clear();
+                  Log("dotsection");
                   break;
                 case 1: // vstem3
                   opStack.Clear();
+                  Log("vstem3");
                   break;
                 case 2: // hstem3
                   opStack.Clear();
+                  Log("hstem3");
                   break;
                 case 6: // seac - standard encoding accented character
                   float x0 = opStack.Pop();
@@ -168,6 +183,7 @@ namespace Converter.Parsers.Fonts
                   // do something
                   opStack.Pop();
                   opStack.Clear();
+                  Log("seac");
                   break;
                 case 7: // sbw
                   width.Y = opStack.Pop();
@@ -177,17 +193,21 @@ namespace Converter.Parsers.Fonts
                   lsb.X = currPoint.X;
                   lsb.Y = currPoint.Y;
                   opStack.Clear();
+                  Log("sbw");
                   break;
                 case 12: // div
                   float num1 = opStack.Pop();
                   float num2 = opStack.Pop();
                   opStack.Push(num1 / num2);
+                  Log("div");
                   break;
                 case 16: // callothersubr
+                  Log("callothersubr");
                   break;
                 case 17: // pop
                   float num = (float)PopNumber();
                   opStack.Push(num);
+                  Log("pop");
                   break;
                 case 33: // setcurrentpoint
                   currPoint.Y = opStack.Pop();
@@ -195,8 +215,11 @@ namespace Converter.Parsers.Fonts
                   // even tho docs say not to do this, we have to so that we know what to do when we are drawing
                   s.MoveTo(currPoint.X, currPoint.Y);
                   opStack.Clear();
+                  Log("setcurrentpoint");
                   break;
                 default:
+                  Log(v.ToString());
+                  SaveLog();
                   throw new InvalidDataException($"Invalid command: {v}");
               }
               break;
@@ -205,19 +228,23 @@ namespace Converter.Parsers.Fonts
               currPoint.X = opStack.Pop();
               lsb.X = currPoint.X;
               opStack.Clear();
+              Log("hsbw");
               break;
             case 14: // endchar
+              Log("endchar");
               break;
             case 21: // rmoveto
               currPoint.Y += opStack.Pop();
               currPoint.X += opStack.Pop();
               s.MoveTo(currPoint.X, currPoint.Y);
               opStack.Clear();
+              Log("rmoveto");
               break;
             case 22: // hmoveto
               currPoint.X += opStack.Pop();
               s.MoveTo(currPoint.X, currPoint.Y);
               opStack.Clear();
+              Log("hmoveto");
               break;
             case 30: // vhcurveto
               dx3 = opStack.Pop();
@@ -232,6 +259,7 @@ namespace Converter.Parsers.Fonts
               currPoint.X += dx2 + dx3;
               currPoint.Y += dy1 + dy2;
               opStack.Clear();
+              Log("vhcurveto");
               break;
             case 31: // hvcurveto
               dy3 = opStack.Pop();
@@ -246,12 +274,17 @@ namespace Converter.Parsers.Fonts
               currPoint.X += dx1 + dx2;
               currPoint.Y += dy2 + dy3;
               opStack.Clear();
+              Log("hvcurveto");
               break;
             default:
+              Log(v.ToString());
+              SaveLog();
               throw new InvalidDataException($"Invalid command: {v}");
           }
         }
       }
+
+      SaveLog();
     }
     // this should probably be virtual as well as font dict
     public byte[] DecryptPrivateDictionary()

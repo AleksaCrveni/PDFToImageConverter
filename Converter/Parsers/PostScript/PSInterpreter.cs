@@ -21,6 +21,8 @@ namespace Converter.Parsers.PostScript
     public Stack<OperandType> __operandTypes;
     public Stack<int> __arrayLengths;
     public byte[] __delimiters;
+    // remove later
+    public StringBuilder __logger;
     public PSInterpreter(byte[] buffer)
     {
       __buffer = buffer;
@@ -31,6 +33,7 @@ namespace Converter.Parsers.PostScript
       __stringOperands = new Stack<string>();
       __operandTypes = new Stack<OperandType>();
       __arrayLengths = new Stack<int>();
+      __logger = new StringBuilder();
       // I understand the warning, in this case its fine since im changing abstract class field only once
       InitDelimiters();
       SkipNulls();
@@ -374,6 +377,13 @@ namespace Converter.Parsers.PostScript
     {
       __operandTypes.Pop();
       return __stringOperands.Pop();
+    }
+
+    public virtual void Log(string l) => __logger.Append($"{l}\n");
+    public virtual void SaveLog()
+    {
+      File.WriteAllText("PSInterpreterLog.txt", __logger.ToString());
+      __logger.Clear();
     }
   }
 }
