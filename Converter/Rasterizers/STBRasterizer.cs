@@ -26,7 +26,7 @@ namespace Converter.Rasterizers
     protected void SetRasterizerVersion(TTF_RASTERIZER_VERSION v) => _rasterVersion = v;
     protected abstract void InitFont();
 
-    public virtual void GetGlyphHMetrics(int glyphIndex, ref int advanceWidth, ref int leftSideBearing)
+    public virtual void STB_GetGlyphHMetrics(int glyphIndex, ref int advanceWidth, ref int leftSideBearing)
     {
       ReadOnlySpan<byte> buffer = _buffer.AsSpan();
       ushort numOfLongHorMetrics = ReadUInt16(ref buffer, _ttf.Offsets.hhea.Position + 34);
@@ -44,7 +44,7 @@ namespace Converter.Rasterizers
     }
 
     // TODO: See if caching format data is better
-    public virtual int FindGlyphIndex(int unicodeCodepoint)
+    public virtual int STB_FindGlyphIndex(int unicodeCodepoint)
     {
       ReadOnlySpan<byte> buffer = _buffer.AsSpan();
       if (_ttf.CmapFormat == 0)
@@ -149,7 +149,7 @@ namespace Converter.Rasterizers
       return 0;
     }
 
-    public virtual void GetFontBoundingBox(ref int x0, ref int y0, ref int x1, ref int y1)
+    public virtual void STB_GetFontBoundingBox(ref int x0, ref int y0, ref int x1, ref int y1)
     {
       ReadOnlySpan<byte> buffer = _buffer.AsSpan();
       x0 = (int)ReadSignedInt16(ref buffer, _ttf.Offsets.head.Position + 36);
@@ -163,13 +163,13 @@ namespace Converter.Rasterizers
     /// Gets Glyphs Height Metrics via codepoint
     /// if codepoint is cached GetGlyphHMetrics could be called directly
     /// </summary>
-    public virtual void GetCodepointHMetrics(int unicodeCodepoint, ref int advanceWidth, ref int leftSideBearing)
+    public virtual void STB_GetCodepointHMetrics(int unicodeCodepoint, ref int advanceWidth, ref int leftSideBearing)
     {
-      int glyphIndex = FindGlyphIndex(unicodeCodepoint);
-      GetGlyphHMetrics(glyphIndex, ref advanceWidth, ref leftSideBearing);
+      int glyphIndex = STB_FindGlyphIndex(unicodeCodepoint);
+      STB_GetGlyphHMetrics(glyphIndex, ref advanceWidth, ref leftSideBearing);
     }
 
-    public virtual void GetFontVMetrics(ref int ascent, ref int descent, ref int lineGap)
+    public virtual void STB_GetFontVMetrics(ref int ascent, ref int descent, ref int lineGap)
     {
       ReadOnlySpan<byte> buffer = _buffer.AsSpan();
       ascent = ReadSignedInt16(ref buffer, _ttf.Offsets.hhea.Position + 4);
@@ -177,20 +177,20 @@ namespace Converter.Rasterizers
       lineGap = ReadSignedInt16(ref buffer, _ttf.Offsets.hhea.Position + 8);
     }
 
-    public virtual float ScaleForPixelHeight(float size)
+    public virtual float STB_ScaleForPixelHeight(float size)
     {
       ReadOnlySpan<byte> buffer = _buffer.AsSpan();
       int fHeight = ReadSignedInt16(ref buffer, _ttf.Offsets.hhea.Position + 4) - ReadSignedInt16(ref buffer, _ttf.Offsets.hhea.Position + 6);
       return size / fHeight;
     }
 
-    public virtual float ScaleForPixelHeight(double size)
+    public virtual float STB_ScaleForPixelHeight(double size)
     {
       ReadOnlySpan<byte> buffer = _buffer.AsSpan();
       int fHeight = ReadSignedInt16(ref buffer, _ttf.Offsets.hhea.Position + 4) - ReadSignedInt16(ref buffer, _ttf.Offsets.hhea.Position + 6);
       return (float)size / fHeight;
     }
-    public virtual int GetGlyphOffset(ref ReadOnlySpan<byte> buffer, int glyphIndex)
+    public virtual int STB_GetGlyphOffset(ref ReadOnlySpan<byte> buffer, int glyphIndex)
     {
       int g1, g2;
       // glyph index out of range
@@ -218,7 +218,7 @@ namespace Converter.Rasterizers
 
       return g1;
     }
-    public virtual bool GetGlyphBox(int glyphIndex, ref int xMin, ref int yMin, ref int xMax, ref int yMax)
+    public virtual bool STB_GetGlyphBox(int glyphIndex, ref int xMin, ref int yMin, ref int xMax, ref int yMax)
     {
       // TODO: if cff = true its open type font?
       if (_ttf.Cff)
@@ -229,7 +229,7 @@ namespace Converter.Rasterizers
       {
 
         ReadOnlySpan<byte> buffer = _buffer.AsSpan();
-        int g = GetGlyphOffset(ref buffer, glyphIndex);
+        int g = STB_GetGlyphOffset(ref buffer, glyphIndex);
         if (g < 0)
           return false;
 
@@ -242,14 +242,14 @@ namespace Converter.Rasterizers
     }
 
     #region antialiasing software rasterizer
-    public virtual void GetGlyphBitmapBoxSubpixel(int glyphIndex, float scaleX, float scaleY, float shiftX, float shiftY, ref int ix0, ref int iy0, ref int ix1, ref int iy1)
+    public virtual void STB_GetGlyphBitmapBoxSubpixel(int glyphIndex, float scaleX, float scaleY, float shiftX, float shiftY, ref int ix0, ref int iy0, ref int ix1, ref int iy1)
     {
       int x0 = 0;
       int y0 = 0;
       int x1 = 0;
       int y1 = 0;
       // gets contour points of the glyph
-      if (!GetGlyphBox(glyphIndex, ref x0, ref y0, ref x1, ref y1))
+      if (!STB_GetGlyphBox(glyphIndex, ref x0, ref y0, ref x1, ref y1))
       {
         ix0 = 0;
         iy0 = 0;
@@ -266,26 +266,26 @@ namespace Converter.Rasterizers
       }
     }
 
-    public void GetGlyphBitmapBox(int glyphIndex, float scaleX, float scaleY, ref int ix0, ref int iy0, ref int ix1, ref int iy1)
+    public void STB_GetGlyphBitmapBox(int glyphIndex, float scaleX, float scaleY, ref int ix0, ref int iy0, ref int ix1, ref int iy1)
     {
-      GetGlyphBitmapBoxSubpixel(glyphIndex, scaleX, scaleY, 0, 0, ref ix0, ref iy0, ref ix1, ref iy1);
+      STB_GetGlyphBitmapBoxSubpixel(glyphIndex, scaleX, scaleY, 0, 0, ref ix0, ref iy0, ref ix1, ref iy1);
     }
 
-    public void GetCodepointBitmapBoxSubpixel(int unicodeCodepoint, float scaleX, float scaleY, float shiftX, float shiftY, ref int ix0, ref int iy0, ref int ix1, ref int iy1)
+    public void STB_GetCodepointBitmapBoxSubpixel(int unicodeCodepoint, float scaleX, float scaleY, float shiftX, float shiftY, ref int ix0, ref int iy0, ref int ix1, ref int iy1)
     {
-      int glyphIndex = FindGlyphIndex(unicodeCodepoint);
-      GetGlyphBitmapBoxSubpixel(glyphIndex, scaleX, scaleY, shiftX, shiftY, ref ix0, ref iy0, ref ix1, ref iy1);
+      int glyphIndex = STB_FindGlyphIndex(unicodeCodepoint);
+      STB_GetGlyphBitmapBoxSubpixel(glyphIndex, scaleX, scaleY, shiftX, shiftY, ref ix0, ref iy0, ref ix1, ref iy1);
     }
 
-    public void GetCodepointBitmapBox(int unicodeCodepoint, float scaleX, float scaleY, ref int ix0, ref int iy0, ref int ix1, ref int iy1)
+    public void STB_GetCodepointBitmapBox(int unicodeCodepoint, float scaleX, float scaleY, ref int ix0, ref int iy0, ref int ix1, ref int iy1)
     {
-      GetCodepointBitmapBoxSubpixel(unicodeCodepoint, scaleX, scaleY, 0, 0, ref ix0, ref iy0, ref ix1, ref iy1);
+      STB_GetCodepointBitmapBoxSubpixel(unicodeCodepoint, scaleX, scaleY, 0, 0, ref ix0, ref iy0, ref ix1, ref iy1);
     }
     #endregion antialiasing software rasterizer
 
     #region kerning
 
-    public virtual int GetGlyphKernInfoAdvance(int glyphIndex1, int glyphIndex2)
+    public virtual int STB_GetGlyphKernInfoAdvance(int glyphIndex1, int glyphIndex2)
     {
       ReadOnlySpan<byte> buffer = _buffer.AsSpan(_ttf.Offsets.kern.Position, _ttf.Offsets.kern.Length);
       uint needle, straw;
@@ -315,49 +315,49 @@ namespace Converter.Rasterizers
       return 0;
     }
 
-    public virtual int GetGlyphGPOSInfoAdvance(int glyphIndex1, int glyphIndex2)
+    public virtual int STB_GetGlyphGPOSInfoAdvance(int glyphIndex1, int glyphIndex2)
     {
       throw new NotImplementedException("Open type not supported yet");
     }
 
-    public virtual int GetGlyphKernAdvance(int glyphIndex1, int glyphIndex2)
+    public virtual int STB_GetGlyphKernAdvance(int glyphIndex1, int glyphIndex2)
     {
       int xAdvance = 0;
       if (_ttf.Offsets.gpos.Length > 0)
-        xAdvance += GetGlyphGPOSInfoAdvance(glyphIndex1, glyphIndex2);
+        xAdvance += STB_GetGlyphGPOSInfoAdvance(glyphIndex1, glyphIndex2);
       else if (_ttf.Offsets.kern.Length > 0)
-        xAdvance += GetGlyphKernInfoAdvance(glyphIndex1, glyphIndex2);
+        xAdvance += STB_GetGlyphKernInfoAdvance(glyphIndex1, glyphIndex2);
       return xAdvance;
     }
 
-    public virtual int GetCodepointKernAdvance(int ch1, int ch2)
+    public virtual int STB_GetCodepointKernAdvance(int ch1, int ch2)
     {
       if (_ttf.Offsets.kern.Length == 0 && _ttf.Offsets.gpos.Length == 0) // if no kerning table, don't waste time looking up both codepoint->glyphs
         return 0;
-      return GetGlyphKernAdvance(FindGlyphIndex(ch1), FindGlyphIndex(ch2));
+      return STB_GetGlyphKernAdvance(STB_FindGlyphIndex(ch1), STB_FindGlyphIndex(ch2));
     }
     #endregion kerning
 
     #region rasterizer
 
-    public virtual float SizedTriangleArea(float height, float width)
+    public virtual float STB_SizedTriangleArea(float height, float width)
     {
       return height * width / 2;
     }
-    public virtual float SizedTrapezoidArea(float height, float topWidth, float bottomWidth)
+    public virtual float STB_SizedTrapezoidArea(float height, float topWidth, float bottomWidth)
     {
       Debug.Assert(topWidth >= 0);
       Debug.Assert(bottomWidth >= 0);
       return (topWidth + bottomWidth) / 2.0f * height;
     }
-    public virtual float PositionTrapezoidArea(float height, float tx0, float tx1, float bx0, float bx1)
+    public virtual float STB_PositionTrapezoidArea(float height, float tx0, float tx1, float bx0, float bx1)
     {
-      return SizedTrapezoidArea(height, tx1 - tx0, bx1 - bx0);
+      return STB_SizedTrapezoidArea(height, tx1 - tx0, bx1 - bx0);
     }
 
     // the edge passed in here does not cross the vertical line at x or the vertical line at x+1
     // (i.e. it has already been clipped to those)
-    public virtual void HandleClippedEdgeV2(Span<float> scanline, int x, ref ActiveEdgeV2 edge, float x0, float y0, float x1, float y1)
+    public virtual void STB_HandleClippedEdgeV2(Span<float> scanline, int x, ref ActiveEdgeV2 edge, float x0, float y0, float x1, float y1)
     {
       if (y0 == y1)
         return;
@@ -400,7 +400,7 @@ namespace Converter.Rasterizers
       }
     }
 
-    public virtual void FillActiveEdgesNewV2(Span<float> scanline, Span<float> scanline2, int len, ref List<ActiveEdgeV2> activeEdges, float yTop)
+    public virtual void STB_FillActiveEdgesNewV2(Span<float> scanline, Span<float> scanline2, int len, ref List<ActiveEdgeV2> activeEdges, float yTop)
     {
       float yBottom = yTop + 1;
       int i;
@@ -421,12 +421,12 @@ namespace Converter.Rasterizers
           {
             if (x0 >= 0)
             {
-              HandleClippedEdgeV2(scanline, (int)x0, ref edge, x0, yTop, x0, yBottom);
-              HandleClippedEdgeV2(scanline2, (int)x0 + 1, ref edge, x0, yTop, x0, yBottom);
+              STB_HandleClippedEdgeV2(scanline, (int)x0, ref edge, x0, yTop, x0, yBottom);
+              STB_HandleClippedEdgeV2(scanline2, (int)x0 + 1, ref edge, x0, yTop, x0, yBottom);
             }
             else
             {
-              HandleClippedEdgeV2(scanline2, 0, ref edge, x0, yTop, x0, yBottom);
+              STB_HandleClippedEdgeV2(scanline2, 0, ref edge, x0, yTop, x0, yBottom);
             }
           }
         }
@@ -476,7 +476,7 @@ namespace Converter.Rasterizers
               int x = (int)xTop;
               height = (sy1 - sy0) * edge.direction;
               Debug.Assert(x >= 0 && x < len);
-              scanline[x] += PositionTrapezoidArea(height, xTop, x + 1.0f, xBottom, x + 1.0f);
+              scanline[x] += STB_PositionTrapezoidArea(height, xTop, x + 1.0f, xBottom, x + 1.0f);
               scanlineFill[x] += height; // everything right of this pixel is filled
             }
             else
@@ -545,7 +545,7 @@ namespace Converter.Rasterizers
               area = sign * (yCrossing - sy0);
 
               // area of the triangle (x_top,sy0), (x1+1,sy0), (x1+1,yCrossing)
-              scanline[x1] += SizedTriangleArea(area, x1 + 1 - xTop);
+              scanline[x1] += STB_SizedTriangleArea(area, x1 + 1 - xTop);
 
               // check if final yCrossing is blown up; no test case for this
               if (yFinal > yBottom)
@@ -578,7 +578,7 @@ namespace Converter.Rasterizers
 
               // area covered in the last pixel is the rectangle from all the pixels to the left,
               // plus the trapezoid filled by the line segment in this pixel all the way to the right edge
-              scanline[x2] += area + sign * PositionTrapezoidArea(sy1 - yFinal, x2, x2 + 1.0f, xBottom, x2 + 1.0f);
+              scanline[x2] += area + sign * STB_PositionTrapezoidArea(sy1 - yFinal, x2, x2 + 1.0f, xBottom, x2 + 1.0f);
 
               // the rest of the line is filled based on the total height of the line segment in this pixel
               scanlineFill[x2] += sign * (sy1 - sy0);
@@ -625,39 +625,39 @@ namespace Converter.Rasterizers
 
               if (x0 < x1 && x3 > x2)
               {         // three segments descending down-right
-                HandleClippedEdgeV2(scanline, x, ref edge, x0, y0, x1, y1);
-                HandleClippedEdgeV2(scanline, x, ref edge, x1, y1, x2, y2);
-                HandleClippedEdgeV2(scanline, x, ref edge, x2, y2, x3, y3);
+                STB_HandleClippedEdgeV2(scanline, x, ref edge, x0, y0, x1, y1);
+                STB_HandleClippedEdgeV2(scanline, x, ref edge, x1, y1, x2, y2);
+                STB_HandleClippedEdgeV2(scanline, x, ref edge, x2, y2, x3, y3);
               }
               else if (x3 < x1 && x0 > x2)
               {  // three segments descending down-left
-                HandleClippedEdgeV2(scanline, x, ref edge, x0, y0, x2, y2);
-                HandleClippedEdgeV2(scanline, x, ref edge, x2, y2, x1, y1);
-                HandleClippedEdgeV2(scanline, x, ref edge, x1, y1, x3, y3);
+                STB_HandleClippedEdgeV2(scanline, x, ref edge, x0, y0, x2, y2);
+                STB_HandleClippedEdgeV2(scanline, x, ref edge, x2, y2, x1, y1);
+                STB_HandleClippedEdgeV2(scanline, x, ref edge, x1, y1, x3, y3);
               }
               else if (x0 < x1 && x3 > x1)
               {  // two segments across x, down-right
-                HandleClippedEdgeV2(scanline, x, ref edge, x0, y0, x1, y1);
-                HandleClippedEdgeV2(scanline, x, ref edge, x1, y1, x3, y3);
+                STB_HandleClippedEdgeV2(scanline, x, ref edge, x0, y0, x1, y1);
+                STB_HandleClippedEdgeV2(scanline, x, ref edge, x1, y1, x3, y3);
               }
               else if (x3 < x1 && x0 > x1)
               {  // two segments across x, down-left
-                HandleClippedEdgeV2(scanline, x, ref edge, x0, y0, x1, y1);
-                HandleClippedEdgeV2(scanline, x, ref edge, x1, y1, x3, y3);
+                STB_HandleClippedEdgeV2(scanline, x, ref edge, x0, y0, x1, y1);
+                STB_HandleClippedEdgeV2(scanline, x, ref edge, x1, y1, x3, y3);
               }
               else if (x0 < x2 && x3 > x2)
               {  // two segments across x+1, down-right
-                HandleClippedEdgeV2(scanline, x, ref edge, x0, y0, x2, y2);
-                HandleClippedEdgeV2(scanline, x, ref edge, x2, y2, x3, y3);
+                STB_HandleClippedEdgeV2(scanline, x, ref edge, x0, y0, x2, y2);
+                STB_HandleClippedEdgeV2(scanline, x, ref edge, x2, y2, x3, y3);
               }
               else if (x3 < x2 && x0 > x2)
               {  // two segments across x+1, down-left
-                HandleClippedEdgeV2(scanline, x, ref edge, x0, y0, x2, y2);
-                HandleClippedEdgeV2(scanline, x, ref edge, x2, y2, x3, y3);
+                STB_HandleClippedEdgeV2(scanline, x, ref edge, x0, y0, x2, y2);
+                STB_HandleClippedEdgeV2(scanline, x, ref edge, x2, y2, x3, y3);
               }
               else
               {  // one segment
-                HandleClippedEdgeV2(scanline, x, ref edge, x0, y0, x3, y3);
+                STB_HandleClippedEdgeV2(scanline, x, ref edge, x0, y0, x3, y3);
               }
             }
           }
@@ -665,7 +665,7 @@ namespace Converter.Rasterizers
       }
     }
 
-    public virtual ActiveEdgeV2 NewActiveEdgeV2(ref TTFEdge edge, int offX, float startPoint)
+    public virtual ActiveEdgeV2 STB_NewActiveEdgeV2(ref TTFEdge edge, int offX, float startPoint)
     {
       ActiveEdgeV2 aEdges;
       float dxdy = (edge.x1 - edge.x0) / (edge.y1 - edge.y0);
@@ -679,7 +679,7 @@ namespace Converter.Rasterizers
       return aEdges;
     }
     // directly AA rasterize edges w/o supersampling
-    public virtual void RasterizeSortedEdgesV2(ref BmpS result, List<TTFEdge> edges, int n, int vSubSample, int offX, int offY)
+    public virtual void STB_RasterizeSortedEdgesV2(ref BmpS result, List<TTFEdge> edges, int n, int vSubSample, int offX, int offY)
     {
       // List is just native implementation to get things going, its not most efficient because we are doing random removal of elements
       // TODO: fix later
@@ -734,7 +734,7 @@ namespace Converter.Rasterizers
         {
           if (edge.y0 != edge.y1)
           {
-            z = NewActiveEdgeV2(ref edge, offX, scanYTop);
+            z = STB_NewActiveEdgeV2(ref edge, offX, scanYTop);
             if (j == 0 && offY != 0)
             {
               if (z.ey < scanYTop)
@@ -752,7 +752,7 @@ namespace Converter.Rasterizers
         }
 
         if (activeEdges.Count > 0)
-          FillActiveEdgesNewV2(scanline, scanline2, result.W, ref activeEdges, scanYTop);
+          STB_FillActiveEdgesNewV2(scanline, scanline2, result.W, ref activeEdges, scanYTop);
 
         {
           float sum = 0;
@@ -788,12 +788,12 @@ namespace Converter.Rasterizers
     /// returns true if y0 of first edge is smaller than y0 of second edge
     /// </summary>
     /// <returns>bool</returns>
-    public virtual bool CompareEdge(TTFEdge a, TTFEdge b)
+    public virtual bool STB_CompareEdge(TTFEdge a, TTFEdge b)
     {
       return a.y0 < b.y0;
     }
 
-    public virtual void SortEdgesInsSort(ref Span<TTFEdge> edges, int n)
+    public virtual void STB_SortEdgesInsSort(ref Span<TTFEdge> edges, int n)
     {
       int i, j;
       TTFEdge tempEdge;
@@ -806,7 +806,7 @@ namespace Converter.Rasterizers
         while (j > 0)
         {
           Span<TTFEdge> b = edges.Slice(j - 1);
-          bool c = CompareEdge(a, b[0]);
+          bool c = STB_CompareEdge(a, b[0]);
           if (!c)
             break;
 
@@ -825,7 +825,7 @@ namespace Converter.Rasterizers
     /// <param name="edges"></param>
     /// <param name="sp">start position, to imitate pointer arithmetic, fix later</param>
     /// <param name="n"></param>
-    public virtual void SortEdgesQuickSort(ref Span<TTFEdge> oRefEdges, int n, int prevIndex = 0)
+    public virtual void STB_SortEdgesQuickSort(ref Span<TTFEdge> oRefEdges, int n, int prevIndex = 0)
     {
       Span<TTFEdge> edges = oRefEdges; // redundant?
       if (prevIndex > 0)
@@ -838,14 +838,14 @@ namespace Converter.Rasterizers
         bool c01, c12, c;
         // compute median of three
         m = n >> 1;
-        c01 = CompareEdge(edges[0], edges[m]);
-        c12 = CompareEdge(edges[m], edges[n - 1]);
+        c01 = STB_CompareEdge(edges[0], edges[m]);
+        c12 = STB_CompareEdge(edges[m], edges[n - 1]);
         /* if 0 >= mid >= end, or 0 < mid < end, then use mid */
         if (c01 != c12)
         {
           /* otherwise, we'll need to swap something else to middle */
           int z;
-          c = CompareEdge(edges[0], edges[n - 1]);
+          c = STB_CompareEdge(edges[0], edges[n - 1]);
           /* 0>mid && mid<n:  0>n => n; 0<n => 0 */
           /* 0<mid && mid>n:  0>n => 0; 0<n => n */
           z = c == c12 ? 0 : n - 1;
@@ -868,11 +868,11 @@ namespace Converter.Rasterizers
           /* for sentinels & efficiency with duplicates */
           for (; ; ++i)
           {
-            if (!CompareEdge(edges[i], edges[0])) break;
+            if (!STB_CompareEdge(edges[i], edges[0])) break;
           }
           for (; ; --j)
           {
-            if (!CompareEdge(edges[0], edges[j])) break;
+            if (!STB_CompareEdge(edges[0], edges[j])) break;
           }
           /* make sure we haven't crossed */
           if (i >= j) break;
@@ -887,13 +887,13 @@ namespace Converter.Rasterizers
         /* recurse on smaller side, iterate on larger */
         if (j < n - i)
         {
-          SortEdgesQuickSort(ref edges, j);
+          STB_SortEdgesQuickSort(ref edges, j);
           edges = edges.Slice(i);
           n = n - i;
         }
         else
         {
-          SortEdgesQuickSort(ref edges, n - i, i);
+          STB_SortEdgesQuickSort(ref edges, n - i, i);
           n = j;
         }
 
@@ -901,19 +901,19 @@ namespace Converter.Rasterizers
     }
 
     // TODO: edges should be array
-    public virtual void SortEdges(ref List<TTFEdge> edges, int n)
+    public virtual void STB_SortEdges(ref List<TTFEdge> edges, int n)
     {
       // TODO: Make edges array instead of list, so we don't have to copy
       TTFEdge[] edgesArr = edges.ToArray();
       Span<TTFEdge> edgesSpan = edgesArr.AsSpan();
 
-      SortEdgesQuickSort(ref edgesSpan, n);
-      SortEdgesInsSort(ref edgesSpan, n);
+      STB_SortEdgesQuickSort(ref edgesSpan, n);
+      STB_SortEdgesInsSort(ref edgesSpan, n);
 
       edges = edgesArr.ToList();
     }
 
-    public virtual void InternalRasterize(ref BmpS result, ref List<PointF> points, ref List<int> wCount, int windings, float scaleX, float scaleY, float shiftX, float shiftY, int offX, int offY, bool invert)
+    public virtual void STB_InternalRasterize(ref BmpS result, ref List<PointF> points, ref List<int> wCount, int windings, float scaleX, float scaleY, float shiftX, float shiftY, int offX, int offY, bool invert)
     {
       float yScaleInv = invert ? -scaleY : scaleY;
       List<TTFEdge> edges = new List<TTFEdge>();
@@ -973,7 +973,7 @@ namespace Converter.Rasterizers
       }
 
       // now sort the edges by their highest point (should snap to integer, and then by x)
-      SortEdges(ref edges, n);
+      STB_SortEdges(ref edges, n);
 
       // TODO:  scanelines rasterization for both V1 and V2
       if (_rasterVersion == TTF_RASTERIZER_VERSION.V1)
@@ -982,11 +982,11 @@ namespace Converter.Rasterizers
       }
       else
       {
-        RasterizeSortedEdgesV2(ref result, edges, n, vSubSample, offX, offY);
+        STB_RasterizeSortedEdgesV2(ref result, edges, n, vSubSample, offX, offY);
       }
     }
 
-    public virtual void TesselateCubic(List<PointF> points, ref int numOfPoints, float x0, float y0, float x1, float y1, float x2, float y2, float x3, float y3, float objspaceFlatnessSquared, int n)
+    public virtual void STB_TesselateCubic(List<PointF> points, ref int numOfPoints, float x0, float y0, float x1, float y1, float x2, float y2, float x3, float y3, float objspaceFlatnessSquared, int n)
     {
       // TODO: this "flatness" calculation is just made-up nonsense that seems to work well enough
       float dx0 = x1 - x0;
@@ -1018,19 +1018,19 @@ namespace Converter.Rasterizers
         float mx = (xa + xb) / 2;
         float my = (ya + yb) / 2;
 
-        TesselateCubic(points, ref numOfPoints, x0, y0, x01, y01, xa, ya, mx, my, objspaceFlatnessSquared, n + 1);
-        TesselateCubic(points, ref numOfPoints, mx, my, xb, yb, x23, y23, x3, y3, objspaceFlatnessSquared, n + 1);
+        STB_TesselateCubic(points, ref numOfPoints, x0, y0, x01, y01, xa, ya, mx, my, objspaceFlatnessSquared, n + 1);
+        STB_TesselateCubic(points, ref numOfPoints, mx, my, xb, yb, x23, y23, x3, y3, objspaceFlatnessSquared, n + 1);
       }
       else
       {
-        AddPoint(points, numOfPoints, x3, y3);
+        STB_AddPoint(points, numOfPoints, x3, y3);
         numOfPoints++;
       }
     }
 
     // tesselate until threshold p is happy
     // TODO: warped to compensate for non-linearn stretching (??)
-    public virtual int TesselateCurve(List<PointF> points, ref int numOfPoints, float x0, float y0, float x1, float y1, float x2, float y2, float objspaceFlatnessSquared, int n)
+    public virtual int STB_TesselateCurve(List<PointF> points, ref int numOfPoints, float x0, float y0, float x1, float y1, float x2, float y2, float objspaceFlatnessSquared, int n)
     {
       // midpoint
       float mx = (x0 + 2 * x1 + x2) / 4;
@@ -1043,18 +1043,18 @@ namespace Converter.Rasterizers
         return 1;
       if (dx * dx + dy * dy > objspaceFlatnessSquared) // half-pixel error allowed.... need to be smaller if AA
       {
-        TesselateCurve(points, ref numOfPoints, x0, y0, (x0 + x1) / 2.0f, (y0 + y1) / 2.0f, mx, my, objspaceFlatnessSquared, n + 1);
-        TesselateCurve(points, ref numOfPoints, mx, my, (x1 + x2) / 2.0f, (y1 + y2) / 2.0f, x2, y2, objspaceFlatnessSquared, n + 1);
+        STB_TesselateCurve(points, ref numOfPoints, x0, y0, (x0 + x1) / 2.0f, (y0 + y1) / 2.0f, mx, my, objspaceFlatnessSquared, n + 1);
+        STB_TesselateCurve(points, ref numOfPoints, mx, my, (x1 + x2) / 2.0f, (y1 + y2) / 2.0f, x2, y2, objspaceFlatnessSquared, n + 1);
       }
       else
       {
-        AddPoint(points, numOfPoints, x2, y2);
+        STB_AddPoint(points, numOfPoints, x2, y2);
         numOfPoints++;
       }
       return 1;
     }
 
-    public virtual void AddPoint(List<PointF>? points, int n, float x, float y)
+    public virtual void STB_AddPoint(List<PointF>? points, int n, float x, float y)
     {
       if (points is null)
         return;
@@ -1065,7 +1065,7 @@ namespace Converter.Rasterizers
       points[n] = p;
     }
 
-    public virtual List<PointF> FlattenCurves(ref List<TTFVertex> vertices, int numOfVerts, float objspaceFlatness, ref List<int> windingLengths, ref int windingCount)
+    public virtual List<PointF> STB_FlattenCurves(ref List<TTFVertex> vertices, int numOfVerts, float objspaceFlatness, ref List<int> windingLengths, ref int windingCount)
     {
       List<PointF>? points = null;
       int numOfPoints = 0;
@@ -1119,20 +1119,20 @@ namespace Converter.Rasterizers
               start = numOfPoints;
               x = vertex.x;
               y = vertex.y;
-              AddPoint(points, numOfPoints++, x, y);
+              STB_AddPoint(points, numOfPoints++, x, y);
               break;
             case (byte)TTF_VMove.VLINE:
               x = vertex.x;
               y = vertex.y;
-              AddPoint(points, numOfPoints++, x, y);
+              STB_AddPoint(points, numOfPoints++, x, y);
               break;
             case (byte)TTF_VMove.VCURVE:
-              TesselateCurve(points, ref numOfPoints, x, y, vertex.cx, vertex.cy, vertex.x, vertex.y, objspaceFlatnessSquared, 0);
+              STB_TesselateCurve(points, ref numOfPoints, x, y, vertex.cx, vertex.cy, vertex.x, vertex.y, objspaceFlatnessSquared, 0);
               x = vertex.x;
               y = vertex.y;
               break;
             case (byte)TTF_VMove.VCUBIC:
-              TesselateCubic(points, ref numOfPoints, x, y, vertex.cx, vertex.cy, vertex.cx1, vertex.cy1, vertex.x, vertex.y, objspaceFlatness, 0);
+              STB_TesselateCubic(points, ref numOfPoints, x, y, vertex.cx, vertex.cy, vertex.cx1, vertex.cy1, vertex.x, vertex.y, objspaceFlatness, 0);
               x = vertex.x;
               y = vertex.y;
               break;
@@ -1146,17 +1146,17 @@ namespace Converter.Rasterizers
       return points;
     }
 
-    public virtual void Rasterize(ref BmpS result, float flatnessInPixels, ref List<TTFVertex> vertices, int numOfVerts, float scaleX, float scaleY, float shiftX, float shiftY, int xOff, int yOff, bool invert)
+    public virtual void STB_Rasterize(ref BmpS result, float flatnessInPixels, ref List<TTFVertex> vertices, int numOfVerts, float scaleX, float scaleY, float shiftX, float shiftY, int xOff, int yOff, bool invert)
     {
       float scale = scaleX > scaleY ? scaleY : scaleX;
       int windingCount = 0;
       List<int> windingLengths = new List<int>();
-      List<PointF> windings = FlattenCurves(ref vertices, numOfVerts, flatnessInPixels / scale, ref windingLengths, ref windingCount);
+      List<PointF> windings = STB_FlattenCurves(ref vertices, numOfVerts, flatnessInPixels / scale, ref windingLengths, ref windingCount);
       if (windings.Count > 0)
-        InternalRasterize(ref result, ref windings, ref windingLengths, windingCount, scaleX, scaleY, shiftX, shiftY, xOff, yOff, invert);
+        STB_InternalRasterize(ref result, ref windings, ref windingLengths, windingCount, scaleX, scaleY, shiftX, shiftY, xOff, yOff, invert);
     }
 
-    public virtual void SetVertex(ref TTFVertex vertex, byte type, int x, int y, int cx, int cy)
+    public virtual void STB_SetVertex(ref TTFVertex vertex, byte type, int x, int y, int cx, int cy)
     {
       vertex.type = type;
       vertex.x = (short)x;
@@ -1165,22 +1165,22 @@ namespace Converter.Rasterizers
       vertex.cy = (short)cy;
     }
 
-    public virtual int CloseShape(ref List<TTFVertex> vertices, int numOfVertices, bool wasOff, bool startOff, int sx, int sy, int scx, int scy, int cx, int cy)
+    public virtual int STB_CloseShape(ref List<TTFVertex> vertices, int numOfVertices, bool wasOff, bool startOff, int sx, int sy, int scx, int scy, int cx, int cy)
     {
       TTFVertex vertex;
       vertex = vertices[numOfVertices];
       if (startOff)
       {
         if (wasOff)
-          SetVertex(ref vertex, (byte)TTF_VMove.VCURVE, cx + scx >> 1, cy + scy >> 1, cx, cy);
-        SetVertex(ref vertex, (byte)TTF_VMove.VCURVE, sx, sy, scx, scy);
+          STB_SetVertex(ref vertex, (byte)TTF_VMove.VCURVE, cx + scx >> 1, cy + scy >> 1, cx, cy);
+        STB_SetVertex(ref vertex, (byte)TTF_VMove.VCURVE, sx, sy, scx, scy);
       }
       else
       {
         if (wasOff)
-          SetVertex(ref vertex, (byte)TTF_VMove.VCURVE, sx, sy, cx, cy);
+          STB_SetVertex(ref vertex, (byte)TTF_VMove.VCURVE, sx, sy, cx, cy);
         else
-          SetVertex(ref vertex, (byte)TTF_VMove.VLINE, sx, sy, 0, 0);
+          STB_SetVertex(ref vertex, (byte)TTF_VMove.VLINE, sx, sy, 0, 0);
       }
       vertices[numOfVertices++] = vertex;
       return numOfVertices;
@@ -1192,7 +1192,7 @@ namespace Converter.Rasterizers
     /// <param name="glyphIndex"></param>
     /// <param name="vertices"></param>
     /// <returns>Number of vertices</returns>
-    public virtual int GetGlyphShapeTT(int glyphIndex, ref List<TTFVertex> vertices)
+    public virtual int STB_GetGlyphShapeTT(int glyphIndex, ref List<TTFVertex> vertices)
     {
       short numOfContours;
       int endPtsOfContoursOffset;
@@ -1201,7 +1201,7 @@ namespace Converter.Rasterizers
       int numOfVertices = 0;
       TTFVertex vertex;
       ReadOnlySpan<byte> buffer = _buffer.AsSpan();
-      int g = GetGlyphOffset(ref buffer, glyphIndex);
+      int g = STB_GetGlyphOffset(ref buffer, glyphIndex);
 
       if (g < 0)
         return 0;
@@ -1336,7 +1336,7 @@ namespace Converter.Rasterizers
           if (nextMove == i)
           {
             if (i != 0)
-              numOfVertices = CloseShape(ref vertices, numOfVertices, wasOff, startOff, sx, sy, scx, scy, cx, cy);
+              numOfVertices = STB_CloseShape(ref vertices, numOfVertices, wasOff, startOff, sx, sy, scx, scy, cx, cy);
 
             startOff = (flags & 1) != 1;
             // next
@@ -1369,7 +1369,7 @@ namespace Converter.Rasterizers
             }
 
             vertex = vertices[numOfVertices];
-            SetVertex(ref vertex, (byte)TTF_VMove.VMOVE, sx, sy, 0, 0);
+            STB_SetVertex(ref vertex, (byte)TTF_VMove.VMOVE, sx, sy, 0, 0);
             vertices[numOfVertices++] = vertex;
             wasOff = false;
             nextMove = 1 + ReadUInt16(ref buffer, endPtsOfContoursOffset + j * 2);
@@ -1384,7 +1384,7 @@ namespace Converter.Rasterizers
               // two off-curv control points in a row means interpolate an on-curve midpoint
               if (wasOff)
               {
-                SetVertex(ref vertex, (byte)TTF_VMove.VCURVE, (cx + x) >> 1, (cy + y) >> 1, cx, cy);
+                STB_SetVertex(ref vertex, (byte)TTF_VMove.VCURVE, (cx + x) >> 1, (cy + y) >> 1, cx, cy);
                 vertices[numOfVertices++] = vertex;
               }
               cx = x;
@@ -1394,9 +1394,9 @@ namespace Converter.Rasterizers
             else
             {
               if (wasOff)
-                SetVertex(ref vertex, (byte)TTF_VMove.VCURVE, x, y, cx, cy);
+                STB_SetVertex(ref vertex, (byte)TTF_VMove.VCURVE, x, y, cx, cy);
               else
-                SetVertex(ref vertex, (byte)TTF_VMove.VLINE, x, y, 0, 0);
+                STB_SetVertex(ref vertex, (byte)TTF_VMove.VLINE, x, y, 0, 0);
 
               vertices[numOfVertices++] = vertex;
               wasOff = false;
@@ -1405,7 +1405,7 @@ namespace Converter.Rasterizers
 
           }
         }
-        numOfVertices = CloseShape(ref vertices, numOfVertices, wasOff, startOff, sx, sy, scx, scy, cx, cy);
+        numOfVertices = STB_CloseShape(ref vertices, numOfVertices, wasOff, startOff, sx, sy, scx, scy, cx, cy);
       }
       else if (numOfContours < 0)
       {
@@ -1492,7 +1492,7 @@ namespace Converter.Rasterizers
           n = (float)Math.Sqrt(mtx[2] * mtx[2] + mtx[3] * mtx[3]);
 
           // Get indexed glyph
-          compNumVerts = GetGlyphShape(gidx, ref compVertex);
+          compNumVerts = STB_GetGlyphShape(gidx, ref compVertex);
           if (compNumVerts > 0)
           {
             // Transform vertices
@@ -1536,7 +1536,7 @@ namespace Converter.Rasterizers
     /// <param name="vertices"></param>
     /// <returns>Number of vertices</returns>
     /// <exception cref="NotImplementedException"></exception>
-    public virtual int GetGlyphShape(int glyphIndex, ref List<TTFVertex> vertices)
+    public virtual int STB_GetGlyphShape(int glyphIndex, ref List<TTFVertex> vertices)
     {
       if (_ttf.Cff)
       {
@@ -1544,20 +1544,20 @@ namespace Converter.Rasterizers
         return 0;
       }
 
-      return GetGlyphShapeTT(glyphIndex, ref vertices);
+      return STB_GetGlyphShapeTT(glyphIndex, ref vertices);
     }
 
-    public virtual void MakeGlyphBitmapSubpixel(ref byte[] bitmapArr, int byteOffset, int glyphWidth, int glyphHeight, int glyphStride, float scaleX, float scaleY, float shiftX, float shiftY, int glyphIndex)
+    public virtual void STB_MakeGlyphBitmapSubpixel(ref byte[] bitmapArr, int byteOffset, int glyphWidth, int glyphHeight, int glyphStride, float scaleX, float scaleY, float shiftX, float shiftY, int glyphIndex)
     {
       int ix0 = 0;
       int iy0 = 0;
       int ix1 = 0;
       int iy1 = 0;
       List<TTFVertex> vertices = new List<TTFVertex>();
-      int numOfVerts = GetGlyphShape(glyphIndex, ref vertices);
+      int numOfVerts = STB_GetGlyphShape(glyphIndex, ref vertices);
       BmpS gbm = new BmpS();
 
-      GetGlyphBitmapBoxSubpixel(glyphIndex, scaleX, scaleY, shiftX, shiftY, ref ix0, ref iy0, ref ix1, ref iy1);
+      STB_GetGlyphBitmapBoxSubpixel(glyphIndex, scaleX, scaleY, shiftX, shiftY, ref ix0, ref iy0, ref ix1, ref iy1);
       gbm.Pixels = bitmapArr;
       gbm.W = glyphWidth;
       gbm.H = glyphHeight;
@@ -1565,17 +1565,17 @@ namespace Converter.Rasterizers
       gbm.Offset = byteOffset;
 
       if (gbm.W > 0 && gbm.H > 0)
-        Rasterize(ref gbm, 0.35f, ref vertices, numOfVerts, scaleX, scaleY, shiftX, shiftY, ix0, iy0, true);
+        STB_Rasterize(ref gbm, 0.35f, ref vertices, numOfVerts, scaleX, scaleY, shiftX, shiftY, ix0, iy0, true);
     }
-    public virtual void MakeCodepointBitmapSubpixel(ref byte[] bitmapArr, int byteOffset, int glyphWidth, int glyphHeight, int glyphStride, float scaleX, float scaleY, float shiftX, float shiftY, int unicodeCodepoint)
+    public virtual void STB_MakeCodepointBitmapSubpixel(ref byte[] bitmapArr, int byteOffset, int glyphWidth, int glyphHeight, int glyphStride, float scaleX, float scaleY, float shiftX, float shiftY, int unicodeCodepoint)
     {
-      int glyphIndex = FindGlyphIndex(unicodeCodepoint);
-      MakeGlyphBitmapSubpixel(ref bitmapArr, byteOffset, glyphWidth, glyphHeight, glyphStride, scaleX, scaleY, shiftX, shiftY, glyphIndex);
+      int glyphIndex = STB_FindGlyphIndex(unicodeCodepoint);
+      STB_MakeGlyphBitmapSubpixel(ref bitmapArr, byteOffset, glyphWidth, glyphHeight, glyphStride, scaleX, scaleY, shiftX, shiftY, glyphIndex);
     }
 
-    public virtual void MakeCodepointBitmap(ref byte[] bitmapArr, int byteOffset, int glyphWidth, int glyphHeight, int glyphStride, float scaleX, float scaleY, int unicodeCodepoint)
+    public virtual void STB_MakeCodepointBitmap(ref byte[] bitmapArr, int byteOffset, int glyphWidth, int glyphHeight, int glyphStride, float scaleX, float scaleY, int unicodeCodepoint)
     {
-      MakeCodepointBitmapSubpixel(ref bitmapArr, byteOffset, glyphWidth, glyphHeight, glyphStride, scaleX, scaleY, 0, 0, unicodeCodepoint);
+      STB_MakeCodepointBitmapSubpixel(ref bitmapArr, byteOffset, glyphWidth, glyphHeight, glyphStride, scaleX, scaleY, 0, 0, unicodeCodepoint);
     }
     #endregion rasterizer
     #region reader functions

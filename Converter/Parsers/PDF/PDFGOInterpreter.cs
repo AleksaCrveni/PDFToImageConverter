@@ -755,20 +755,20 @@ namespace Converter.Parsers.PDF
         int lineGap = 0;
         // missing data in font descriptor, read from font
         if (ascent == 0 || descent == 0)
-          activeParser.GetFontVMetrics(ref ascent, ref descent, ref lineGap);
+          activeParser.STB_GetFontVMetrics(ref ascent, ref descent, ref lineGap);
         ascent = (int)Math.Round(ascent * s.scaleY);
         descent = (int)Math.Round(descent * s.scaleY);
         lineGap = (int)Math.Round(lineGap * s.scaleY);
         int ax = 0; // charatcter width
         int lsb = 0; // left side bearing
 
-        activeParser.GetCodepointHMetrics(c, ref ax, ref lsb);
+        activeParser.STB_GetCodepointHMetrics(c, ref ax, ref lsb);
 
         int c_x0 = 0;
         int c_y0 = 0;
         int c_x1 = 0;
         int c_y1 = 0;
-        activeParser.GetCodepointBitmapBox(c, s.scaleX, s.scaleY, ref c_x0, ref c_y0, ref c_x1, ref c_y1);
+        activeParser.STB_GetCodepointBitmapBox(c, s.scaleX, s.scaleY, ref c_x0, ref c_y0, ref c_x1, ref c_y1);
 
         // char height - different than bounding box height
         int y = Y + c_y0;
@@ -779,7 +779,7 @@ namespace Converter.Parsers.PDF
         int glyphHeight = c_y1 - c_y0;
 
         int byteOffset = X + (y * _targetSize.Width);
-        activeParser.MakeCodepointBitmap(ref _outputBuffer, byteOffset, glyphWidth, glyphHeight, _targetSize.Width, s.scaleX, s.scaleY, c);
+        activeParser.STB_MakeCodepointBitmap(ref _outputBuffer, byteOffset, glyphWidth, glyphHeight, _targetSize.Width, s.scaleX, s.scaleY, c);
         // kerning
 
         //int kern;

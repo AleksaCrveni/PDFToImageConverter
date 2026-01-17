@@ -292,7 +292,7 @@ namespace Converter.Rasterizers
     {
       int aw = 0;
       int lsb = 0;
-      GetGlyphHMetrics(glyphIndex, ref aw, ref lsb);
+      STB_GetGlyphHMetrics(glyphIndex, ref aw, ref lsb);
 
       float advance = aw / _unitsPerEm;
       float widthScale = width / advance;
