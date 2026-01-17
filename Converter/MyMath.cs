@@ -1,13 +1,4 @@
-﻿using Converter.FileStructures.PDF.GraphicsInterpreter;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Runtime.InteropServices;
-using System.Text;
-using System.Threading.Tasks;
-using System.Transactions;
-
-namespace Converter
+﻿namespace Converter
 {
   public static class MyMath
   {
@@ -50,5 +41,8 @@ namespace Converter
       mR[2, 1] = mA[2, 0] * mB[0, 1] + mA[2, 1] * mB[1, 1] + mA[2, 2] * mB[2, 1];
       mR[2, 2] = mA[2, 0] * mB[0, 2] + mA[2, 1] * mB[1, 2] + mA[2, 2] * mB[2, 2];
     }
+
+    public static float FPart(float x) => x - MathF.Floor(x);
+    public static float RFPart(float x) => 1 - FPart(x);
   }
 }
