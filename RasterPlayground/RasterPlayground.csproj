@@ -8,7 +8,10 @@
   </PropertyGroup>
 
   <Target Name="PostBuild" AfterTargets="PostBuildEvent">
-    <Exec Command="cd $(OutputPath) &amp; mkdir Single &amp; $(AssemblyName)" />
   </Target>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Converter\Converter.csproj" />
+  </ItemGroup>
 
 </Project>
