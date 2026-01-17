@@ -1,5 +1,6 @@
 ﻿using Converter.FileStructures.Type1;
 using Converter.Parsers.PDF;
+using Converter.Rasterizers;
 using Converter.StaticData;
 using System;
 using System.Globalization;
@@ -45,7 +46,7 @@ namespace Converter.Parsers.PostScript
     }
 
     public abstract bool IsCurrentCharPartOfOperator();
-    public abstract void InterpretCharString(TYPE1_Font font, string name);
+    public abstract PSShape? InterpretCharString(string name, TYPE1_Point2D width, TYPE1_Point2D lsb, TYPE1_Point2D currPoint);
 
     public virtual void InitDelimiters()
     {
@@ -379,7 +380,7 @@ namespace Converter.Parsers.PostScript
       return __stringOperands.Pop();
     }
 
-    public virtual void Log(string l) => __logger.Append($"{l}\n");
+    public virtual void Log(string l) => __logger.Append($"{l} ");
     public virtual void SaveLog()
     {
       File.WriteAllText("PSInterpreterLog.txt", __logger.ToString());

@@ -6,13 +6,14 @@ namespace Converter.Rasterizers
   // Currently implemented for Type1 Adobe font
   // TODO: Way later see if List is appropriate DS due to double sizing when growing 
   // Cubic bezier
-  public class Shape
+  public class PSShape
   {
     public List<PS_COMMAND> _moves;
     public List<float> _shapePoints;
-    public Shape()
+    public PSShape()
     {
-
+      _moves = new List<PS_COMMAND>();
+      _shapePoints = new List<float>();
     }
 
     public void LineTo(float dx, float dy)
@@ -47,11 +48,6 @@ namespace Converter.Rasterizers
       _shapePoints.Add(dx3);
       _shapePoints.Add(dy3);
       _moves.Add(PS_COMMAND.CURVE_TO);
-    }
-
-    public void DrawIntoBitmap(float scale)
-    {
-
     }
   }
 }

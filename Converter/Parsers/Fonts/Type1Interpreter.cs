@@ -18,27 +18,28 @@ namespace Converter.Parsers.Fonts
   public class Type1Interpreter : PSInterpreter
   {
     private PDF_FontInfo _ffInfo;
+    public TYPE1_Font font;
 
     public Type1Interpreter(byte[] buffer, PDF_FontInfo ffInfo) : base(buffer)
     {
       _ffInfo = ffInfo;
+      font = new TYPE1_Font();
     }
 
-    public TYPE1_Font LoadFont()
+    public void LoadFont()
     {
-      TYPE1_Font font = new TYPE1_Font();
-      ParseHeader(font);
-      Interpreter(font);
-      return font;
+      
+      ParseHeader();
+      Interpreter();
     } 
 
-    private void Interpreter(TYPE1_Font font)
+    private void Interpreter()
     {
       // skip header for now
       SkipUntilAfterString("dict".AsSpan());
       SkipNextString(); // begin
 
-      ParseFontDictionary(font);
+      ParseFontDictionary();
       // we can skip to this by offseting with Length1 (length of clear  portion of the program)
       // length of it is Length2
       // TODO: Apparently this can be ascii string as well, look into this
@@ -56,20 +57,17 @@ namespace Converter.Parsers.Fonts
 
     // 6.2 Charstring Number Encoding Adobe Type1 Font Specification
     // TODO optimize if checks and can shift right by 8 instead of multipyling by 256
-    public override void InterpretCharString(TYPE1_Font font, string name)
+    public override PSShape? InterpretCharString(string name, TYPE1_Point2D width, TYPE1_Point2D lsb, TYPE1_Point2D currPoint)
     {
       byte[] rawData = font.FontDict.Private.CharStrings.GetValueOrDefault(name, null);
       if (rawData == null)
-        return;
+        return null;
       // Separate operand stack independed of PS stack
       // So called Type 1 Build-Char operand stack and can hold up to 24 numeric values
       // This might be an array considering we have to clear stack often
       Stack<float> opStack = new Stack<float>(24);
       ReadOnlySpan<byte> buffer = rawData.AsSpan();
-      TYPE1_Point2D width = new TYPE1_Point2D();
-      TYPE1_Point2D lsb = new TYPE1_Point2D();
-      TYPE1_Point2D currPoint = new TYPE1_Point2D();
-      Shape s = new Shape();
+      PSShape s = new PSShape();
       byte v = 0;
       for (int i = 0; i < buffer.Length; i++)
       {
@@ -285,6 +283,7 @@ namespace Converter.Parsers.Fonts
       }
 
       SaveLog();
+      return s;
     }
     // this should probably be virtual as well as font dict
     public byte[] DecryptPrivateDictionary()
@@ -379,7 +378,7 @@ namespace Converter.Parsers.Fonts
       }
     }
 
-    private void ParseFontDictionary(TYPE1_Font font)
+    private void ParseFontDictionary()
     {
       font.FontDict = new();
       font.FontDict.FontInfo = new();
@@ -502,7 +501,14 @@ namespace Converter.Parsers.Fonts
         token = GetNextTokenString();
       }
     }
+
+    private void ParseSubrs()
+    {
+      ParseSubrs(font);
+    }
+
     // TODO: Not sure if ParseSubrs and PArseCharStrings should be in PSIntrepreter class
+    // this has option to be passed because we call it from helper inside helper
     private void ParseSubrs(TYPE1_Font font)
     {
       GetNumber();
@@ -532,6 +538,11 @@ namespace Converter.Parsers.Fonts
       }
 
       File.WriteAllLines(Files.RootFolder + @$"\{_ffInfo.FontDescriptor.FontName}" + @"-decryptedSubrs.txt", decrypted);
+    }
+    
+    private void ParseCharStrings()
+    {
+      ParseCharStrings(font);
     }
     private void ParseCharStrings(TYPE1_Font font)
     {
@@ -583,7 +594,7 @@ namespace Converter.Parsers.Fonts
       return tok;
     }
 
-    private void ParseHeader(TYPE1_Font info)
+    private void ParseHeader()
     {
       // For now skip header
       SkipUntilAfterString("%%EndComments".AsSpan());
