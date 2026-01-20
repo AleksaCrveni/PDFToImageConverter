@@ -1,15 +1,19 @@
 ﻿using Converter.FileStructures.PDF;
+using Converter.FileStructures.PostScript;
+using Converter.FileStructures.TTF;
+using Converter.FileStructures.Type1;
 using Converter.Parsers.Fonts;
-using System;
 
 namespace Converter.Rasterizers
 {
   public class Type1Rasterizer : STBRasterizer, IRasterizer
   {
     private PDF_FontInfo _fontInfo;
+    private Type1Interpreter _interpreter;
     public Type1Rasterizer(byte[] rawFontBuffer, ref PDF_FontInfo fontInfo) : base(rawFontBuffer)
     {
       _fontInfo = fontInfo;
+      _interpreter = new Type1Interpreter(_buffer, _fontInfo);
       InitFont();
     }
 
@@ -25,8 +29,82 @@ namespace Converter.Rasterizers
 
     protected override void InitFont()
     {
-      Type1Interpreter interpreter = new Type1Interpreter(_buffer, _fontInfo);
-      interpreter.LoadFont();
+      
+      _interpreter.LoadFont();
+    }
+
+    public PSShape? InterpretByName(string charName)
+    {
+      TYPE1_Point2D lsb = new TYPE1_Point2D();
+      TYPE1_Point2D currPoint = new TYPE1_Point2D();
+      return _interpreter.InterpretCharString(charName,lsb, currPoint);
+    }
+    
+    // temp
+    public List<TTFVertex> ConvertToTTFVertexFormat(PSShape s, float scale)
+    {
+      List<TTFVertex> vertices = new List<TTFVertex>();
+      int i = 0;
+      int HEIGHT = 300;
+      int WIDTH = 300;
+      TTFVertex v;
+      foreach (PS_COMMAND cmd in s._moves)
+      {
+        switch (cmd)
+        {
+          case PS_COMMAND.MOVE_TO:
+            v = new TTFVertex();
+            v.type = (byte)TTF_VMove.VMOVE;
+            v.x = (short)(s._shapePoints[i++] * scale);
+            v.y = (short)(s._shapePoints[i++] * scale);
+            break;
+          case PS_COMMAND.LINE_TO:
+            v = new TTFVertex();
+            v.type = (byte)TTF_VMove.VLINE;
+            v.x = (short)(s._shapePoints[i++] * scale);
+            v.y = (short)(s._shapePoints[i++] * scale);
+            break;
+          // cubic Bezier
+          case PS_COMMAND.CURVE_TO:
+            v = new TTFVertex();
+            v.type = (byte)TTF_VMove.VCUBIC;
+            v.x = (short)(s._shapePoints[i++] * scale);
+            v.y = (short)(s._shapePoints[i++] * scale);
+            v.cx = (short)(s._shapePoints[i++] * scale);
+            v.cy = (short)(s._shapePoints[i++] * scale);
+           
+            v.cx1 = (short)(s._shapePoints[i++] * scale);
+            v.cy1 = (short)(s._shapePoints[i++] * scale);
+
+
+            break;
+          default:
+            throw new InvalidDataException($"Unexpected command: {cmd}");
+        }
+        vertices.Add(v);
+      }
+      return vertices;
+    }
+
+    // this is just temp to get it to work with STBrasterizer
+    public void GetFakeBoundingBoxFromPoints(List<PointF> points, ref int ix0, ref int iy0, ref int height, float scale)
+    {
+      float fx0 = int.MaxValue; // min X
+      float fy0 = int.MinValue; // max Y
+      float fyMin = int.MaxValue; // min Y
+      foreach (PointF p in points)
+      {
+        if (p.X < fx0)
+          fx0 = p.X;
+        if (p.Y < fyMin)
+          fyMin = p.Y;
+        else if (p.Y > fy0)
+          fy0 = p.Y;
+      }
+
+      height = (int)(fy0 - fyMin);
+      ix0 = (int)MathF.Floor(fx0);
+      iy0 = (int)Math.Floor(-fy0);
     }
   }
 }

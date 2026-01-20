@@ -1,4 +1,5 @@
 ﻿using Converter.FileStructures.PDF;
+using Converter.FileStructures.PostScript;
 using Converter.FileStructures.Type1;
 using Converter.Parsers.PostScript;
 using Converter.Rasterizers;
@@ -6,6 +7,7 @@ using Converter.StaticData;
 using Converter.Utils;
 using System.Buffers.Binary;
 using System.Diagnostics;
+using System.Globalization;
 using System.Text;
 
 namespace Converter.Parsers.Fonts
@@ -57,7 +59,7 @@ namespace Converter.Parsers.Fonts
 
     // 6.2 Charstring Number Encoding Adobe Type1 Font Specification
     // TODO optimize if checks and can shift right by 8 instead of multipyling by 256
-    public override PSShape? InterpretCharString(string name, TYPE1_Point2D width, TYPE1_Point2D lsb, TYPE1_Point2D currPoint)
+    public override PSShape? InterpretCharString(string name, TYPE1_Point2D lsb, TYPE1_Point2D currPoint)
     {
       byte[] rawData = font.FontDict.Private.CharStrings.GetValueOrDefault(name, null);
       if (rawData == null)
@@ -147,6 +149,37 @@ namespace Converter.Parsers.Fonts
               Log("rrcurveto");
               break;
             case 9: // closepath
+              // draw line to last moveto, but do not move point to there
+              // its different to normal PS command
+              // TODO: Maybe have all these methods to be part of PSinterpreter that can be overriden by childen interpteres
+              if (s._moves.Count > 0 && s._moves.Last() == PS_COMMAND.CLOSEPATH)
+                break;
+
+              int pos = s._shapePoints.Count - 1;
+              float targetX = 0;
+              float targetY = 0;
+              // get last move to
+              for (int j = s._moves.Count - 1; j >= 0; j--)
+              {
+                PS_COMMAND move = s._moves[j];
+                if (move == PS_COMMAND.CURVE_TO)
+                {
+                  pos -= 6;
+                } 
+                else if (move == PS_COMMAND.LINE_TO)
+                {
+                  pos -= 2;
+                } else if (move == PS_COMMAND.MOVE_TO)
+                {
+                  targetY = s._shapePoints[pos--];
+                  targetX = s._shapePoints[pos];
+                  break;
+                }
+              }
+
+              s.LineTo(targetX, targetY); // draw line
+              s.MoveTo(currPoint.X, currPoint.Y); // move it back so that when we convert to vertexes we stay in same place
+              s._actualLast = PS_COMMAND.CLOSEPATH; // assign close path so that we can check if last one was closepath
               Log("closepath");
               break;
             case 10: // callsubr
@@ -184,8 +217,8 @@ namespace Converter.Parsers.Fonts
                   Log("seac");
                   break;
                 case 7: // sbw
-                  width.Y = opStack.Pop();
-                  width.X = opStack.Pop();
+                  s._width.Y = opStack.Pop();
+                  s._width.X = opStack.Pop();
                   currPoint.Y = opStack.Pop();
                   currPoint.X = opStack.Pop();
                   lsb.X = currPoint.X;
@@ -222,7 +255,7 @@ namespace Converter.Parsers.Fonts
               }
               break;
             case 13: // hsbw - horizontal side beararing and width
-              width.X = opStack.Pop();
+              s._width.X = opStack.Pop();
               currPoint.X = opStack.Pop();
               lsb.X = currPoint.X;
               opStack.Clear();
@@ -230,7 +263,8 @@ namespace Converter.Parsers.Fonts
               break;
             case 14: // endchar
               Log("endchar");
-              break;
+              SaveLog();
+              return s;
             case 21: // rmoveto
               currPoint.Y += opStack.Pop();
               currPoint.X += opStack.Pop();
