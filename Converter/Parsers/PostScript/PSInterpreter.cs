@@ -381,9 +381,9 @@ namespace Converter.Parsers.PostScript
     }
 
     public virtual void Log(string l) => __logger.Append($"{l} ");
-    public virtual void SaveLog()
+    public virtual void SaveLog(string name = "")
     {
-      File.WriteAllText("PSInterpreterLog.txt", __logger.ToString());
+      File.WriteAllText($"PSInterpreterLog_{name}.txt", __logger.ToString());
       __logger.Clear();
     }
   }

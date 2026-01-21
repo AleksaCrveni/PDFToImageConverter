@@ -142,7 +142,9 @@ namespace Converter.Parsers.Fonts
               float dy1 = opStack.Pop();
               float dx1 = opStack.Pop();
 
-              s.CurveTo(dx1, dy1, dx2, dy2, dx3, dy3);
+              s.CurveTo(currPoint.X + dx1, currPoint.Y + dy1,
+                currPoint.X + dx1 + dx2, currPoint.Y + dy1 + dy2,
+                currPoint.X + dx1 + dx2 + dx3, currPoint.Y + dy1 + dy2 + dy3);
               currPoint.X += dx1 + dx2 + dx3;
               currPoint.Y += dy1 + dy2 + dy3;
               opStack.Clear();
@@ -263,7 +265,7 @@ namespace Converter.Parsers.Fonts
               break;
             case 14: // endchar
               Log("endchar");
-              SaveLog();
+              SaveLog(name);
               return s;
             case 21: // rmoveto
               currPoint.Y += opStack.Pop();
@@ -285,8 +287,8 @@ namespace Converter.Parsers.Fonts
               dy1 = opStack.Pop();
 
               s.CurveTo(currPoint.X, currPoint.Y + dy1,
-                currPoint.X + dx2, currPoint.Y + dy2,
-                currPoint.X + dx3, currPoint.Y);
+                currPoint.X + dx2, currPoint.Y + dy1 + dy2,
+                currPoint.X + dx2 + dx3, currPoint.Y + dy1 + dy2);
 
               currPoint.X += dx2 + dx3;
               currPoint.Y += dy1 + dy2;
@@ -300,8 +302,8 @@ namespace Converter.Parsers.Fonts
               dx1 = opStack.Pop();
 
               s.CurveTo(currPoint.X + dx1, currPoint.Y,
-                currPoint.X + dx2, currPoint.Y + dy2,
-                currPoint.X, currPoint.Y + dy3);
+                currPoint.X + dx1 + dx2, currPoint.Y + dy2,
+                currPoint.X + dx1 + dx2, currPoint.Y + dy2 + dy3);
 
               currPoint.X += dx1 + dx2;
               currPoint.Y += dy2 + dy3;
@@ -310,13 +312,13 @@ namespace Converter.Parsers.Fonts
               break;
             default:
               Log(v.ToString());
-              SaveLog();
+              SaveLog(name);
               throw new InvalidDataException($"Invalid command: {v}");
           }
         }
       }
 
-      SaveLog();
+      SaveLog(name);
       return s;
     }
     // this should probably be virtual as well as font dict

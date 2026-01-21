@@ -68,15 +68,15 @@ namespace Converter.Rasterizers
           case PS_COMMAND.CURVE_TO:
             v = new TTFVertex();
             v.type = (byte)TTF_VMove.VCUBIC;
-            v.x = (short)(s._shapePoints[i++] * scale);
-            v.y = (short)(s._shapePoints[i++] * scale);
+            
+            // This is correct order for converting from PS CurveTo arguments to Vertex format that will be passed to TesselateCubic
             v.cx = (short)(s._shapePoints[i++] * scale);
             v.cy = (short)(s._shapePoints[i++] * scale);
-           
             v.cx1 = (short)(s._shapePoints[i++] * scale);
             v.cy1 = (short)(s._shapePoints[i++] * scale);
-
-
+            v.x = (short)(s._shapePoints[i++] * scale);
+            v.y = (short)(s._shapePoints[i++] * scale);
+          
             break;
           default:
             throw new InvalidDataException($"Unexpected command: {cmd}");
