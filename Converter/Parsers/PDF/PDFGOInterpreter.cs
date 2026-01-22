@@ -753,9 +753,7 @@ namespace Converter.Parsers.PDF
         int ascent = fd.FontInfo.FontDescriptor.Ascent;
         int descent = fd.FontInfo.FontDescriptor.Ascent;
         int lineGap = 0;
-        // missing data in font descriptor, read from font
-        if (ascent == 0 || descent == 0)
-          activeParser.STB_GetFontVMetrics(ref ascent, ref descent, ref lineGap);
+
         ascent = (int)Math.Round(ascent * s.scaleY);
         descent = (int)Math.Round(descent * s.scaleY);
         lineGap = (int)Math.Round(lineGap * s.scaleY);
