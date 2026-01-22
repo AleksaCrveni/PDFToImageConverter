@@ -757,10 +757,6 @@ namespace Converter.Parsers.PDF
         ascent = (int)Math.Round(ascent * s.scaleY);
         descent = (int)Math.Round(descent * s.scaleY);
         lineGap = (int)Math.Round(lineGap * s.scaleY);
-        int ax = 0; // charatcter width
-        int lsb = 0; // left side bearing
-
-        activeParser.STB_GetCodepointHMetrics(c, ref ax, ref lsb);
 
         int c_x0 = 0;
         int c_y0 = 0;
