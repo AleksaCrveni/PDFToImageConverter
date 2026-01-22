@@ -706,17 +706,16 @@ namespace Converter.Parsers.PDF
     public void PDF_DrawText(string font, string textToWrite, PDFGI_DrawState state, int positionAdjustment = 0)
     {
       // TODO: just do this once at opettor and assign ref to glolbal obj
+      // Get right rasterizer
       PDF_FontData fd = GetFontDataFromKey(currentTextObject.FontRef);
       IRasterizer activeParser = fd.Rasterizer;
       double[] activeWidths = fd.FontInfo.Widths;
-      // skip for now 
-      //if (fd.Key == "F2.0")
-      //  return;
-      // ascent and descent are defined in font descriptor, use those I think over getting i from  the font
 
       char c;
       int glyphIndex;
       int baseline = 0;
+
+      // Account for position adjustment
       state.TextObject.TextMatrix[2, 0] -= (positionAdjustment / 1000f) * state.TextObject.TextMatrix[0, 0] * state.TextObject.FontScaleFactor;
 
       for (int i = 0; i < textToWrite.Length; i++)
@@ -733,13 +732,17 @@ namespace Converter.Parsers.PDF
         int Y = _targetSize.Height - (int)(state.TextRenderingMatrix[2, 1]);
 
         int idx = (int)c - fd.FontInfo.FirstChar;
+
+        #region width
         float width = 0;
         if (idx < activeWidths.Length)
           width = (float)activeWidths[idx] / 1000f;
         else
           width = fd.FontInfo.FontDescriptor.MissingWidth / 1000f;
+        #endregion
 
         (float scaleX, float scaleY) s = activeParser.GetScale(glyph.glyphIndex, state.TextRenderingMatrix, width);
+
         #region asserts
         Debug.Assert(X > 0, $"X is negative at index {i}. Lit: {textToWrite}");
         Debug.Assert(Y > 0, $"Y is negative at index {i}. Lit: {textToWrite}");
@@ -749,51 +752,44 @@ namespace Converter.Parsers.PDF
         Debug.Assert(s.scaleY > 0, $"Scale factor Y must be higher than 0! sfY: {s.scaleY}. Lit: {textToWrite}.Ind : {i}");
         #endregion asserts
 
-        int ascent = fd.FontInfo.FontDescriptor.Ascent;
-        int descent = fd.FontInfo.FontDescriptor.Ascent;
-        int lineGap = 0;
+        int ascent = (int)Math.Round(fd.FontInfo.FontDescriptor.Ascent * s.scaleY);
+        int descent = (int)Math.Round(fd.FontInfo.FontDescriptor.Descent * s.scaleY);
 
-        ascent = (int)Math.Round(ascent * s.scaleY);
-        descent = (int)Math.Round(descent * s.scaleY);
-        lineGap = (int)Math.Round(lineGap * s.scaleY);
+        #region glyph metrics
 
         int c_x0 = 0;
         int c_y0 = 0;
         int c_x1 = 0;
         int c_y1 = 0;
         activeParser.STB_GetGlyphBitmapBox(glyph.glyphIndex, s.scaleX, s.scaleY, ref c_x0, ref c_y0, ref c_x1, ref c_y1);
-
         // char height - different than bounding box height
         int y = Y + c_y0;
-
-        if (y < 0)
-          y = 0;
         int glyphWidth = c_x1 - c_x0; // I think that this should be replaced from value in Widths array
         int glyphHeight = c_y1 - c_y0;
 
-        int byteOffset = X + (y * _targetSize.Width);
+        #endregion
 
+        int byteOffset = X + (y * _targetSize.Width);
         int shiftX = 0;
         int shiftY = 0;
+
         activeParser.STB_MakeGlyphBitmapSubpixel(ref _outputBuffer, byteOffset, glyphWidth, glyphHeight, _targetSize.Width, s.scaleX, s.scaleY, shiftX, shiftY, glyph.glyphIndex);
-        // kerning
 
-        //int kern;
-        //kern = parser.GetCodepointKernAdvance(textToTranslate[i], textToTranslate[i + 1]);
-        //x += (int)Math.Round(kern * scaleFactor);
-
-
+        #region Advance
         double advanceX = width * state.TextObject.FontScaleFactor + state.TextObject.Tc;
-        double advanceY = 0 + state.TextObject.FontScaleFactor; // when advance Y not 0? when fonts are vertical??
+        double advanceY = 0 + state.TextObject.FontScaleFactor; // This wont work for vertical fonts
+
         if (c == ' ')
           advanceX += state.TextObject.Tw;
         advanceX *= state.TextObject.Th;
+
         // TODO: this really depends on what type of CTM it is. i.e is there shear, transaltion, rotation etc
         // I should detect this and save state somewhere
         // for now just support translate and scale
         // NOTE: actually I think I can just multiply matrix, and this is done to avoid matrix multiplciation
         state.TextObject.TextMatrix[2, 0] = advanceX * state.TextRenderingMatrix[0, 0] + state.TextObject.TextMatrix[2, 0];
         state.TextObject.TextMatrix[2, 1] = 0 * state.TextObject.TextMatrix[1, 1] + state.TextObject.TextMatrix[2, 1];
+        #endregion
       }
     }
 
