@@ -22,19 +22,12 @@ namespace Tester
     }
 
     [TestMethod]
-    public void BaseDocTest()
+    public void TestPDFs()
     {
       PdfParser pdfParser = new PdfParser();
       PDF_Options options = new PDF_Options();
-      PDFFile pdfFile = pdfParser.Parse(Files.BaseDocFilePath, ref options);
-    }
-
-    [TestMethod]
-    public void SampleDocTest()
-    {
-      PdfParser pdfParser = new PdfParser();
-      PDF_Options options = new PDF_Options();
-      PDFFile pdfFile = pdfParser.Parse(Files.Sample, ref options);
+      pdfParser.Parse(Files.BaseDocFilePath, ref options);
+      pdfParser.Parse(Files.Sample, ref options);
     }
 
   }
