@@ -714,12 +714,11 @@ namespace Converter.Parsers.PDF
       //  return;
       // ascent and descent are defined in font descriptor, use those I think over getting i from  the font
 
-
       char c;
       int glyphIndex;
       int baseline = 0;
       state.TextObject.TextMatrix[2, 0] -= (positionAdjustment / 1000f) * state.TextObject.TextMatrix[0, 0] * state.TextObject.FontScaleFactor;
-      // int res = ttfHelper.GetGlyphFromEncoding('S');
+
       for (int i = 0; i < textToWrite.Length; i++)
       {
         c = textToWrite[i];
@@ -762,7 +761,7 @@ namespace Converter.Parsers.PDF
         int c_y0 = 0;
         int c_x1 = 0;
         int c_y1 = 0;
-        activeParser.STB_GetCodepointBitmapBox(c, s.scaleX, s.scaleY, ref c_x0, ref c_y0, ref c_x1, ref c_y1);
+        activeParser.STB_GetGlyphBitmapBox(glyph.glyphIndex, s.scaleX, s.scaleY, ref c_x0, ref c_y0, ref c_x1, ref c_y1);
 
         // char height - different than bounding box height
         int y = Y + c_y0;
@@ -773,7 +772,10 @@ namespace Converter.Parsers.PDF
         int glyphHeight = c_y1 - c_y0;
 
         int byteOffset = X + (y * _targetSize.Width);
-        activeParser.STB_MakeCodepointBitmap(ref _outputBuffer, byteOffset, glyphWidth, glyphHeight, _targetSize.Width, s.scaleX, s.scaleY, c);
+
+        int shiftX = 0;
+        int shiftY = 0;
+        activeParser.STB_MakeGlyphBitmapSubpixel(ref _outputBuffer, byteOffset, glyphWidth, glyphHeight, _targetSize.Width, s.scaleX, s.scaleY, shiftX, shiftY, glyph.glyphIndex);
         // kerning
 
         //int kern;
