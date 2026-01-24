@@ -121,33 +121,46 @@ namespace Converter.Parsers.PDF
       PDF_PageInfo pInfo;
       for (int i = 0; i < file.PageInformation.Count; i++)
       {
-        // Process Resources
-        PDF_ResourceDict resourceDict = new PDF_ResourceDict();
-        ParseResourceDictionary(file, file.PageInformation[i].ResourcesIR, ref resourceDict);
         pInfo = file.PageInformation[i];
-        pInfo.ResourceDict = resourceDict;
 
+        // Do content first since its easier to log it if unsupported font type is used
         // Process Contents
         PDF_CommonStreamDict contentDict = new PDF_CommonStreamDict();
         ParsePageContents(file, file.PageInformation[i].ContentsIR, ref contentDict);
         pInfo.ContentDict = contentDict;
+
+        //File.WriteAllBytes(Path.Join(Files.RootFolder, "Prijemni-1_content.txt"), contentDict.RawStreamData);
+        // Process Resources
+        PDF_ResourceDict resourceDict = new PDF_ResourceDict();
+        ParseResourceDictionary(file, file.PageInformation[i].ResourcesIR, ref resourceDict);
+        pInfo.ResourceDict = resourceDict;
+
         file.PageInformation[i] = pInfo;
-        // don't do anything else for now, untill i learn about graphics and image formats
-        // i can parse data further but i hav eno clue what to do with it or what i really need.
       }
     }
 
     // Wrap for now if i have to do extra work later
-    private void ParsePageContents(PDFFile file, (int objIndex, int generation) objPosition, ref PDF_CommonStreamDict contentDict)
+    private void ParsePageContents(PDFFile file, List<(int objIndex, int generation)> objPositions, ref PDF_CommonStreamDict contentDict)
     {
-      ParseCommonStream(file, objPosition, ref contentDict);
+      PDF_CommonStreamDict intermDict = new PDF_CommonStreamDict();
+      // Use list for now since it will double internal buffer when it fills it
+      // TODO: see if we can just story array of conntents and process them like that in PDFGOInterpreter,
+      // but I image that would add unneccesary complexity object will be using only RawStreamData Field
+      // NOTE: this does mem copy for now and its not ideal solution it also might brick with large content pages
+      List<byte> buff = new List<byte>();
+      foreach ((int objIndex, int generation) objPosition in objPositions)
+      {
+        ParseCommonStream(file, objPosition, ref intermDict);
+        buff.AddRange(intermDict.RawStreamData);
+      }
+      contentDict.RawStreamData = buff.ToArray();
     }
 
     private void ParseCommonStream(PDFFile file, (int objIndex, int generation) objPosition, ref PDF_CommonStreamDict dict)
     {
       SharedAllocator allocator = GetObjBuffer(file, objPosition);
       ReadOnlySpan<byte> buffer = allocator.Buffer.AsSpan(allocator.Range);
-      PDFSpanParseHelper helper = new PDFSpanParseHelper(ref buffer);
+        PDFSpanParseHelper helper = new PDFSpanParseHelper(ref buffer);
 
       helper.GoToStartOfDict();
       string tokenString = helper.GetNextToken();
@@ -1390,8 +1403,12 @@ namespace Converter.Parsers.PDF
               pageInfo.BoxColorInfo = helper.GetNextDict();
               break;
             case "Contents" :
-              pageInfo.ContentsIR = helper.GetNextIndirectReference();
-              break;
+              helper.SkipWhiteSpace();
+              if (helper._char == '[')
+                pageInfo.ContentsIR = helper.GetNextIndirectReferenceList();
+              else
+                pageInfo.ContentsIR = new List<(int objIndex, int generation)>() { helper.GetNextIndirectReference() };
+                break;
             case "Rotate" :
               pageInfo.Rotate = helper.GetNextInt32();
               break;

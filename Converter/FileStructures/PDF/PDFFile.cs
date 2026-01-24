@@ -154,7 +154,7 @@ namespace Converter.FileStructures.PDF
     public PDF_Rect TrimBox;
     public PDF_Rect ArtBox;
     public Dictionary<object, object> BoxColorInfo;
-    public (int, int) ContentsIR; // I don't know if this can be array of IR, docs aren't clear, search more samples
+    public List<(int objIndex, int generation)> ContentsIR; // I don't know if this can be array of IR, docs aren't clear, search more samples
     public int Rotate;
     public Dictionary<object, object> Group; // 11.4.7
     public byte[] Thumb;
