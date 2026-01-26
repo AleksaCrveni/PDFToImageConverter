@@ -173,6 +173,9 @@ namespace Converter.Parsers.PostScript
       int len = __arrayLengths.Pop();
       __operandTypes.Pop();
 
+      if (len == 0)
+        return Array.Empty<double>();
+
       double[] arr = new double[len];
 
       // traverse from back because its stack 
@@ -185,7 +188,12 @@ namespace Converter.Parsers.PostScript
 
     public virtual void GetArray()
     {
-      SkipWhiteSpaceAndDelimiters();
+      SkipWhiteSpace();
+      // We can't be skipping dleimiters here beucase some of the elements may contain delimiters
+      // We should just move past '[' and whitespace
+      if (__char == '[')
+        ReadChar();
+      SkipWhiteSpace();
       int count = 0;
       while (__char != ']' && __char != '}' && __char != PDFConstants.NULL)
       {

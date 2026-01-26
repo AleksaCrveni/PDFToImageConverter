@@ -30,22 +30,19 @@ namespace Converter.Parsers.Fonts
 
     public void LoadFont()
     {
-      
-      ParseHeader();
+      SkipHeader();
       Interpreter();
     } 
 
     private void Interpreter()
     {
-      // skip header for now
-      SkipUntilAfterString("dict".AsSpan());
-      SkipNextString(); // begin
-
+      
       ParseFontDictionary();
       // we can skip to this by offseting with Length1 (length of clear  portion of the program)
       // length of it is Length2
       // TODO: Apparently this can be ascii string as well, look into this
       byte[] privateDictRaw = DecryptPrivateDictionary();
+      Debug.Assert(privateDictRaw.Length > 0);
       File.WriteAllBytes(Files.RootFolder + @$"\{_ffInfo.FontDescriptor.FontName}-decryptedEEXEC.txt", privateDictRaw);
       ParsePrivateDictionary(font, privateDictRaw);
     }
@@ -629,11 +626,40 @@ namespace Converter.Parsers.Fonts
       tok =  Encoding.Default.GetString(__buffer.AsSpan().Slice(starter, __position - starter));
       return tok;
     }
-
-    private void ParseHeader()
+    // We don't look for %%EndComments because some font files just don't contain them
+    // Search for dict begin instead
+    private void SkipHeader()
     {
-      // For now skip header
-      SkipUntilAfterString("%%EndComments".AsSpan());
+      // skip header for now
+      bool found = false;
+      while (!found && __position <= __buffer.Length)
+      {
+        SkipUntilAfterString("dict".AsSpan());
+        IsNextStringAsSpan("begin".AsSpan(), ref found);
+      }
+    }
+
+    private void IsNextStringAsSpan(ReadOnlySpan<char> strToCmp, ref bool found)
+    {
+      ReadOnlySpan<byte> token = new ReadOnlySpan<byte>();
+      GetNextStringAsSpan(ref token);
+      if (strToCmp.Length == token.Length)
+      {
+        for (int i = 0; i < strToCmp.Length; i++)
+        {
+          if (strToCmp[i] != token[i])
+          {
+            found = false;
+            return;
+          }
+        }
+        found = true;
+      }
+      else
+      {
+        found = false;
+      }
+      
     }
 
     // NOTE: Use only when you know str encoding
