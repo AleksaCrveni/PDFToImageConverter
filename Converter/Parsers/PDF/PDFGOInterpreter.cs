@@ -3,6 +3,7 @@ using Converter.FileStructures.PDF;
 using Converter.FileStructures.PDF.GraphicsInterpreter;
 using Converter.Rasterizers;
 using Converter.StaticData;
+using System.Buffers;
 using System.Diagnostics;
 using System.Globalization;
 using System.Text;
@@ -279,7 +280,44 @@ namespace Converter.Parsers.PDF
           #endregion textState
           #region textPositioning;
           case 0x6454: // Td
+            double ty = GetNextStackValAsDouble();
+            double tx = GetNextStackValAsDouble();
+
+            reUsableMatrix1[0, 0] = 1;
+            reUsableMatrix1[0, 1] = 0;
+            reUsableMatrix1[0, 2] = 0;
+
+            reUsableMatrix1[1, 0] = 0;
+            reUsableMatrix1[1, 1] = 1;
+            reUsableMatrix1[1, 2] = 0;
+
+            reUsableMatrix1[2, 0] = tx;
+            reUsableMatrix1[2, 1] = ty;
+            reUsableMatrix1[2, 2] = 1;
+
+            MyMath.MultiplyMatrixes3x3(reUsableMatrix1, currentTextObject.TextLineMatrix, currentTextObject.TextMatrix);
+            MyMath.CopyMatrix3x3Data(currentTextObject.TextLineMatrix, currentTextObject.TextMatrix);
+            break;
           case 0x4454: // TD
+            ty = GetNextStackValAsDouble();
+            tx = GetNextStackValAsDouble();
+            currentTextObject.TL = -ty;
+
+            reUsableMatrix1[0, 0] = 1;
+            reUsableMatrix1[0, 1] = 0;
+            reUsableMatrix1[0, 2] = 0;
+
+            reUsableMatrix1[1, 0] = 0;
+            reUsableMatrix1[1, 1] = 1;
+            reUsableMatrix1[1, 2] = 0;
+
+            reUsableMatrix1[2, 0] = tx;
+            reUsableMatrix1[2, 1] = ty;
+            reUsableMatrix1[2, 2] = 1;
+
+            MyMath.MultiplyMatrixes3x3(reUsableMatrix1, currentTextObject.TextLineMatrix, currentTextObject.TextMatrix);
+            MyMath.CopyMatrix3x3Data(currentTextObject.TextLineMatrix, currentTextObject.TextMatrix);
+            break;
           case 0x6d54: // Tm
             double tmOp = GetNextStackValAsDouble();
             currentTextObject.TextMatrix[2, 1] = tmOp;
@@ -353,7 +391,7 @@ namespace Converter.Parsers.PDF
               // read in proper order
               for (int i = literalsList.Count - 1; i >= 0; i--)
               {
-                PDF_DrawText(currentTextObject.FontRef, literalsList[i].Literal, state, literalsList[i].PosCorrection);
+                //PDF_DrawText(currentTextObject.FontRef, literalsList[i].Literal, state, literalsList[i].PosCorrection);
               } 
             }
             break;
@@ -603,18 +641,77 @@ namespace Converter.Parsers.PDF
     }
 
     // we are at '('
+    // we need to use string builder here because of the escape characters
     private void GetStringLiteral()
     {
       ReadChar();
       int startPos = _pos;
-      while (_char != ')' || _char == PDFConstants.NULL)
+      int c = 0;
+      int depth = 1;
+
+      // TODO: Use pool for this
+      StringBuilder sb = new StringBuilder();
+      while (depth != 0 && _char == PDFConstants.NULL)
       {
+        // octal representation page 16
+        if (_char == '(')
+        {
+          depth++;
+        }
+        else if (_char == ')')
+        {
+          depth--;
+        }
+        else if (_char == '\\')
+        {
+          if (_char >= '0' && _char < '8')
+          {
+            int count = 0;
+            int val = 0;
+            while (_char >= '0' && _char < 8 && count < 3)
+            {
+              val = val * 8 + count - '0';
+              ReadChar();
+              count++;
+            }
+            // return it back since we will read char at the end
+            _pos--;
+            _readPos--;
+            c = val;
+          }
+          else if (c == 'n')
+          {
+            c = '\n';
+          }
+          else if (c == 'r')
+          {
+            c = '\r';
+          }
+          else if (c == 't')
+          {
+            c = '\t';
+          }
+          else if (c == 'b')
+          {
+            c = '\b';
+          }
+          else if (c == 'f')
+          {
+            c = '\f';
+          }
+          else if (c == '\n' || c == '\r')
+          {
+            ReadChar();
+            continue;
+          }
+        }
+
+        sb.Append((char) c);
         ReadChar();
       }
 
-      stringOperands.Push(Encoding.UTF8.GetString(_buffer.Slice(startPos, _pos - startPos)));
+      stringOperands.Push(sb.ToString());
       operandTypes.Push(OperandType.STRING);
-      ReadChar(); // skip ')'
     }
     
     private void ReadChar()
@@ -652,6 +749,7 @@ namespace Converter.Parsers.PDF
       return (_char >= 48 && _char <= 57);
     }
 
+    // Should this be removed?
     public void ComputeTextRenderingMatrix()
     {
       // Set initial value to first matrix
@@ -665,10 +763,10 @@ namespace Converter.Parsers.PDF
       reUsableMatrix1[2, 1] = currentTextObject.TRise;
       reUsableMatrix1[2, 2] = 1;
 
-      MyMath.MultiplyMatrixes3x3(reUsableMatrix1, currentTextObject.TextMatrix, ref reUsableMatrix2);
-      MyMath.MultiplyMatrixes3x3(reUsableMatrix2, currentGS.CTM, ref textRenderingMatrix);
+      MyMath.MultiplyMatrixes3x3(reUsableMatrix1, currentTextObject.TextMatrix, reUsableMatrix2);
+      MyMath.MultiplyMatrixes3x3(reUsableMatrix2, currentGS.CTM, textRenderingMatrix);
     }
-
+    // Should this be removed?
     public void UpdateTextMatrixAfterGlyphRender(int charWidth, int charHeight, int posAdjustment)
     {
       double tx = ((charWidth - posAdjustment / 1000) * currentTextObject.FontScaleFactor + currentTextObject.Tc + currentTextObject.Tw) * (currentTextObject.Th);
@@ -686,7 +784,7 @@ namespace Converter.Parsers.PDF
       reUsableMatrix1[2, 1] = ty;
       reUsableMatrix1[2, 2] = 1;
       // multiply
-      MyMath.MultiplyMatrixes3x3(reUsableMatrix1, currentTextObject.TextMatrix, ref reUsableMatrix2);
+      MyMath.MultiplyMatrixes3x3(reUsableMatrix1, currentTextObject.TextMatrix, reUsableMatrix2);
 
       // asign value to textMatrix
       currentTextObject.TextMatrix[0, 0] = reUsableMatrix2[0, 0];
@@ -731,9 +829,9 @@ namespace Converter.Parsers.PDF
         // because origin is bottom-left we have do bitmapHeight - , to get position on the top
         int Y = _targetSize.Height - (int)(state.TextRenderingMatrix[2, 1]);
 
-        int idx = (int)c - fd.FontInfo.FirstChar;
+        #region width calculation
 
-        #region width
+        int idx = (int)c - fd.FontInfo.FirstChar;
         float width = 0;
         if (idx < activeWidths.Length)
           width = (float)activeWidths[idx] / 1000f;
@@ -807,7 +905,7 @@ namespace Converter.Parsers.PDF
       reUsableMatrix1[2, 1] = f;
       reUsableMatrix1[2, 2] = 1;
 
-      MyMath.MultiplyMatrixes3x3(reUsableMatrix1, currentGS.CTM, ref reUsableMatrix2);
+      MyMath.MultiplyMatrixes3x3(reUsableMatrix1, currentGS.CTM, reUsableMatrix2);
 
       currentGS.CTM[0, 0] = reUsableMatrix2[0, 0];
       currentGS.CTM[0, 1] = reUsableMatrix2[0, 1];
@@ -838,8 +936,8 @@ namespace Converter.Parsers.PDF
       identity[2, 2] = 1;
 
       double[,] mid = new double[3, 3];
-      MyMath.MultiplyMatrixes3x3(identity, currentTextObject.TextMatrix, ref mid);
-      MyMath.MultiplyMatrixes3x3(mid, CTM, ref textRenderingMatrix);
+      MyMath.MultiplyMatrixes3x3(identity, currentTextObject.TextMatrix, mid);
+      MyMath.MultiplyMatrixes3x3(mid, CTM, textRenderingMatrix);
     }
 
     private PDF_FontData GetFontDataFromKey(string searchKey)
