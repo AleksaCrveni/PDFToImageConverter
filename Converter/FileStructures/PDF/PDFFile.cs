@@ -266,8 +266,9 @@ namespace Converter.FileStructures.PDF
     public int LastChar;
     public double[] Widths;
     public PDF_FontDescriptor FontDescriptor;
-    // can be name of dict, but just do enum for now
-    public PDF_FontEncodingData EncodingData;
+    // we want this always initialized because we will always check it
+    // but sometimes font info might not contain it so we would have to do null check
+    public PDF_FontEncodingData EncodingData = new PDF_FontEncodingData();
 
     // Type 0 only
     public (int ojbIndex, int generation) DescendantFontsIR = (-1, -1);

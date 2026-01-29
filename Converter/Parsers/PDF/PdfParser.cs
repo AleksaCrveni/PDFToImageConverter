@@ -676,10 +676,9 @@ namespace Converter.Parsers.PDF
             // can be either name of IR to dict
             helper.SkipWhiteSpace();
             int bytesRead = 0;
-            PDF_FontEncodingData encodingData = new PDF_FontEncodingData();
             if (helper._char == '/')
             {
-              encodingData.BaseEncoding = helper.GetNextToken();
+              fontInfo.EncodingData.BaseEncoding = helper.GetNextToken();
             }
             else
             {
@@ -687,11 +686,9 @@ namespace Converter.Parsers.PDF
               SharedAllocator irAllocator = GetObjBuffer(file, IR);
               ReadOnlySpan<byte> irBuffer = irAllocator.Buffer.AsSpan(irAllocator.Range);
 
-              ParseFontEncodingDictionary(file, irBuffer, ref encodingData);
+              ParseFontEncodingDictionary(file, irBuffer, ref fontInfo.EncodingData);
               FreeAllocator(irAllocator);
             }
-
-            fontInfo.EncodingData = encodingData;
             break;
           case "DescendantFonts": // Spec says its array, but i've seen examples where writers just slap IR without array
             helper.SkipWhiteSpace();
