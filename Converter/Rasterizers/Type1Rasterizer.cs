@@ -5,7 +5,6 @@ using Converter.FileStructures.TTF;
 using Converter.FileStructures.Type1;
 using Converter.Parsers.Fonts;
 using Converter.StaticData;
-using System.Text;
 
 namespace Converter.Rasterizers
 {
@@ -13,6 +12,7 @@ namespace Converter.Rasterizers
   {
     private PDF_FontInfo _fontInfo;
     private Type1Interpreter _interpreter;
+    private double[,] _fontMatrix;
     public Type1Rasterizer(byte[] rawFontBuffer, ref PDF_FontInfo fontInfo) : base(rawFontBuffer, fontInfo.EncodingData.BaseEncoding)
     {
       _fontInfo = fontInfo;
@@ -41,13 +41,25 @@ namespace Converter.Rasterizers
 
     public (float scaleX, float scaleY) GetScale(int glyphName, double[,] textRenderingMatrix, float width)
     {
-      throw new NotImplementedException();
+      // in type 1 font units are already scaled including width are already scaled
+      float scaleX = (float)_fontMatrix[0, 0]; 
+      float scaleY = (float)_fontMatrix[1, 1];
+
+      // not sure if we need to scale width here
+
+      scaleX *= (float)textRenderingMatrix[0, 0];
+      scaleY *= (float)textRenderingMatrix[1, 1];
+      return (scaleX, scaleY);
     }
 
     protected override void InitFont()
     {
       
       _interpreter.LoadFont();
+      if (_interpreter.font.FontDict.FontMatrix != null)
+        _fontMatrix = _interpreter.font.FontDict.FontMatrix;
+      else
+        _fontMatrix = new double[3, 3] { { 0.001, 0, 0 }, { 0, 0.001, 0 }, { 0, 0, 0 } }; // default
     }
 
     public PSShape? InterpretByName(string charName)

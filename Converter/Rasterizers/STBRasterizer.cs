@@ -21,7 +21,7 @@ namespace Converter.Rasterizers
     private TTF_RASTERIZER_VERSION _rasterVersion;
     protected int _byteSize;
     protected int _beginOfSfnt;
-    protected STBRasterizer(byte[] rawFontBuffer, string encodingType)
+    protected STBRasterizer(byte[] rawFontBuffer, string? encodingType)
     {
       _buffer = rawFontBuffer;
       _rasterVersion = TTF_RASTERIZER_VERSION.V2;
@@ -33,7 +33,7 @@ namespace Converter.Rasterizers
     protected void SetRasterizerVersion(TTF_RASTERIZER_VERSION v) => _rasterVersion = v;
     protected abstract void InitFont();
 
-    public virtual void SetCorrectEncoding(string encoding)
+    public virtual void SetCorrectEncoding(string? encoding)
     {
       // set PDF_FontEncodingSource
       if (encoding == PDF_FontEncodingType.WinAnsiEncoding.ToString())
@@ -46,7 +46,7 @@ namespace Converter.Rasterizers
         _encodingArray = PDFEncodings.MacRomanEncoding;
         _encodingSource = PDF_FontEncodingSource.ENCODING;
       }
-      else if (encoding == string.Empty)
+      else if (string.IsNullOrEmpty(encoding))
       {
         _encodingArray = new int[0];
         _encodingSource = PDF_FontEncodingSource.CMAP;
