@@ -1,6 +1,7 @@
 ﻿using Converter.FileStructures.PDF;
 using Converter.StaticData;
 using System.Globalization;
+using System.Reflection.Emit;
 using System.Text;
 
 namespace Converter.Parsers.PDF
@@ -580,26 +581,82 @@ namespace Converter.Parsers.PDF
       return res;
     }
 
-    // String literal
-    // Fix in respect to Table 3 - Escape sequences in literal string
-    public string GetNextTextString()
+    public string GetNextStringLiteral()
     {
       ReadUntilNonWhiteSpaceDelimiter();
       if (_char != '(')
         throw new InvalidDataException("String literal error. Expected (");
       ReadChar();
-      int starter = _position;
-      while (_readPosition < _buffer.Length && _char != ')')
+
+      int c = 0;
+      int depth = 1;
+
+      // TODO: Use pool for this
+      StringBuilder sb = new StringBuilder();
+      while (depth != 0 && _char != PDFConstants.NULL)
       {
+        // octal representation page 16
+        c = _char;
+        if (_char == '(')
+        {
+          depth++;
+        }
+        else if (_char == ')')
+        {
+          depth--;
+          if (depth == 0)
+            break;
+        }
+        else if (_char == '\\')
+        {
+          ReadChar();
+          if (_char >= '0' && _char < '8')
+          {
+            int count = 0;
+            int val = 0;
+            while (_char >= '0' && _char < '8' && count < 3)
+            {
+              val = val * 8 + _char - '0';
+              ReadChar();
+              count++;
+            }
+            // return it back since we will read char at the end
+            _position--;
+            _readPosition--;
+            c = val;
+          }
+          else if (c == 'n')
+          {
+            c = '\n';
+          }
+          else if (c == 'r')
+          {
+            c = '\r';
+          }
+          else if (c == 't')
+          {
+            c = '\t';
+          }
+          else if (c == 'b')
+          {
+            c = '\b';
+          }
+          else if (c == 'f')
+          {
+            c = '\f';
+          }
+          else if (c == '\n' || c == '\r')
+          {
+            ReadChar();
+            continue;
+          }
+        }
+
+        sb.Append((char)c);
         ReadChar();
       }
-
-      string result = Encoding.Default.GetString(_buffer.Slice(starter, _position - starter));
-
-      if (_char != ')')
-        throw new InvalidDataException("String literal error. Expected )");
       ReadChar();
-      return result;
+      return sb.ToString();
     }
     public void SkipNextToken()
     {

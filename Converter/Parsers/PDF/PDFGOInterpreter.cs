@@ -391,7 +391,7 @@ namespace Converter.Parsers.PDF
               // read in proper order
               for (int i = literalsList.Count - 1; i >= 0; i--)
               {
-                //PDF_DrawText(currentTextObject.FontRef, literalsList[i].Literal, state, literalsList[i].PosCorrection);
+                PDF_DrawText(currentTextObject.FontRef, literalsList[i].Literal, state, literalsList[i].PosCorrection);
               } 
             }
             break;
@@ -645,15 +645,15 @@ namespace Converter.Parsers.PDF
     private void GetStringLiteral()
     {
       ReadChar();
-      int startPos = _pos;
       int c = 0;
       int depth = 1;
 
       // TODO: Use pool for this
       StringBuilder sb = new StringBuilder();
-      while (depth != 0 && _char == PDFConstants.NULL)
+      while (depth != 0 && _char != PDFConstants.NULL)
       {
         // octal representation page 16
+        c = _char;
         if (_char == '(')
         {
           depth++;
@@ -661,16 +661,19 @@ namespace Converter.Parsers.PDF
         else if (_char == ')')
         {
           depth--;
+          if (depth == 0)
+            break;
         }
         else if (_char == '\\')
         {
+          ReadChar();
           if (_char >= '0' && _char < '8')
           {
             int count = 0;
             int val = 0;
-            while (_char >= '0' && _char < 8 && count < 3)
+            while (_char >= '0' && _char < '8' && count < 3)
             {
-              val = val * 8 + count - '0';
+              val = val * 8 + _char - '0';
               ReadChar();
               count++;
             }
@@ -712,6 +715,7 @@ namespace Converter.Parsers.PDF
 
       stringOperands.Push(sb.ToString());
       operandTypes.Push(OperandType.STRING);
+      ReadChar();
     }
     
     private void ReadChar()

@@ -2,10 +2,7 @@
 using Converter.Parsers.PDF;
 using Converter.Rasterizers;
 using Converter.StaticData;
-using System;
 using System.Globalization;
-using System.Numerics;
-using System.Runtime.CompilerServices;
 using System.Text;
 
 namespace Converter.Parsers.PostScript
@@ -255,18 +252,81 @@ namespace Converter.Parsers.PostScript
       __operandTypes.Push(OperandType.DOUBLE);
     }
 
+    // I am not sure if this string literal follows same rules as 
     public virtual void GetStringLiteral()
     {
       ReadChar();
-      int startPos = __position;
-      while (__char != ')' || __char == PDFConstants.NULL)
+      int c = 0;
+      int depth = 1;
+
+      // TODO: Use pool for this
+      StringBuilder sb = new StringBuilder();
+      while (depth != 0 && __char != PDFConstants.NULL)
       {
+        // octal representation page 16
+        c = __char;
+        if (__char == '(')
+        {
+          depth++;
+        }
+        else if (__char == ')')
+        {
+          depth--;
+          if (depth == 0)
+            break;
+        }
+        else if (__char == '\\')
+        {
+          ReadChar();
+          if (__char >= '0' && __char < '8')
+          {
+            int count = 0;
+            int val = 0;
+            while (__char >= '0' && __char < '8' && count < 3)
+            {
+              val = val * 8 + __char - '0';
+              ReadChar();
+              count++;
+            }
+            // return it back since we will read char at the end
+            __position--;
+            __readPosition--;
+            c = val;
+          }
+          else if (c == 'n')
+          {
+            c = '\n';
+          }
+          else if (c == 'r')
+          {
+            c = '\r';
+          }
+          else if (c == 't')
+          {
+            c = '\t';
+          }
+          else if (c == 'b')
+          {
+            c = '\b';
+          }
+          else if (c == 'f')
+          {
+            c = '\f';
+          }
+          else if (c == '\n' || c == '\r')
+          {
+            ReadChar();
+            continue;
+          }
+        }
+
+        sb.Append((char)c);
         ReadChar();
       }
 
-      __stringOperands.Push(Encoding.UTF8.GetString(__buffer.AsSpan().Slice(startPos, __position - startPos)));
+      __stringOperands.Push(sb.ToString());
       __operandTypes.Push(OperandType.STRING);
-      ReadChar(); // skip ')'
+      ReadChar();
     }
     public virtual void GetName()
     {

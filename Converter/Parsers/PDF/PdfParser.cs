@@ -1108,7 +1108,7 @@ namespace Converter.Parsers.PDF
             if (helper._char == '<')
               fontDescriptor.FontFamily = helper.GetNextByteString();
             else
-              fontDescriptor.FontFamily = helper.GetNextTextString();
+              fontDescriptor.FontFamily = helper.GetNextStringLiteral();
             break;
           case "FontStretch":
             fontDescriptor.FontStretch = helper.GetNextName<PDF_FontStretch>();
@@ -1576,7 +1576,7 @@ namespace Converter.Parsers.PDF
             catalog.MarkInfo = helper.GetNextDict();
             break;
           case "Lang":
-            catalog.Lang = helper.GetNextTextString();
+            catalog.Lang = helper.GetNextStringLiteral();
             break;
           case "SpiderInfo":
             catalog.SpiderInfo = helper.GetNextDict();
