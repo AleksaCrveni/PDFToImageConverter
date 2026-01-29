@@ -172,5 +172,27 @@ namespace Converter.StaticData
       "Cacute", "cacute", "Ccaron", "ccaron", "dcroat"
     };
 
+    public readonly static string[] MacExtrasGlyphEncoding =
+    {
+      "NUL", "HT", "LF", "CR", "DLE", "DC1", "DC2", "DC3", "DC4", "RS", "US", "notequal", "DEL", "infinity", "lessequal",
+      "greaterequal", "partialdiff", "summation", "product", "pi", "integral", "Omega", "radical", "approxequal", "Delta",
+      "nbspace", "lozenge", "apple"
+    };
+
+    public static string GetGlyphName(int glyphNameIndex)
+    {
+      if (glyphNameIndex < StandardGlyphNames.Length)
+        return StandardGlyphNames[glyphNameIndex];
+      else
+      {
+        // don't quite understand wwhere this is coming from but i've seen this being done
+        glyphNameIndex -= StandardGlyphNames.Length;
+        if (glyphNameIndex < MacExtrasGlyphEncoding.Length)
+          return MacExtrasGlyphEncoding[glyphNameIndex];
+      }
+
+      return ".notdef";
+    }
+
   }
 }

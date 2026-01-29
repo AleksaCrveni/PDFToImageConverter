@@ -1,5 +1,6 @@
 ﻿using Converter.FileStructures.General;
 using Converter.FileStructures.PDF;
+using Converter.FileStructures.PDF.GraphicsInterpreter;
 using Converter.FileStructures.TTF;
 using Converter.Parsers.PDF;
 using Converter.StaticData;
@@ -11,20 +12,16 @@ namespace Converter.Rasterizers
   {
     private PDF_FontInfo _fontInfo;
     private PDF_FontEncodingData _encodingData;
-    private PDF_FontEncodingSource _encodingSource;
-    private int[] _encodingArray;
     private TTF_Table_POST _ttfTablePOST;
     private TTF_Table_CMAP _ttfTableCMAP;
     private float _unitsPerEm = 1000f; // used to covnert from glyph to text space, for ttf its 1/1000 default value
-    public TTFRasterizer(byte[] rawFontProgram, ref PDF_FontInfo fontInfo) : base (rawFontProgram)
+    public TTFRasterizer(byte[] rawFontProgram, ref PDF_FontInfo fontInfo) : base (rawFontProgram, fontInfo.EncodingData.BaseEncoding)
     {
       _fontInfo = fontInfo;
       _encodingData = fontInfo.EncodingData;
 
       InitFont(); // should be called in derived class??
-      SetCorrectEncoding();
-   
-    }
+   }
 
     protected override void InitFont()
     {
@@ -240,17 +237,20 @@ namespace Converter.Rasterizers
     }
 
     // Page 274. Make this more robust, ok for basic start
-    public (int glyphIndex, string glyphName) GetGlyphInfo(char c)
+    public (int glyphIndex, string glyphName) GetGlyphInfo(int codepoint)
     {
       // GlyphName sometime may not be needed in TTF, but do it for now
       // 1. Get correct glyphname based on encoding
       // 2. Get glyphIndex of given glyphname
 
       // unicode values aren't always right?? bug? other converters treat � as DDFE, but its actually FFFD (??), some encoding is wrong on my side?
-      if ((int)c > 255)
-        c = ' ';
-      // single byte
-      byte b = (byte)(c & 255);
+      // UPDATE: I think that i should be passing codepoint be able to readunicode values, for this issue specifically we aren't able to process ligature since its over 65555 value (unicode)
+      // TODO: adress at some point after we figure it out with Type1 font stuff
+
+      if (codepoint > 255)
+        codepoint = ' ';
+      // single byte since its TTF
+      byte b = (byte)(codepoint & 255);
       // if its non symbolic font encdoing are mac or win, ther shouldn't be anything in the differences array (or it should be empty in code)
       
       // 1.
@@ -259,11 +259,15 @@ namespace Converter.Rasterizers
       // check from cmap if encoding is not defined
       if (glyphName == string.Empty)
       {
-        int glyphNameIndex= _encodingArray[b];
-        if (glyphNameIndex < PDFEncodings.StandardGlyphNames.Length)
-          glyphName = PDFEncodings.StandardGlyphNames[glyphNameIndex];
-        else
+        if (b < _encodingArray.Length)
+        {
+          int glyphNameIndex = _encodingArray[b];
+          glyphName = PDFEncodings.GetGlyphName(glyphNameIndex);
+        } else
+        {
           glyphName = ".notdef";
+        }
+        
       }
 
       // 2.
@@ -472,35 +476,6 @@ namespace Converter.Rasterizers
       return 0;
     }
 
-    private void SetCorrectEncoding()
-    {
-      // CMAP SHOULD BE USED IF there is cmap dict and if there is encoidng then use encoding
-      // set PDF_FontEncodingSource
-      if (_encodingData.BaseEncoding == "WinAnsiEncoding")
-      {
-        _encodingArray = PDFEncodings.WinAnsiEncoding; // shouldn't this be adobe encoding??
-        _encodingSource = PDF_FontEncodingSource.ENCODING;
-      } else if (_encodingData.BaseEncoding == "MacRomanEncoding")
-      {
-        _encodingArray = PDFEncodings.MacRomanEncoding;
-        _encodingSource = PDF_FontEncodingSource.ENCODING;
-      } else if (_encodingData.BaseEncoding == string.Empty)
-      {
-        _encodingArray = new int[0];
-        _encodingSource = PDF_FontEncodingSource.CMAP;
-        // TODO: These should be some more work done with prepending cmap data with some bytes, but figure out that later
-
-      } else if (_encodingData.BaseEncoding == "StandardEncoding")
-      {
-        _encodingArray = PDFEncodings.AdobeSandardEncoding;
-        _encodingSource = PDF_FontEncodingSource.ENCODING;
-      } else
-      {
-        throw new InvalidDataException("Invalid font encoding!");
-      }
-
-    }
-
     #region table loaders
     // TODO: Not sure if parsing is needed or we can just read from 'local' buffer each time
     // Separate for now
@@ -556,6 +531,11 @@ namespace Converter.Rasterizers
     private string ReadStringOfSize(ref ReadOnlySpan<byte> buffer, int pos, int len)
     {
       return Encoding.Default.GetString(buffer.Slice(pos, len));
+    }
+
+    public void RasterizeGlyph(byte[] bitmapArr, int byteOffset, int glyphWidth, int glyphHeight, int glyphStride, float scaleX, float scaleY, float shiftX, float shiftY, ref GlyphInfo glyphInfo)
+    {
+      throw new NotImplementedException();
     }
     #endregion read helpers
   }

@@ -1,5 +1,8 @@
 ﻿using Converter.FileStructures.General;
+using Converter.FileStructures.PDF;
+using Converter.FileStructures.PDF.GraphicsInterpreter;
 using Converter.FileStructures.TTF;
+using Converter.StaticData;
 using System.Buffers.Binary;
 using System.Diagnostics;
 
@@ -7,24 +10,60 @@ namespace Converter.Rasterizers
 {
   // Slighly altered version of STBTrueType.cs to fit my need
   // any bugfixes or new functionalities to original STBTrueType.cs should be done here as well
-  // This class should not hold any non font file format things
+  // This class should not hold any font file specific things
   public abstract class STBRasterizer
   {
     protected byte[] _buffer;
+    protected int[] _encodingArray;
+    protected PDF_FontEncodingType _encodingType;
+    protected PDF_FontEncodingSource _encodingSource; // we don't use this right now
     protected TrueTypeFont _ttf;
     private TTF_RASTERIZER_VERSION _rasterVersion;
     protected int _byteSize;
     protected int _beginOfSfnt;
-    protected STBRasterizer(byte[] rawFontBuffer)
+    protected STBRasterizer(byte[] rawFontBuffer, string encodingType)
     {
       _buffer = rawFontBuffer;
       _rasterVersion = TTF_RASTERIZER_VERSION.V2;
       _byteSize = 8;
       _beginOfSfnt = 0;
+      SetCorrectEncoding(encodingType);
     }
 
     protected void SetRasterizerVersion(TTF_RASTERIZER_VERSION v) => _rasterVersion = v;
     protected abstract void InitFont();
+
+    public virtual void SetCorrectEncoding(string encoding)
+    {
+      // set PDF_FontEncodingSource
+      if (encoding == PDF_FontEncodingType.WinAnsiEncoding.ToString())
+      {
+        _encodingArray = PDFEncodings.WinAnsiEncoding; // shouldn't this be adobe encoding??
+        _encodingSource = PDF_FontEncodingSource.ENCODING;
+      }
+      else if (encoding == PDF_FontEncodingType.MacRomanEncoding.ToString())
+      {
+        _encodingArray = PDFEncodings.MacRomanEncoding;
+        _encodingSource = PDF_FontEncodingSource.ENCODING;
+      }
+      else if (encoding == string.Empty)
+      {
+        _encodingArray = new int[0];
+        _encodingSource = PDF_FontEncodingSource.CMAP;
+        // TODO: These should be some more work done with prepending cmap data with some bytes, but figure out that later
+
+      }
+      else if (encoding == PDF_FontEncodingType.StandardEncoding.ToString())
+      {
+        _encodingArray = PDFEncodings.AdobeSandardEncoding;
+        _encodingSource = PDF_FontEncodingSource.ENCODING;
+      }
+      else
+      {
+        throw new InvalidDataException("Invalid font encoding!");
+      }
+    }
+
 
     public virtual void STB_GetGlyphHMetrics(int glyphIndex, ref int advanceWidth, ref int leftSideBearing)
     {
@@ -1629,6 +1668,12 @@ namespace Converter.Rasterizers
       return sum;
     }
 
+    #region Wrappers
+    //public abstract void RasterizeGlyph(byte[] bitmap, GlyphInfo);
+    #endregion 
+
+
+
 
     #region MyRasterizerFunctions
 
@@ -1642,7 +1687,7 @@ namespace Converter.Rasterizers
     /// <param name="y0"></param>
     /// <param name="x1"></param>
     /// <param name="y1"></param>
-    public virtual void DrawLine(byte[] bitmapArr, int byteOffset, int bitmapWidth, float x0, float y0, float x1, float y1)
+    public virtual void MY_DrawLine(byte[] bitmapArr, int byteOffset, int bitmapWidth, float x0, float y0, float x1, float y1)
     {
       bool steep = MathF.Abs(y1 - y0) > MathF.Abs(x1 - x0);
       if (steep)

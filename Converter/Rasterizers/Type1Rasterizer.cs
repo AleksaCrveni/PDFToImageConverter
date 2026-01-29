@@ -1,8 +1,11 @@
 ﻿using Converter.FileStructures.PDF;
+using Converter.FileStructures.PDF.GraphicsInterpreter;
 using Converter.FileStructures.PostScript;
 using Converter.FileStructures.TTF;
 using Converter.FileStructures.Type1;
 using Converter.Parsers.Fonts;
+using Converter.StaticData;
+using System.Text;
 
 namespace Converter.Rasterizers
 {
@@ -10,16 +13,30 @@ namespace Converter.Rasterizers
   {
     private PDF_FontInfo _fontInfo;
     private Type1Interpreter _interpreter;
-    public Type1Rasterizer(byte[] rawFontBuffer, ref PDF_FontInfo fontInfo) : base(rawFontBuffer)
+    public Type1Rasterizer(byte[] rawFontBuffer, ref PDF_FontInfo fontInfo) : base(rawFontBuffer, fontInfo.EncodingData.BaseEncoding)
     {
       _fontInfo = fontInfo;
       _interpreter = new Type1Interpreter(_buffer, _fontInfo);
       InitFont();
     }
 
-    public (int glyphIndex, string glyphName) GetGlyphInfo(char c)
+    public (int glyphIndex, string glyphName) GetGlyphInfo(int codepoint)
     {
-      throw new NotImplementedException();
+      string glyphName = _fontInfo.EncodingData.GetGlyphNameFromDifferences(codepoint);
+      if (glyphName == string.Empty)
+      {
+        if (codepoint < _encodingArray.Length)
+        {
+          int glyphNameIndex = _encodingArray[codepoint];
+          glyphName = PDFEncodings.GetGlyphName(glyphNameIndex);
+        }
+        {
+          glyphName = ".notdef";
+        }
+      }
+
+      // Type1 doesnt use glyphIndex
+      return (0, glyphName);
     }
 
     public (float scaleX, float scaleY) GetScale(int glyphName, double[,] textRenderingMatrix, float width)
@@ -105,6 +122,11 @@ namespace Converter.Rasterizers
       height = (int)(fy0 - fyMin);
       ix0 = (int)MathF.Floor(fx0);
       iy0 = (int)Math.Floor(-fy0);
+    }
+
+    public void RasterizeGlyph(byte[] bitmapArr, int byteOffset, int glyphWidth, int glyphHeight, int glyphStride, float scaleX, float scaleY, float shiftX, float shiftY, ref GlyphInfo glyphInfo)
+    {
+      throw new NotImplementedException();
     }
   }
 }

@@ -1,10 +1,11 @@
-﻿using Converter.FileStructures.TTF;
+﻿using Converter.FileStructures.PDF.GraphicsInterpreter;
+using Converter.FileStructures.TTF;
 
 namespace Converter.Rasterizers
 {
   public interface IRasterizer
   {
-    public (int glyphIndex, string glyphName) GetGlyphInfo(char c);
+    public (int glyphIndex, string glyphName) GetGlyphInfo(int codepoint);
     public (float scaleX, float scaleY) GetScale(int glyphName, double[,] textRenderingMatrix, float width);
     void STB_AddPoint(List<PointF>? points, int n, float x, float y);
     int STB_CloseShape(ref List<TTFVertex> vertices, int numOfVertices, bool wasOff, bool startOff, int sx, int sy, int scx, int scy, int cx, int cy);
@@ -47,5 +48,14 @@ namespace Converter.Rasterizers
     void STB_SortEdgesQuickSort(ref Span<TTFEdge> oRefEdges, int n, int prevIndex = 0);
     void STB_TesselateCubic(List<PointF> points, ref int numOfPoints, float x0, float y0, float x1, float y1, float x2, float y2, float x3, float y3, float objspaceFlatnessSquared, int n);
     int STB_TesselateCurve(List<PointF> points, ref int numOfPoints, float x0, float y0, float x1, float y1, float x2, float y2, float objspaceFlatnessSquared, int n);
+
+
+    void TTF_RasterizeGlyph()
+    {
+
+    }
+
+    // TODO: add some wrappers to make it more understandable from caller perspective
+    void RasterizeGlyph(byte[] bitmapArr, int byteOffset, int glyphWidth, int glyphHeight, int glyphStride, float scaleX, float scaleY, float shiftX, float shiftY, ref GlyphInfo glyphInfo);
   }
 }
