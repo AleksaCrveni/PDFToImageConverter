@@ -21,6 +21,7 @@ namespace Tester
       Directory.CreateDirectory(dirName);
     }
 
+    // We can just do them all in one method, even if it fails it will be easy to see which file fails first and fix them in order
     [TestMethod]
     public void TestPDFs()
     {

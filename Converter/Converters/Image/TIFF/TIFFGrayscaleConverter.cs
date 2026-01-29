@@ -20,14 +20,17 @@ namespace Converter.Converters.Image.TIFF
       if (_options.Height == 0 || _options.Height < height)
         _options.Height = height;
 
-      // temp workaround to allow multiple test results to be ran at the same time
+      // temp workaround
       long rnd = Random.Shared.NextInt64();
-      _writer = new TIFFGrayscaleWriter($"TestOutput/{rnd}_convertTest.tiff");
+      if (Directory.Exists("TestOutput"))
+        _writer = new TIFFGrayscaleWriter($"TestOutput/{rnd}_convertTest.tiff");
+      else
+        _writer = new TIFFGrayscaleWriter($"convertTest.tiff");
       TIFFWriterOptions tiffOptions = new TIFFWriterOptions()
-      {
-        Width = _options.Width,
-        Height = _options.Height
-      };
+        {
+          Width = _options.Width,
+          Height = _options.Height
+        };
     }
 
     public override void Save(byte[] buffer)
