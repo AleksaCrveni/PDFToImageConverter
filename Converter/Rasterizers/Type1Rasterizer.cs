@@ -5,6 +5,8 @@ using Converter.FileStructures.TTF;
 using Converter.FileStructures.Type1;
 using Converter.Parsers.Fonts;
 using Converter.StaticData;
+using System.Diagnostics;
+using static System.Formats.Asn1.AsnWriter;
 
 namespace Converter.Rasterizers
 {
@@ -69,7 +71,7 @@ namespace Converter.Rasterizers
       TYPE1_Point2D currPoint = new TYPE1_Point2D();
       return _interpreter.InterpretCharString(charName,lsb, currPoint);
     }
-    
+ 
     // temp
     public List<TTFVertex> ConvertToTTFVertexFormat(PSShape s, float scale)
     {
@@ -139,8 +141,30 @@ namespace Converter.Rasterizers
 
     public override void RasterizeGlyph(byte[] bitmapArr, int byteOffset, int glyphWidth, int glyphHeight, int glyphStride, float scaleX, float scaleY, float shiftX, float shiftY, ref GlyphInfo glyphInfo)
     {
-      throw new NotImplementedException();
-    }
+      TYPE1_Point2D width = new TYPE1_Point2D();
+      PSShape? shape = InterpretByName(glyphInfo.Name);
+      Debug.Assert(shape != null);
+      float scale = scaleX > scaleY ? scaleX : scaleY;
+      // we scale here
+      List<TTFVertex> vertices = ConvertToTTFVertexFormat(shape, scale); // for now we only support aspect ratio scaling
+      List<int> windingLengths = new List<int>();
+      int windingCount = 0;
 
+      List<PointF> windings = STB_FlattenCurves(ref vertices, vertices.Count, 0.35f / scale, ref windingLengths, ref windingCount);
+      int ix0 = 0;
+      int iy0 = 0;
+      int height = 0;
+      GetFakeBoundingBoxFromPoints(windings, ref ix0, ref iy0, ref height, scale);
+      // ??
+      if (width.Y > 0)
+        height = (int)(width.Y * scale);
+      BmpS result = new BmpS();
+      result.H = height;
+      result.W = (int)(shape._width.X * scale);
+      result.Offset = byteOffset; // draw at 20,20
+      result.Pixels = bitmapArr;
+      result.Stride = glyphStride;
+      STB_InternalRasterize(ref result, ref windings, ref windingLengths, windingCount, 1, 1, 0, 0, ix0, iy0, true);
+    }
   }
 }
