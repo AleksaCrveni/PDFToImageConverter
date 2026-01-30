@@ -19,6 +19,7 @@
     public double Tl = 0; // Leading
     public double Tw = 0; // Word Space
     public double Tc = 0; // Char space
+    public double TL = 0; // Text leading
     public int TMode = 0; // Render mode
     public double TRise = 0; // Rise
     public bool Active;

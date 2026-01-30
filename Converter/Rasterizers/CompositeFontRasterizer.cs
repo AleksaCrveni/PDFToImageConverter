@@ -12,7 +12,7 @@ namespace Converter.Rasterizers
       //fontInfo.CompositeFontInfo.DescendantDict.BaseFont
     }
 
-    public (int glyphIndex, string glyphName) GetGlyphInfo(int codepoint)
+    public void GetGlyphInfo(int codepoint, ref GlyphInfo glyphInfo)
     {
       throw new NotImplementedException();
     }
@@ -22,7 +22,7 @@ namespace Converter.Rasterizers
       throw new NotImplementedException();
     }
 
-    public void RasterizeGlyph(byte[] bitmapArr, int byteOffset, int glyphWidth, int glyphHeight, int glyphStride, float scaleX, float scaleY, float shiftX, float shiftY, ref GlyphInfo glyphInfo)
+    public override void RasterizeGlyph(byte[] bitmapArr, int byteOffset, int glyphWidth, int glyphHeight, int glyphStride, float scaleX, float scaleY, float shiftX, float shiftY, ref GlyphInfo glyphInfo)
     {
       throw new NotImplementedException();
     }

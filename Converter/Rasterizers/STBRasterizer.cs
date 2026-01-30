@@ -1669,7 +1669,14 @@ namespace Converter.Rasterizers
     }
 
     #region Wrappers
-    //public abstract void RasterizeGlyph(byte[] bitmap, GlyphInfo);
+    public abstract void RasterizeGlyph(byte[] bitmapArr, int byteOffset, int glyphWidth, int glyphHeight, int glyphStride, float scaleX, float scaleY, float shiftX, float shiftY, ref GlyphInfo glyphInfo);
+
+    public virtual void SetDefaultGlyphInfoValues(ref GlyphInfo glyphInfo)
+    {
+      // TODO: maybe this should be index -1 or name .notdef
+      glyphInfo.Index = 0;
+      glyphInfo.Name = string.Empty;
+    }
     #endregion 
 
 

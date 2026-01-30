@@ -20,7 +20,7 @@ namespace Converter.Rasterizers
       InitFont();
     }
 
-    public (int glyphIndex, string glyphName) GetGlyphInfo(int codepoint)
+    public void GetGlyphInfo(int codepoint, ref GlyphInfo glyphInfo)
     {
       string glyphName = _fontInfo.EncodingData.GetGlyphNameFromDifferences(codepoint);
       if (glyphName == string.Empty)
@@ -36,7 +36,8 @@ namespace Converter.Rasterizers
       }
 
       // Type1 doesnt use glyphIndex
-      return (0, glyphName);
+      glyphInfo.Index = 0;
+      glyphInfo.Name = glyphName;
     }
 
     public (float scaleX, float scaleY) GetScale(int glyphName, double[,] textRenderingMatrix, float width)
@@ -136,9 +137,10 @@ namespace Converter.Rasterizers
       iy0 = (int)Math.Floor(-fy0);
     }
 
-    public void RasterizeGlyph(byte[] bitmapArr, int byteOffset, int glyphWidth, int glyphHeight, int glyphStride, float scaleX, float scaleY, float shiftX, float shiftY, ref GlyphInfo glyphInfo)
+    public override void RasterizeGlyph(byte[] bitmapArr, int byteOffset, int glyphWidth, int glyphHeight, int glyphStride, float scaleX, float scaleY, float shiftX, float shiftY, ref GlyphInfo glyphInfo)
     {
       throw new NotImplementedException();
     }
+
   }
 }

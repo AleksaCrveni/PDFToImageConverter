@@ -816,15 +816,16 @@ namespace Converter.Parsers.PDF
       char c;
       int glyphIndex;
       int baseline = 0;
-
+      GlyphInfo glyphInfo = new GlyphInfo(); // make global??
       // Account for position adjustment
       state.TextObject.TextMatrix[2, 0] -= (positionAdjustment / 1000f) * state.TextObject.TextMatrix[0, 0] * state.TextObject.FontScaleFactor;
 
       for (int i = 0; i < textToWrite.Length; i++)
       {
         c = textToWrite[i];
+        activeParser.SetDefaultGlyphInfoValues(ref glyphInfo);
         // TODO: use this instead of c, FIX 
-        (int glyphIndex, string glyphName) glyph = activeParser.GetGlyphInfo(c);
+        activeParser.GetGlyphInfo(c, ref glyphInfo);
 
         ComputeTextRenderingMatrix(state.TextObject, state.CTM, ref state.TextRenderingMatrix);
 
@@ -843,7 +844,7 @@ namespace Converter.Parsers.PDF
           width = fd.FontInfo.FontDescriptor.MissingWidth / 1000f;
         #endregion
 
-        (float scaleX, float scaleY) s = activeParser.GetScale(glyph.glyphIndex, state.TextRenderingMatrix, width);
+        (float scaleX, float scaleY) s = activeParser.GetScale(glyphInfo.Index, state.TextRenderingMatrix, width);
 
         #region asserts
         Debug.Assert(X > 0, $"X is negative at index {i}. Lit: {textToWrite}");
@@ -863,7 +864,7 @@ namespace Converter.Parsers.PDF
         int c_y0 = 0;
         int c_x1 = 0;
         int c_y1 = 0;
-        activeParser.STB_GetGlyphBitmapBox(glyph.glyphIndex, s.scaleX, s.scaleY, ref c_x0, ref c_y0, ref c_x1, ref c_y1);
+        activeParser.STB_GetGlyphBitmapBox(glyphInfo.Index, s.scaleX, s.scaleY, ref c_x0, ref c_y0, ref c_x1, ref c_y1);
         // char height - different than bounding box height
         int y = Y + c_y0;
         int glyphWidth = c_x1 - c_x0; // I think that this should be replaced from value in Widths array
@@ -875,7 +876,7 @@ namespace Converter.Parsers.PDF
         int shiftX = 0;
         int shiftY = 0;
 
-        activeParser.STB_MakeGlyphBitmapSubpixel(ref _outputBuffer, byteOffset, glyphWidth, glyphHeight, _targetSize.Width, s.scaleX, s.scaleY, shiftX, shiftY, glyph.glyphIndex);
+        activeParser.RasterizeGlyph(_outputBuffer, byteOffset, glyphWidth, glyphHeight, _targetSize.Width, s.scaleX, s.scaleY, shiftX, shiftY, ref glyphInfo);
 
         #region Advance
         double advanceX = width * state.TextObject.FontScaleFactor + state.TextObject.Tc;

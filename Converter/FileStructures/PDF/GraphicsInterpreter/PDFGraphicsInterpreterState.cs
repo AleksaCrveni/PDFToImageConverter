@@ -103,5 +103,11 @@ namespace Converter.FileStructures.PDF.GraphicsInterpreter
     public bool NonZeroClippingPath = false;
     public bool EvenOddClippingPath = false;
   }
+
+  public struct GlyphInfo()
+  {
+    public string Name;
+    public int Index;
+  }
 }
  

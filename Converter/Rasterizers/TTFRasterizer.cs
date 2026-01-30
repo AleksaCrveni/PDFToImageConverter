@@ -236,9 +236,18 @@ namespace Converter.Rasterizers
       _ttf.Offsets = tOff;
     }
 
-    // Page 274. Make this more robust, ok for basic start
-    public (int glyphIndex, string glyphName) GetGlyphInfo(int codepoint)
+    public override void RasterizeGlyph(byte[] bitmapArr, int byteOffset, int glyphWidth, int glyphHeight, int glyphStride, float scaleX, float scaleY, float shiftX, float shiftY, ref GlyphInfo glyphInfo)
     {
+      STB_MakeGlyphBitmapSubpixel(ref bitmapArr, byteOffset, glyphWidth, glyphHeight, glyphStride, scaleX, scaleY, shiftX, shiftY, glyphInfo.Index);
+    }
+
+    // Page 274. Make this more robust, ok for basic start
+    public void GetGlyphInfo(int codepoint, ref GlyphInfo glyphInfo)
+    {
+      // 0. Reset glyphInfo to default
+      glyphInfo.Index = 0;
+      glyphInfo.Name = string.Empty;
+
       // GlyphName sometime may not be needed in TTF, but do it for now
       // 1. Get correct glyphname based on encoding
       // 2. Get glyphIndex of given glyphname
@@ -277,7 +286,12 @@ namespace Converter.Rasterizers
       {
         glyphIndex = GetGlyphIndexFromPostTable(glyphName);
         if (glyphIndex != 0)
-          return (glyphIndex, glyphName);
+        {
+          glyphInfo.Index = glyphIndex;
+          glyphInfo.Name = glyphName;
+          return;
+        }
+          
       }
 
       // if not found check adobe list
@@ -287,9 +301,11 @@ namespace Converter.Rasterizers
         // is this ok?
         char character = (char)unicodeValues[0];
         glyphIndex = GetGlyphIndexFromCmap(character, _ttfTableCMAP.Index31SubtableOffset, _ttfTableCMAP.Format31);
-        return (glyphIndex, glyphName);
+        glyphInfo.Index = glyphIndex;
+        glyphInfo.Name = glyphName;
+        return;
       }
-      return (0, "");
+      return;
     }
     // This has to be called for each character because of widths array, it may or may not be same as advance in hmtx table 
     public (float scaleX, float scaleY) GetScale(int glyphIndex, double[,] textRenderingMatrix, float width)
@@ -533,10 +549,6 @@ namespace Converter.Rasterizers
       return Encoding.Default.GetString(buffer.Slice(pos, len));
     }
 
-    public void RasterizeGlyph(byte[] bitmapArr, int byteOffset, int glyphWidth, int glyphHeight, int glyphStride, float scaleX, float scaleY, float shiftX, float shiftY, ref GlyphInfo glyphInfo)
-    {
-      throw new NotImplementedException();
-    }
     #endregion read helpers
   }
 }
