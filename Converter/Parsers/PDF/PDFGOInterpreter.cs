@@ -136,7 +136,7 @@ namespace Converter.Parsers.PDF
           case 0x7371: // qs
                        // Name of gs paramter dict that is in ExtGState subdict in current resorouceDict
                        // do it later
-            throw new Exception("Implement dictname (gs)");
+            throw new NotImplementedException("Operator not i implemented");
             break;
 
           // special graphics states
@@ -217,7 +217,9 @@ namespace Converter.Parsers.PDF
           #endregion pathConstruction
           #region pathPainting
           case 0x53: // S
+            throw new NotImplementedException("Operator not i implemented");
           case 0x73: // s
+            throw new NotImplementedException("Operator not i implemented");
           case 0x66: // f
 
             currentPC.PathConstructs.Clear();
@@ -225,11 +227,17 @@ namespace Converter.Parsers.PDF
             currentPC.NonZeroClippingPath = false;
             break;
           case 0x46: // F
+            throw new NotImplementedException("Operator not i implemented");
           case 0x2a66: // f*
+            throw new NotImplementedException("Operator not i implemented");
           case 0x42: // B
+            throw new NotImplementedException("Operator not i implemented");
           case 0x2a42: // B*
+            throw new NotImplementedException("Operator not i implemented");
           case 0x62: // b
+            throw new NotImplementedException("Operator not i implemented");
           case 0x2a62: // b*
+            throw new NotImplementedException("Operator not i implemented");
           case 0x6e: // n
             mp = new PDFGI_Point();
             currentPC.PathConstructs.Add((PDFGI_PathConstructOperator.n, mp));       // CHECK CLIPPING PATH SECTION
@@ -396,15 +404,21 @@ namespace Converter.Parsers.PDF
             }
             break;
           case 0x27:   // '
+            throw new NotImplementedException("Operator not i implemented");
           case 0x22:   // "
-                       // text showing
+            throw new NotImplementedException("Operator not i implemented");
+            // text showing
+
             break;
           #endregion textShowing
           case 0x3064: // d0
+            throw new NotImplementedException("Operator not i implemented");
           case 0x3164: // d1
-                       // type 3 fonts
+            throw new NotImplementedException("Operator not i implemented");
+            // type 3 fonts
             break;
           case 0x5343: // CS
+            throw new NotImplementedException("Operator not i implemented");
           case 0x7363: // cs
             PDF_ColorSpaceInfo info = new PDF_ColorSpaceInfo();
             bool found = false;
@@ -424,7 +438,9 @@ namespace Converter.Parsers.PDF
             currentGS.ColorSpaceInfo = info;
             break;
           case 0x4353: // SC
+            throw new NotImplementedException("Operator not i implemented");
           case 0x4e4353: // SCN
+            throw new NotImplementedException("Operator not i implemented");
           case 0x6373: // sc
             int N = currentGS.ColorSpaceInfo.Dict.N;
             for (int i =0; i < N; i++)
@@ -433,37 +449,56 @@ namespace Converter.Parsers.PDF
             }
             break;
           case 0x6e6373: // scn
+            throw new NotImplementedException("Operator not i implemented");
           case 0x47: // G
+            GetNextStackValAsDouble();
+            break;
           case 0x67: // g
             GetNextStackValAsDouble();
             break;
           case 0x4752: // RG
+            throw new NotImplementedException("Operator not i implemented");
           case 0x6772: // rg
+            throw new NotImplementedException("Operator not i implemented");
           case 0x4b: // K
+            throw new NotImplementedException("Operator not i implemented");
           case 0x6b: // k
                      // color
+            throw new NotImplementedException("Operator not i implemented");
             break;
           case 0x6873: // sh
                        // shading patterns
+            throw new NotImplementedException("Operator not i implemented");
             break;
           case 0x4972: // BI
+            throw new NotImplementedException("Operator not i implemented");
           case 0x4449: // ID
+            throw new NotImplementedException("Operator not i implemented");
           case 0x4945: // EI
-                       // inline images
+            throw new NotImplementedException("Operator not i implemented");
+            // inline images
             break;
           case 0x6f44: // Do
-                       // XObject
+            throw new NotImplementedException("Operator not i implemented");
+            // XObject
             break;
           case 0x504d: // MP
+            throw new NotImplementedException("Operator not i implemented");
           case 0x5044: // DP
+            throw new NotImplementedException("Operator not i implemented");
           case 0x434d42: // BMC
+            throw new NotImplementedException("Operator not i implemented");
           case 0x434442: // BDC
+            throw new NotImplementedException("Operator not i implemented");
           case 0x434d45: // EMC
-                         // Marked content
+            throw new NotImplementedException("Operator not i implemented");
+            // Marked content
             break;
           case 0x5842: // BX
+            throw new NotImplementedException("Operator not i implemented");
           case 0x5845: // EX
-                       // Compatibility
+            throw new NotImplementedException("Operator not i implemented");
+            // Compatibility
             break;
           default:
             break;
@@ -472,6 +507,7 @@ namespace Converter.Parsers.PDF
         val = ReadNext();
         tokensParsed++;
       }
+      // TODO: remove this eventually
       Debug.Assert(_outputBuffer.Select(x => x > 0).Any());
       _converter.Save(_outputBuffer);
     }
@@ -864,7 +900,7 @@ namespace Converter.Parsers.PDF
         int c_y0 = 0;
         int c_x1 = 0;
         int c_y1 = 0;
-        activeParser.STB_GetGlyphBitmapBox(glyphInfo.Index, s.scaleX, s.scaleY, ref c_x0, ref c_y0, ref c_x1, ref c_y1);
+        activeParser.GetGlyphBoundingBox(ref glyphInfo, s.scaleX, s.scaleY, ref c_x0, ref c_y0, ref c_x1, ref c_y1);
         // char height - different than bounding box height
         int y = Y + c_y0;
         int glyphWidth = c_x1 - c_x0; // I think that this should be replaced from value in Widths array

@@ -334,6 +334,11 @@ namespace Converter.Rasterizers
       return (scaleX, scaleY);
     }
 
+    public override void GetGlyphBoundingBox(ref GlyphInfo glyphInfo, float scaleX, float scaleY, ref int ix0, ref int iy0, ref int ix1, ref int iy1)
+    {
+      STB_GetGlyphBitmapBox(glyphInfo.Index, scaleX, scaleY, ref ix0, ref iy0 , ref ix1, ref iy1);
+    }
+
 
     // TODO: not sure if this is implemented right, test tomorrow
     private int GetGlyphIndexFromPostTable(string glyphName)

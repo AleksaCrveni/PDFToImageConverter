@@ -1670,6 +1670,7 @@ namespace Converter.Rasterizers
 
     #region Wrappers
     public abstract void RasterizeGlyph(byte[] bitmapArr, int byteOffset, int glyphWidth, int glyphHeight, int glyphStride, float scaleX, float scaleY, float shiftX, float shiftY, ref GlyphInfo glyphInfo);
+    public abstract void GetGlyphBoundingBox(ref GlyphInfo glyphInfo, float scaleX, float scaleY, ref int ix0, ref int iy0, ref int ix1, ref int iy1);
 
     public virtual void SetDefaultGlyphInfoValues(ref GlyphInfo glyphInfo)
     {
