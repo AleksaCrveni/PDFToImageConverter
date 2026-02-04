@@ -1,4 +1,4 @@
-﻿using System.Security.Cryptography.X509Certificates;
+﻿using Converter.Rasterizers;
 
 namespace Converter.FileStructures.PDF.GraphicsInterpreter
 {
@@ -103,11 +103,15 @@ namespace Converter.FileStructures.PDF.GraphicsInterpreter
     public bool NonZeroClippingPath = false;
     public bool EvenOddClippingPath = false;
   }
-
+  /// <summary>
+  /// Different rasterizers may use different fields
+  /// So far Name and Shape are used by Type1 Rasterizer and Index is used by TTF
+  /// </summary>
   public struct GlyphInfo()
   {
     public string Name;
     public int Index;
+    public PSShape? Shape;
   }
 }
  
