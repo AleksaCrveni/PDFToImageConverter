@@ -1195,7 +1195,13 @@ namespace Converter.Parsers.PDF
             fontDescriptor.FontFile = fontFileInfo;
             break;
           case "CharSet":
-            fontDescriptor.CharSet = helper.GetNextToken();
+            helper.SkipWhiteSpace();
+            if (helper._char == '<')
+              fontDescriptor.CharSet = helper.GetNextByteString();
+            else
+            {
+              fontDescriptor.CharSet = helper.GetNextRawString();
+            }
             break;
           case "Style": // CID Only
             throw new NotImplementedException();

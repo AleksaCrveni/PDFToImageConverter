@@ -42,6 +42,30 @@ namespace Converter.Parsers.PDF
       return Encoding.Default.GetString(_buffer.Slice(starter, _position - starter));
     }
 
+    /// <summary>
+    /// Get next raw string
+    /// </summary>
+    /// <param name="delimiter"></param>
+    /// <returns></returns>
+    public string GetNextRawString()
+    {
+      ReadOnlySpan<byte> span = new ReadOnlySpan<byte>();
+      GetNextStringAsReadOnlySpan(ref span);
+      return Encoding.Default.GetString(span);
+    }
+
+    /// <summary>
+    /// Ignoores delimiters when reading a string. Used to parse formats like "/a/b/c/test/deqe"
+    /// Not most efficient, we could technically not read string but impact is negligable
+    /// </summary>
+    /// <returns></returns>
+    public List<string> SplitNextRawString(char delimiter)
+    {
+      ReadOnlySpan<byte> span = new ReadOnlySpan<byte>();
+      GetNextStringAsReadOnlySpan(ref span);
+      return Encoding.Default.GetString(span).Split(delimiter).ToList();
+    }
+
     public string GetNextASCIIString()
     {
       SkipWhiteSpaceAndDelimiters();
@@ -370,7 +394,7 @@ namespace Converter.Parsers.PDF
     // byte string is starting with < and ending with >
     public string GetNextByteString()
     {
-      SkipWhiteSpaceAndDelimiters();
+      SkipWhiteSpace();
       if (_char != '<')
         throw new InvalidDataException("Invalid array data. Expected Array");
       // Move to actual array start
