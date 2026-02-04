@@ -6,7 +6,6 @@ using Converter.FileStructures.Type1;
 using Converter.Parsers.Fonts;
 using Converter.StaticData;
 using System.Diagnostics;
-using static System.Formats.Asn1.AsnWriter;
 
 namespace Converter.Rasterizers
 {
@@ -15,6 +14,11 @@ namespace Converter.Rasterizers
     private PDF_FontInfo _fontInfo;
     private Type1Interpreter _interpreter;
     private double[,] _fontMatrix;
+    // Temp workaround
+    // TODO: We should probably Cache all glyphs after we compute it 
+    // but currently we have to scale them to get bounding box so we would have 2 caches which is not ideal
+    // this could be avoided if we change how PDFGO works which is probably what I will end up doing
+    private PSShape? _currentShape; 
     public Type1Rasterizer(byte[] rawFontBuffer, ref PDF_FontInfo fontInfo) : base(rawFontBuffer, fontInfo.EncodingData.BaseEncoding)
     {
       _fontInfo = fontInfo;
@@ -55,6 +59,28 @@ namespace Converter.Rasterizers
       return (scaleX, scaleY);
     }
 
+    public override void GetGlyphBoundingBox(ref GlyphInfo glyphInfo, float scaleX, float scaleY, ref int ix0, ref int iy0, ref int ix1, ref int iy1)
+    {
+      TYPE1_Point2D width = new TYPE1_Point2D();
+      PSShape? shape = InterpretByName(glyphInfo.Name);
+      Debug.Assert(shape != null);
+      float scale = scaleX > scaleY ? scaleX : scaleY;
+      // we scale here
+      List<TTFVertex> vertices = ConvertToTTFVertexFormat(shape, scale); // for now we only support aspect ratio scaling
+      List<int> windingLengths = new List<int>();
+      int windingCount = 0;
+
+      List<PointF> windings = STB_FlattenCurves(ref vertices, vertices.Count, 0.35f / scale, ref windingLengths, ref windingCount);
+
+      GetFakeBoundingBoxFromPoints(windings, ref ix0, ref iy0, ref ix1, ref iy1);
+      shape._windingCount = windingCount;
+      shape._windingLengths = windingLengths;
+      shape._windings = windings;
+      shape._xMin = ix0;
+      shape._yMin = iy0;
+      _currentShape = shape;
+    }
+
     protected override void InitFont()
     {
       
@@ -69,7 +95,17 @@ namespace Converter.Rasterizers
     {
       TYPE1_Point2D lsb = new TYPE1_Point2D();
       TYPE1_Point2D currPoint = new TYPE1_Point2D();
-      return _interpreter.InterpretCharString(charName,lsb, currPoint);
+      byte[]? data = _interpreter.font.FontDict.Private.CharStrings.GetValueOrDefault(charName);
+      if (data == null)
+        return null;
+      PSShape s = new PSShape();
+
+      // Separate operand stack independed of PS stack
+      // So called Type 1 Build-Char operand stack and can hold up to 24 numeric values
+      // This might be an array considering we have to clear stack often
+      Stack<float> opStack = new Stack<float>(24);
+      _interpreter.InterpretCharString(data, opStack, lsb, currPoint, s, charName);
+      return s;
     }
  
     // temp
@@ -118,53 +154,46 @@ namespace Converter.Rasterizers
       return vertices;
     }
 
-    // this is just temp to get it to work with STBrasterizer
-    public void GetFakeBoundingBoxFromPoints(List<PointF> points, ref int ix0, ref int iy0, ref int height, float scale)
+
+    // TODO
+    public void GetFakeBoundingBoxFromPoints(List<PointF> points, ref int ix0, ref int iy0, ref int ix1, ref int iy1)
     {
-      float fx0 = int.MaxValue; // min X
-      float fy0 = int.MinValue; // max Y
-      float fyMin = int.MaxValue; // min Y
+      // Units are already scaled
+      float fx0 = float.MaxValue; // min X
+      float fy0 = float.MaxValue; // min Y
+      float fx1 = float.MinValue; // max X
+      float fy1 = float.MinValue; // max Y
+
       foreach (PointF p in points)
       {
         if (p.X < fx0)
           fx0 = p.X;
-        if (p.Y < fyMin)
-          fyMin = p.Y;
-        else if (p.Y > fy0)
+        else if (p.X > fx1)
+          fx1 = p.X;
+
+        if (p.Y < fy0)
           fy0 = p.Y;
+        else if (p.Y > fy1)
+          fy1 = p.Y;
       }
 
-      height = (int)(fy0 - fyMin);
+      // Y axis is ivnerted
       ix0 = (int)MathF.Floor(fx0);
-      iy0 = (int)Math.Floor(-fy0);
+      iy0 = (int)Math.Floor(-fy1);
+      ix1 = (int)Math.Floor(fx1);
+      iy1 = (int)Math.Ceiling(-fy0);
     }
+
 
     public override void RasterizeGlyph(byte[] bitmapArr, int byteOffset, int glyphWidth, int glyphHeight, int glyphStride, float scaleX, float scaleY, float shiftX, float shiftY, ref GlyphInfo glyphInfo)
     {
-      TYPE1_Point2D width = new TYPE1_Point2D();
-      PSShape? shape = InterpretByName(glyphInfo.Name);
-      Debug.Assert(shape != null);
-      float scale = scaleX > scaleY ? scaleX : scaleY;
-      // we scale here
-      List<TTFVertex> vertices = ConvertToTTFVertexFormat(shape, scale); // for now we only support aspect ratio scaling
-      List<int> windingLengths = new List<int>();
-      int windingCount = 0;
-
-      List<PointF> windings = STB_FlattenCurves(ref vertices, vertices.Count, 0.35f / scale, ref windingLengths, ref windingCount);
-      int ix0 = 0;
-      int iy0 = 0;
-      int height = 0;
-      GetFakeBoundingBoxFromPoints(windings, ref ix0, ref iy0, ref height, scale);
-      // ??
-      if (width.Y > 0)
-        height = (int)(width.Y * scale);
       BmpS result = new BmpS();
-      result.H = height;
-      result.W = (int)(shape._width.X * scale);
-      result.Offset = byteOffset; // draw at 20,20
+      result.H = glyphHeight;
+      result.W = glyphWidth;
+      result.Offset = byteOffset;
       result.Pixels = bitmapArr;
       result.Stride = glyphStride;
-      STB_InternalRasterize(ref result, ref windings, ref windingLengths, windingCount, 1, 1, 0, 0, ix0, iy0, true);
+      STB_InternalRasterize(ref result, ref _currentShape._windings, ref _currentShape._windingLengths, _currentShape._windingCount, 1, 1, 0, 0, _currentShape._xMin, _currentShape._yMin, true);
     }
   }
 }

@@ -7,6 +7,7 @@ namespace Converter.Rasterizers
   {
     public void GetGlyphInfo(int codepoint, ref GlyphInfo glyphInfo);
     public (float scaleX, float scaleY) GetScale(int glyphIndex, double[,] textRenderingMatrix, float width);
+    // xmin, ymin, xmax, ymax
     public void GetGlyphBoundingBox(ref GlyphInfo glyphInfo, float scaleX, float scaleY, ref int ix0, ref int iy0, ref int ix1, ref int iy1);
     public void RasterizeGlyph(byte[] bitmapArr, int byteOffset, int glyphWidth, int glyphHeight, int glyphStride, float scaleX, float scaleY, float shiftX, float shiftY, ref GlyphInfo glyphInfo);
     void SetDefaultGlyphInfoValues(ref GlyphInfo glyphInfo);

@@ -12,6 +12,11 @@ namespace Converter.Rasterizers
       //fontInfo.CompositeFontInfo.DescendantDict.BaseFont
     }
 
+    public override void GetGlyphBoundingBox(ref GlyphInfo glyphInfo, float scaleX, float scaleY, ref int ix0, ref int iy0, ref int ix1, ref int iy1)
+    {
+      throw new NotImplementedException();
+    }
+
     public void GetGlyphInfo(int codepoint, ref GlyphInfo glyphInfo)
     {
       throw new NotImplementedException();
