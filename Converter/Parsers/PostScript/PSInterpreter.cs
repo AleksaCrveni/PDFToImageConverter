@@ -43,7 +43,7 @@ namespace Converter.Parsers.PostScript
     }
 
     public abstract bool IsCurrentCharPartOfOperator();
-    public abstract PSShape? InterpretCharString(string name, TYPE1_Point2D lsb, TYPE1_Point2D currPoint);
+    public abstract void InterpretCharString(byte[] data, Stack<float> opStack, TYPE1_Point2D lsb, TYPE1_Point2D currPoint, PSShape outShape, string name);
 
     public virtual void InitDelimiters()
     {

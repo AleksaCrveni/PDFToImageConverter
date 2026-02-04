@@ -6,8 +6,8 @@ using Converter.Rasterizers;
 using Converter.StaticData;
 using Converter.Utils;
 using System.Buffers.Binary;
+using System.ComponentModel.Design;
 using System.Diagnostics;
-using System.Globalization;
 using System.Text;
 
 namespace Converter.Parsers.Fonts
@@ -21,11 +21,18 @@ namespace Converter.Parsers.Fonts
   {
     private PDF_FontInfo _ffInfo;
     public TYPE1_Font font;
+    
+    // State
+    private int _subroutineCallCount = 0;
+    private bool _flex = false;
+    private float[] _flexArr;
+    private int _flexIndex = 0;
 
     public Type1Interpreter(byte[] buffer, PDF_FontInfo ffInfo) : base(buffer)
     {
       _ffInfo = ffInfo;
       font = new TYPE1_Font();
+      _flexArr = new float[14]; // 14 is max size of flex arguments
     }
 
     public void LoadFont()
@@ -56,40 +63,37 @@ namespace Converter.Parsers.Fonts
 
     // 6.2 Charstring Number Encoding Adobe Type1 Font Specification
     // TODO optimize if checks and can shift right by 8 instead of multipyling by 256
-    public override PSShape? InterpretCharString(string name, TYPE1_Point2D lsb, TYPE1_Point2D currPoint)
+    public override void InterpretCharString(byte[] data, Stack<float> opStack, TYPE1_Point2D lsb, TYPE1_Point2D currPoint, PSShape outShape, string name)
     {
-      byte[] rawData = font.FontDict.Private.CharStrings.GetValueOrDefault(name, null);
-      if (rawData == null)
-        return null;
-      // Separate operand stack independed of PS stack
-      // So called Type 1 Build-Char operand stack and can hold up to 24 numeric values
-      // This might be an array considering we have to clear stack often
-      Stack<float> opStack = new Stack<float>(24);
-      ReadOnlySpan<byte> buffer = rawData.AsSpan();
-      PSShape s = new PSShape();
+      ReadOnlySpan<byte> buffer = data.AsSpan();
       byte v = 0;
+      int num = 0;
       for (int i = 0; i < buffer.Length; i++)
       {
         v = buffer[i];
         if (v >= 32 && v <= 246)
         {
-          opStack.Push(v - 139);
-          Log(v.ToString());
+          num = v - 139;
+          opStack.Push(num);
+          Log(num.ToString());
         }
         else if (v >= 247 && v <= 250)
         {
-          opStack.Push(((v - 247) * 256) + buffer[++i] + 108);
-          Log(v.ToString());
+          num = ((v - 247) * 256) + buffer[++i] + 108;
+          opStack.Push(num);
+          Log(num.ToString());
         }
         else if (v >= 251 && v <= 254)
         {
-          opStack.Push((-((v - 251) * 256)) - buffer[++i] - 108);
-          Log(v.ToString());
+          num = (-((v - 251) * 256)) - buffer[++i] - 108;
+          opStack.Push(num);
+          Log(num.ToString());
         }
         else if (v == 255)
         {
-          opStack.Push(BinaryPrimitives.ReadInt32BigEndian(buffer.Slice(++i, 4)));
-          Log(v.ToString());
+          num = BinaryPrimitives.ReadInt32BigEndian(buffer.Slice(++i, 4));
+          opStack.Push(num);
+          Log(num.ToString());
         }
         else
         {
@@ -106,26 +110,34 @@ namespace Converter.Parsers.Fonts
               break;
             case 4: // vmoveto
               currPoint.Y += opStack.Pop();
-              s.MoveTo(currPoint.X, currPoint.Y);
+              if (_flex)
+              {
+                _flexArr[_flexIndex++] = currPoint.X;
+                _flexArr[_flexIndex++] = currPoint.Y;
+              }
+              else
+              {
+                outShape.MoveTo(currPoint.X, currPoint.Y);
+              }
               opStack.Clear();
               Log("vmoveto");
               break;
             case 5: // rlineto
               currPoint.Y += opStack.Pop();
               currPoint.X += opStack.Pop();
-              s.LineTo(currPoint.X, currPoint.Y);
+              outShape.LineTo(currPoint.X, currPoint.Y);
               opStack.Clear();
               Log("rlineto");
               break;
             case 6: // hlineto
               currPoint.X += opStack.Pop();
-              s.LineTo(currPoint.X, currPoint.Y);
+              outShape.LineTo(currPoint.X, currPoint.Y);
               opStack.Clear();
               Log("hlineto");
               break;
             case 7: // vlineto
               currPoint.Y += opStack.Pop();
-              s.LineTo(currPoint.X, currPoint.Y);
+              outShape.LineTo(currPoint.X, currPoint.Y);
               opStack.Clear();
               Log("vlineto");
               break;
@@ -139,7 +151,7 @@ namespace Converter.Parsers.Fonts
               float dy1 = opStack.Pop();
               float dx1 = opStack.Pop();
 
-              s.CurveTo(currPoint.X + dx1, currPoint.Y + dy1,
+              outShape.CurveTo(currPoint.X + dx1, currPoint.Y + dy1,
                 currPoint.X + dx1 + dx2, currPoint.Y + dy1 + dy2,
                 currPoint.X + dx1 + dx2 + dx3, currPoint.Y + dy1 + dy2 + dy3);
               currPoint.X += dx1 + dx2 + dx3;
@@ -151,16 +163,16 @@ namespace Converter.Parsers.Fonts
               // draw line to last moveto, but do not move point to there
               // its different to normal PS command
               // TODO: Maybe have all these methods to be part of PSinterpreter that can be overriden by childen interpteres
-              if (s._moves.Count > 0 && s._moves.Last() == PS_COMMAND.CLOSEPATH)
+              if (outShape._moves.Count > 0 && outShape._moves.Last() == PS_COMMAND.CLOSEPATH)
                 break;
 
-              int pos = s._shapePoints.Count - 1;
+              int pos = outShape._shapePoints.Count - 1;
               float targetX = 0;
               float targetY = 0;
               // get last move to
-              for (int j = s._moves.Count - 1; j >= 0; j--)
+              for (int j = outShape._moves.Count - 1; j >= 0; j--)
               {
-                PS_COMMAND move = s._moves[j];
+                PS_COMMAND move = outShape._moves[j];
                 if (move == PS_COMMAND.CURVE_TO)
                 {
                   pos -= 6;
@@ -170,23 +182,60 @@ namespace Converter.Parsers.Fonts
                   pos -= 2;
                 } else if (move == PS_COMMAND.MOVE_TO)
                 {
-                  targetY = s._shapePoints[pos--];
-                  targetX = s._shapePoints[pos];
+                  targetY = outShape._shapePoints[pos--];
+                  targetX = outShape._shapePoints[pos];
                   break;
                 }
               }
 
-              s.LineTo(targetX, targetY); // draw line
-              s.MoveTo(currPoint.X, currPoint.Y); // move it back so that when we convert to vertexes we stay in same place
-              s._actualLast = PS_COMMAND.CLOSEPATH; // assign close path so that we can check if last one was closepath
+              outShape.LineTo(targetX, targetY); // draw line
+              outShape.MoveTo(currPoint.X, currPoint.Y); // move it back so that when we convert to vertexes we stay in same place
+              outShape._actualLast = PS_COMMAND.CLOSEPATH; // assign close path so that we can check if last one was closepath
               Log("closepath");
               break;
             case 10: // callsubr
+              int subr = (int)opStack.Pop();
+              if (subr == 0)
+              {
+                Debug.Assert(_flexIndex == 14);
+                // Flex uses 2 bezier curves to create one precise shallow curve
+                outShape.CurveTo(_flexArr[2], _flexArr[3], _flexArr[4], _flexArr[5], _flexArr[6], _flexArr[7]);
+                outShape.CurveTo(_flexArr[8], _flexArr[9], _flexArr[10], _flexArr[11], _flexArr[12], _flexArr[13]);
+                _flex = false;
+                _flexIndex = 0;
+                opStack.Clear();
+              }
+              else if (subr == 1)
+              {
+                _flex = true;
+                _flexIndex = 0;
+                opStack.Clear();
+              }
+              else if (subr == 2)
+              {
+                Debug.Assert(_flex);
+                opStack.Clear();
+              }
+              else if (subr > 3)
+              {
+                // not sure if i sohuld be checking 1 here,
+                Debug.Assert(font.FontDict.Private.Subrs[subr]?.Length > 1);
+                _subroutineCallCount++;
+                if (_subroutineCallCount > 10)
+                  throw new Exception("Limit of MAX 10 subroutine calls at once exceeded!");
+                else
+                {
+                  InterpretCharString(font.FontDict.Private.Subrs[subr], opStack, lsb, currPoint, outShape, $"othersubr_{subr}");
+                }
+                _subroutineCallCount--;
+                  
+              }
+              
               Log("callsubr");
               break;
             case 11: // return
               Log("return");
-              break;
+              return;
             case 12: // escape
               switch (buffer[++i])
               {
@@ -208,16 +257,14 @@ namespace Converter.Parsers.Fonts
                   float x1 = opStack.Pop();
                   float y1 = opStack.Pop();
                   float x2 = opStack.Pop();
-                  float y2 = opStack.Pop();
 
                   // do something
-                  opStack.Pop();
                   opStack.Clear();
                   Log("seac");
                   break;
                 case 7: // sbw
-                  s._width.Y = opStack.Pop();
-                  s._width.X = opStack.Pop();
+                  outShape._width.Y = opStack.Pop();
+                  outShape._width.X = opStack.Pop();
                   currPoint.Y = opStack.Pop();
                   currPoint.X = opStack.Pop();
                   lsb.X = currPoint.X;
@@ -232,18 +279,42 @@ namespace Converter.Parsers.Fonts
                   Log("div");
                   break;
                 case 16: // callothersubr
+                  int oSubr = (int)opStack.Pop();
+                  int count = (int)opStack.Pop();
+
+                  if (oSubr == 0)
+                  {
+                    // push only 2 args
+                    __numberOperands.Push(opStack.Pop());
+                    __operandTypes.Push(PDF.OperandType.DOUBLE);
+                    __numberOperands.Push(opStack.Pop());
+                    __operandTypes.Push(PDF.OperandType.DOUBLE);
+                  }
+                  else if (oSubr == 3)
+                  {
+                    __numberOperands.Push(3);
+                    __operandTypes.Push(PDF.OperandType.DOUBLE);
+                  }
+                  else
+                  {
+                    for (int j = 0; j < count; j++)
+                    {
+                      __numberOperands.Push(opStack.Pop());
+                      __operandTypes.Push(PDF.OperandType.DOUBLE);
+                    }
+                  }
                   Log("callothersubr");
                   break;
                 case 17: // pop
-                  float num = (float)PopNumber();
-                  opStack.Push(num);
+                  // push number from interpreter stack to buildchar stack
+                  opStack.Push((float)PopNumber());
                   Log("pop");
                   break;
                 case 33: // setcurrentpoint
                   currPoint.Y = opStack.Pop();
                   currPoint.X = opStack.Pop();
                   // even tho docs say not to do this, we have to so that we know what to do when we are drawing
-                  s.MoveTo(currPoint.X, currPoint.Y);
+                  outShape.MoveTo(currPoint.X, currPoint.Y);
                   opStack.Clear();
                   Log("setcurrentpoint");
                   break;
@@ -254,7 +325,7 @@ namespace Converter.Parsers.Fonts
               }
               break;
             case 13: // hsbw - horizontal side beararing and width
-              s._width.X = opStack.Pop();
+              outShape._width.X = opStack.Pop();
               currPoint.X = opStack.Pop();
               lsb.X = currPoint.X;
               opStack.Clear();
@@ -263,17 +334,35 @@ namespace Converter.Parsers.Fonts
             case 14: // endchar
               Log("endchar");
               SaveLog(name);
-              return s;
+              return;
             case 21: // rmoveto
               currPoint.Y += opStack.Pop();
               currPoint.X += opStack.Pop();
-              s.MoveTo(currPoint.X, currPoint.Y);
+
+              if (_flex)
+              {
+                _flexArr[_flexIndex++] = currPoint.X;
+                _flexArr[_flexIndex++] = currPoint.Y;
+              }
+              else
+              {
+                outShape.MoveTo(currPoint.X, currPoint.Y);
+              }
+                
               opStack.Clear();
               Log("rmoveto");
               break;
             case 22: // hmoveto
               currPoint.X += opStack.Pop();
-              s.MoveTo(currPoint.X, currPoint.Y);
+              if (_flex)
+              {
+                _flexArr[_flexIndex++] = currPoint.X;
+                _flexArr[_flexIndex++] = currPoint.Y;
+              }
+              else
+              {
+                outShape.MoveTo(currPoint.X, currPoint.Y);
+              }
               opStack.Clear();
               Log("hmoveto");
               break;
@@ -283,7 +372,7 @@ namespace Converter.Parsers.Fonts
               dx2 = opStack.Pop();
               dy1 = opStack.Pop();
 
-              s.CurveTo(currPoint.X, currPoint.Y + dy1,
+              outShape.CurveTo(currPoint.X, currPoint.Y + dy1,
                 currPoint.X + dx2, currPoint.Y + dy1 + dy2,
                 currPoint.X + dx2 + dx3, currPoint.Y + dy1 + dy2);
 
@@ -298,7 +387,7 @@ namespace Converter.Parsers.Fonts
               dx2 = opStack.Pop();
               dx1 = opStack.Pop();
 
-              s.CurveTo(currPoint.X + dx1, currPoint.Y,
+              outShape.CurveTo(currPoint.X + dx1, currPoint.Y,
                 currPoint.X + dx1 + dx2, currPoint.Y + dy2,
                 currPoint.X + dx1 + dx2, currPoint.Y + dy2 + dy3);
 
@@ -316,7 +405,6 @@ namespace Converter.Parsers.Fonts
       }
 
       SaveLog(name);
-      return s;
     }
     // this should probably be virtual as well as font dict
     public byte[] DecryptPrivateDictionary()
