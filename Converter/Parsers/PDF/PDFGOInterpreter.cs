@@ -113,7 +113,7 @@ namespace Converter.Parsers.PDF
             PDFGI_DashPattern dashPattern = new PDFGI_DashPattern();
             int phase = GetNextStackValAsInt();
             int[] dashArr = new int[arrayLengths.Pop()];
-            for (int dpIndex = dashArr.Length; dpIndex >= 0; dpIndex--)
+            for (int dpIndex = dashArr.Length -1 ; dpIndex >= 0; dpIndex--)
             {
               dashArr[dpIndex] = GetNextStackValAsInt();
             }
@@ -217,7 +217,8 @@ namespace Converter.Parsers.PDF
           #endregion pathConstruction
           #region pathPainting
           case 0x53: // S
-            throw new NotImplementedException("Operator not i implemented");
+            // TODO: implement this
+            break;
           case 0x73: // s
             throw new NotImplementedException("Operator not i implemented");
           case 0x66: // f
@@ -530,7 +531,8 @@ namespace Converter.Parsers.PDF
       if (IsCurrentCharPartOfOperator() && _char != PDFConstants.NULL)
       {
         int startPos = _pos;
-        while (!IsCurrentCharPDFWhitespaceOrNewLine())
+        // TODO: this may have to be all more delimiters than '/'
+        while (!IsCurrentCharPDFWhitespaceOrNewLine() && _char != '/')
           ReadChar();
         _fourByteSlice.Fill(0);
         for (int i = 0; i < _pos - startPos; i++)
@@ -872,6 +874,7 @@ namespace Converter.Parsers.PDF
 
         #region width calculation
 
+        // Does this work for all charcaters
         int idx = (int)c - fd.FontInfo.FirstChar;
         float width = 0;
         if (idx < activeWidths.Length)
@@ -901,9 +904,17 @@ namespace Converter.Parsers.PDF
         int c_x1 = 0;
         int c_y1 = 0;
         activeParser.GetGlyphBoundingBox(ref glyphInfo, s.scaleX, s.scaleY, ref c_x0, ref c_y0, ref c_x1, ref c_y1);
+
+        Debug.Assert(c_x0 != int.MaxValue && c_x0 != int.MinValue);
+        Debug.Assert(c_y0 != int.MaxValue && c_y0 != int.MinValue);
+        Debug.Assert(c_x1 != int.MaxValue && c_x1 != int.MinValue);
+        Debug.Assert(c_y1 != int.MaxValue && c_y1 != int.MinValue);
+
         // char height - different than bounding box height
         int y = Y + c_y0;
-        int glyphWidth = c_x1 - c_x0; // I think that this should be replaced from value in Widths array
+        // I think that this should be replaced from value in Widths array
+        // NOTE: widths array wont work since this width is not in units but in pixels after its been scaled down
+        int glyphWidth = c_x1 - c_x0; 
         int glyphHeight = c_y1 - c_y0;
 
         #endregion
@@ -915,8 +926,10 @@ namespace Converter.Parsers.PDF
         activeParser.RasterizeGlyph(_outputBuffer, byteOffset, glyphWidth, glyphHeight, _targetSize.Width, s.scaleX, s.scaleY, shiftX, shiftY, ref glyphInfo);
 
         #region Advance
-        double advanceX = width * state.TextObject.FontScaleFactor + state.TextObject.Tc;
-        double advanceY = 0 + state.TextObject.FontScaleFactor; // This wont work for vertical fonts
+        // double advanceX = width * state.TextObject.FontScaleFactor + state.TextObject.Tc;
+        // double advanceY = 0 + state.TextObject.FontScaleFactor; // This wont work for vertical fonts
+        double advanceX = width + state.TextObject.Tc;
+        double advanceY = 0; // This wont work for vertical fonts
 
         if (c == ' ')
           advanceX += state.TextObject.Tw;
