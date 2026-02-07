@@ -92,6 +92,7 @@ namespace Converter.Parsers.Fonts
         else if (v == 255)
         {
           num = BinaryPrimitives.ReadInt32BigEndian(buffer.Slice(++i, 4));
+          i += 3;
           opStack.Push(num);
           Log(num.ToString());
         }
