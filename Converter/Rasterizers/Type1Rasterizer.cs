@@ -28,7 +28,9 @@ namespace Converter.Rasterizers
 
     public void GetGlyphInfo(int codepoint, ref GlyphInfo glyphInfo)
     {
-      string glyphName = _fontInfo.EncodingData.GetGlyphNameFromDifferences(codepoint);
+      string glyphName = string.Empty;
+
+      glyphName = _fontInfo.EncodingData.GetGlyphNameFromDifferences(codepoint);
       if (glyphName == string.Empty)
       {
         if (codepoint < _encodingArray.Length)
@@ -36,9 +38,19 @@ namespace Converter.Rasterizers
           int glyphNameIndex = _encodingArray[codepoint];
           glyphName = PDFEncodings.GetGlyphName(glyphNameIndex);
         }
+        else
         {
           glyphName = ".notdef";
         }
+      }
+
+      // If PDF Encoding is empty check fontfile encoding
+      // TODO: this works only for bytes so we will need to make this work different and return some kind of list that will have to be processed or something
+      // for now put assert
+      if (glyphName == ".notdef")
+      {
+        Debug.Assert(codepoint < 256);
+        glyphName = _interpreter.font.FontDict.Encoding[codepoint];
       }
 
       // Type1 doesnt use glyphIndex
