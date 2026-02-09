@@ -1,4 +1,5 @@
 ﻿using Converter.FileStructures.TIFF;
+using System.Net.Http.Headers;
 namespace Converter.Writers.TIFF
 {
   public class TIFFGrayscaleWriter : ITIFFWriter, IDisposable
@@ -85,19 +86,10 @@ namespace Converter.Writers.TIFF
       _stream.Write(remainderSizeBuffer);
     }
 
-    public void WriteSuppliedBufferData(byte[] suppliedBuffer, ulong byteCount, ulong stripSize, int remainder)
+    // we will always write it in a line so we dont actually need bytecount ,st ripsize and remainder
+    public void WriteSuppliedBufferData(byte[] suppliedBuffer)
     {
-      Span<byte> buffer = suppliedBuffer.AsSpan();
-      BufferWriter writer = new BufferWriter(ref buffer);
-      for (ulong i = 0; i < byteCount; i += (ulong)stripSize)
-      {
-        // read random value into each buffer stuff and then write
-        // do entire buffer because we know we are in range and no need to refresh
-        _stream.Write(writer._buffer);
-      }
-
-      Span<byte> remainderSizeBuffer = writer._buffer.Slice(0, remainder);
-      _stream.Write(remainderSizeBuffer);
+      _stream.Write(suppliedBuffer);
     }
     public void WriteRandomImage(ref BufferWriter writer, ref TIFFWriterOptions options, TIFF_ImgDataMode mode, byte[]? suppliedBuffer = null)
     {
@@ -131,10 +123,11 @@ namespace Converter.Writers.TIFF
           WriteRandomImageData(ref writer, byteCount, (ulong)stripSize, remainder);
           break;
         case TIFF_ImgDataMode.BUFFER_SUPPLIED:
-          WriteSuppliedBufferData(suppliedBuffer, byteCount, (ulong)stripSize, remainder);
+          WriteSuppliedBufferData(suppliedBuffer);
           break;
         
       }
+     
       // Write byte offsets
       data.StripOffsetsPointer = (int)_stream.Position;
       pos = 0;
@@ -171,6 +164,8 @@ namespace Converter.Writers.TIFF
       // get IFD start pos before we write again
       uint IFDStartPos = (uint)_stream.Position;
       _stream.Write(writer._buffer.Slice(0, pos));
+
+      
 
       // write IFD offset in header first 4-7 bytes
       _stream.Position = 4;
