@@ -1,6 +1,7 @@
 ﻿using Converter.FileStructures.BMP;
 using System.Buffers.Binary;
 using System.ComponentModel;
+using System.Net.Http.Headers;
 using System.Text;
 
 namespace Converter.Parsers.Images.BMP
@@ -51,6 +52,7 @@ namespace Converter.Parsers.Images.BMP
       uint DIBSize = BinaryPrimitives.ReadUInt32LittleEndian(buff.Slice(file.Pos, 4));
       file.Pos += 4;
 
+      file.DIBHeaderSize = DIBSize;
       file.DIBHeaderType = (BMP_DIB_HEADER_TYPE)DIBSize;
       if (file.DIBHeaderType == BMP_DIB_HEADER_TYPE.NULL)
         throw new InvalidDataException($"Invalid DIB_HEADER_TYPE! Got {DIBSize}");
@@ -58,6 +60,62 @@ namespace Converter.Parsers.Images.BMP
 
     public void ParseDIBHeader(BMPFile file)
     {
+      BMP_DIBHeader DIBHeader = new BMP_DIBHeader();
+      file.DIBHeader = DIBHeader;
+      if (file.DIBHeaderSize > 124)
+        throw new InvalidDataException("DIBHeader size too BIG!");
+      Span<byte> buffer = new byte[file.DIBHeaderSize];
+      int readBytes = file.Stream.Read(buffer);
+      if (readBytes != file.DIBHeaderSize)
+        throw new InvalidDataException("Invalid DIBHeader size!");
+
+      file.Pos = 0;
+      _ = file.DIBHeaderType switch
+      {
+        BMP_DIB_HEADER_TYPE.BITMAPCOREHEADER => ParseDIBCoreHeader(file),
+        BMP_DIB_HEADER_TYPE.OS22XBITMAPHEADER16B => ParseDIBOS22Header16B(file),
+        BMP_DIB_HEADER_TYPE.BITMAPINFOHEADER => ParseDIBInfoHeader(file, ref buffer),
+        BMP_DIB_HEADER_TYPE.BITMAPV2INFOHEADER => ParseDIBV2Header(file),
+        BMP_DIB_HEADER_TYPE.BITMAPV3INFOHEADER => ParseDIBV3Header(file),
+        BMP_DIB_HEADER_TYPE.OS22XBITMAPHEADER64B => ParseDIBOS22Header64B(file),
+        BMP_DIB_HEADER_TYPE.BITMAPV4INFOHEADER => ParseDIBV4Header(file),
+        BMP_DIB_HEADER_TYPE.BITMAPV5INFOHEADER => ParseDIBV5Header(file),
+      };
     }
+
+    public void ParseDIBCoreHeader(BMPFile file)
+    {
+      throw new NotImplementedException();
+    }
+    public void ParseDIBOS22Header16B(BMPFile file)
+    {
+      throw new NotImplementedException();
+    }
+    public void ParseDIBInfoHeader(BMPFile file, ref Span<byte> buffer)
+    {
+
+    }
+    public void ParseDIBV2Header(BMPFile file)
+    {
+
+    }
+    public void ParseDIBV3Header(BMPFile file)
+    {
+
+    }
+    public void ParseDIBOS22Header64B(BMPFile file)
+    {
+      throw new NotImplementedException();
+    }
+    public void ParseDIBV4Header(BMPFile file)
+    {
+
+    }
+
+    public void ParseDIBV5Header(BMPFile file)
+    {
+
+    }
+
   }
 }
