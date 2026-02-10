@@ -315,13 +315,13 @@ namespace Converter.Parsers.PDF
             (bool isDirect, SharedAllocator? allocator) info = ReadIntoDirectOrIndirectDict(file, ref helper);
             if (info.isDirect)
             {
-              ParseColorSpaceIRDictionary(file, ref helper, true, ref csData);
+              ParseColorSpaceIRDictionary(file, ref helper, true, csData);
             }
             else
             {
               ReadOnlySpan<byte> irBuffer = info.allocator.Buffer.AsSpan(info.allocator.Range);
               PDFSpanParseHelper irHelper = new PDFSpanParseHelper(ref irBuffer);
-              ParseColorSpaceIRDictionary(file, ref irHelper, false, ref csData);
+              ParseColorSpaceIRDictionary(file, ref irHelper, false, csData);
             }
             FreeAllocator(info.allocator);
             resourceDict.ColorSpace = csData;
@@ -372,7 +372,7 @@ namespace Converter.Parsers.PDF
         throw new InvalidDataException("Invalid dictionary");
     }
 
-    private void ParseColorSpaceStreamAndDictionary(PDFFile file, (int objIndex, int generation) objPosition, ref PDF_ColorSpaceDictionary dict)
+    private void ParseColorSpaceStreamAndDictionary(PDFFile file, (int objIndex, int generation) objPosition, PDF_ColorSpaceDictionary dict)
     {
       SharedAllocator allocator = GetObjBuffer(file, objPosition);
       ReadOnlySpan<byte> buffer = allocator.Buffer.AsSpan(allocator.Range);
@@ -453,7 +453,7 @@ namespace Converter.Parsers.PDF
         
         (int objectIndex, int _) objPosition = helper.GetNextIndirectReference();
         PDF_ColorSpaceDictionary csd = new PDF_ColorSpaceDictionary();
-        ParseColorSpaceStreamAndDictionary(file, objPosition, ref csd);
+        ParseColorSpaceStreamAndDictionary(file, objPosition, csd);
 
         csi.ColorSpaceFamily = csf;
         csi.Dict = csd;
@@ -463,7 +463,7 @@ namespace Converter.Parsers.PDF
 
     }
 
-    private int ParseColorSpaceIRDictionary(PDFFile file, ref PDFSpanParseHelper helper, bool dictOpen, ref List<PDF_ColorSpaceData> csData)
+    private int ParseColorSpaceIRDictionary(PDFFile file, ref PDFSpanParseHelper helper, bool dictOpen, List<PDF_ColorSpaceData> csData)
     {
       bool dictStartFound = dictOpen;
       while (!dictStartFound)

@@ -193,7 +193,7 @@ namespace Converter.FileStructures.PDF
     public Dictionary<object, object> Properties;
   }
 
-  public struct PDF_ColorSpaceDictionary
+  public class PDF_ColorSpaceDictionary
   {
     public PDF_CommonStreamDict CommonStreamDict;
     public int N;
@@ -202,13 +202,13 @@ namespace Converter.FileStructures.PDF
     public object Metadata;
   }
 
-  public struct PDF_ColorSpaceData
+  public class PDF_ColorSpaceData
   {
     public string Key;
     public List<PDF_ColorSpaceInfo> ColorSpaceInfo;
   }
 
-  public struct PDF_ColorSpaceInfo
+  public class PDF_ColorSpaceInfo
   {
     public PDF_ColorSpace ColorSpaceFamily;
     public PDF_ColorSpaceDictionary Dict;
