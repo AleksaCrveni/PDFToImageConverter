@@ -1,8 +1,7 @@
 ﻿using Converter.FileStructures.BMP;
 using System.Buffers.Binary;
-using System.ComponentModel;
-using System.Net.Http.Headers;
 using System.Text;
+using Converter.Utils;
 
 namespace Converter.Parsers.Images.BMP
 {
@@ -32,25 +31,14 @@ namespace Converter.Parsers.Images.BMP
         throw new InvalidDataException("Header too short!");
 
       header.Identifier = Encoding.ASCII.GetString(buff.Slice(file.Pos, 2));
-      file.Pos += 2;
-
-      header.FileSize = BinaryPrimitives.ReadUInt32LittleEndian(buff.Slice(file.Pos, 4));
-      file.Pos += 4;
-
-      header.Res1 = BinaryPrimitives.ReadUInt16LittleEndian(buff.Slice(file.Pos, 2));
-      file.Pos += 2;
-
-      header.Res1 = BinaryPrimitives.ReadUInt16LittleEndian(buff.Slice(file.Pos, 2));
-      file.Pos += 2;
-
-      header.ImageDataOffset = BinaryPrimitives.ReadUInt32LittleEndian(buff.Slice(file.Pos, 4));
-      file.Pos += 4;
-
+      header.FileSize = BufferReader.ReadUInt32LE(ref buff, ref file.Pos);
+      header.Res1 = BufferReader.ReadUInt16LE(ref buff, ref file.Pos);
+      header.Res2 = BufferReader.ReadUInt16LE(ref buff, ref file.Pos);
+      header.ImageDataOffset = BufferReader.ReadUInt32LE(ref buff, ref file.Pos);
       file.Header = header;
 
       // Parse DIB Type 
-      uint DIBSize = BinaryPrimitives.ReadUInt32LittleEndian(buff.Slice(file.Pos, 4));
-      file.Pos += 4;
+      uint DIBSize = BufferReader.ReadUInt32LE(ref buff, ref file.Pos);
 
       file.DIBHeaderSize = DIBSize;
       file.DIBHeaderType = (BMP_DIB_HEADER_TYPE)DIBSize;
