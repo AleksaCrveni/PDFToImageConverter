@@ -17,13 +17,13 @@ int main(int argc, char const *argv[])
 {
   long size;
   unsigned char* fontBuffer;
-  FILE* fontFile = fopen("C:/Windows/Fonts/arial.ttf", "rb");
+  FILE* fontFile = fopen("W:/PDFToImageConverter/Files/TT1FontInfo.txt", "rb");
   fseek(fontFile, 0, SEEK_END);
   size = ftell(fontFile);
   fseek(fontFile, 0, SEEK_SET);
-  int fontSize = 16;
+  int fontSize = 36;
   fontBuffer = malloc(size);
-
+  
   // read into buffer and dodnt keep file open
   fread(fontBuffer, size, 1, fontFile);
   fclose(fontFile);
@@ -37,21 +37,22 @@ int main(int argc, char const *argv[])
   }
 
   // this should be page width
-  int bitmapWidth = 1024;
+  int bitmapWidth = 612;
   // this should be Ascent - Descent or something similar ?? basically max line height
   // but it font work for all fonts, so it may be something big that can just be reused
   // and read with boundaries
-  int bitmapHeight = 256;
+  int bitmapHeight = 792;
   
   // this is Ascent - Descent
-  int lineHeight = 64;
+  int lineHeight = 16;
 
   unsigned char* bitmap = calloc(bitmapWidth * bitmapHeight, sizeof(unsigned char));
 
   // I think we should use this for scale?? or just value from Text line matrix or something similar
   float scaleFactor = stbtt_ScaleForPixelHeight(&info, lineHeight);
 
-  char* textToTranslate = "o";
+  char* textToTranslate = "Nova Dusk PDF";
+  int indexes[] = {4,8,11, 6, 1, 2, 10, 9, 7, 1, 5, 2, 3};
   char* textToTranslate2nd = "Second Row";
 
   int x = 0;
@@ -69,6 +70,7 @@ int main(int argc, char const *argv[])
   int i =0;
   int len = strlen(textToTranslate);
   int baseline = 0;
+  int useIndex = 1;
   for (i = 0; i < len; ++i)
   {
     /*if (textToTranslate[i] == '@')
@@ -79,19 +81,26 @@ int main(int argc, char const *argv[])
       
     int ax; // charatcter width
     int lsb; // left side bearing
-
-    stbtt_GetCodepointHMetrics(&info, textToTranslate[i], &ax, &lsb);
+    if (useIndex)
+      stbtt_GetGlyphHMetrics(&info, indexes[i], &ax, &lsb);
+    else
+      stbtt_GetCodepointHMetrics(&info, textToTranslate[i], &ax, &lsb);
     //stbtt_GetGlyphHMetrics(&info, )
 
     int c_x0, c_y0, c_x1, c_y1;
-    stbtt_GetCodepointBitmapBox(&info, textToTranslate[i], scaleFactor, scaleFactor, &c_x0, &c_y0, &c_x1, &c_y1);
+    if (useIndex)
+      stbtt_GetGlyphBitmapBox(&info, indexes[i], scaleFactor, scaleFactor, &c_x0, &c_y0, &c_x1, &c_y1);
+    else
+      stbtt_GetCodepointBitmapBox(&info, textToTranslate[i], scaleFactor, scaleFactor, &c_x0, &c_y0, &c_x1, &c_y1);
     
     // char height
     int y = ascent + c_y0 + baseline;
 
     int charOffset = x + roundf(lsb * scaleFactor) + (y * bitmapWidth);
-    stbtt_MakeCodepointBitmap(&info, bitmap + charOffset, c_x1 - c_x0, c_y1 - c_y0, bitmapWidth, scaleFactor, scaleFactor, textToTranslate[i]);
-    
+    if (useIndex)
+      stbtt_MakeGlyphBitmap(&info, bitmap + charOffset, c_x1 - c_x0, c_y1 - c_y0, bitmapWidth, scaleFactor, scaleFactor, indexes[i]);
+    else
+      stbtt_MakeCodepointBitmap(&info, bitmap + charOffset, c_x1 - c_x0, c_y1 - c_y0, bitmapWidth, scaleFactor, scaleFactor, textToTranslate[i]);
     // advance x
     x += roundf(ax * scaleFactor);
 

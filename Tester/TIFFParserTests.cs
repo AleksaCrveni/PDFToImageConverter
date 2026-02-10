@@ -1,5 +1,5 @@
 ﻿using Converter;
-using Converter.Parsers.TIFF;
+using Converter.Parsers.Images.TIFF;
 using System;
 using System.Collections.Generic;
 using System.Linq;

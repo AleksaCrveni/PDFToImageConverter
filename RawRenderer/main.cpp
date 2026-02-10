@@ -24,10 +24,10 @@ typedef double real64;
 
 #define global_var static
 
-global_var int RENDER_WIDTH = 25;
-global_var int RENDER_HEIGHT = 25;
-global_var int WINDOW_WIDTH = 500;
-global_var int WINDOW_HEIGHT = 500;
+global_var int RENDER_WIDTH = 1200;
+global_var int RENDER_HEIGHT = 1200;
+global_var int WINDOW_WIDTH = 800;
+global_var int WINDOW_HEIGHT = 800;
 
 const TCHAR* dir = _T("..\\..\\RasterPlayground\\bin\\Debug\\net8.0\\Single\\");
 const char* filePath = "..\\..\\RasterPlayground\\bin\\Debug\\net8.0\\Single\\data.txt";
@@ -36,6 +36,7 @@ struct win32_offscreen_buffer
 {
 	BITMAPINFO Info;
 	void *Memory;
+	void* SizeInfo;
 };
 struct win32_window_dimension
 {
@@ -118,6 +119,7 @@ int WINAPI WinMain(HINSTANCE Instance, HINSTANCE PrevInstance, PSTR CommandLine,
   GlobalBuffer = {};
   // 4 is for bytes per pixel
   GlobalBuffer.Memory = VirtualAlloc(0, RENDER_WIDTH*RENDER_HEIGHT*4, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
+	GlobalBuffer.SizeInfo = VirtualAlloc(0, 4, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
   GlobalBuffer.Info = {};
   GlobalBuffer.Info.bmiHeader.biSize = sizeof(GlobalBuffer.Info.bmiHeader);
 	GlobalBuffer.Info.bmiHeader.biWidth = RENDER_WIDTH;
@@ -140,6 +142,7 @@ int WINAPI WinMain(HINSTANCE Instance, HINSTANCE PrevInstance, PSTR CommandLine,
 	WindowClass.lpszClassName = "Program";
 	win32_offscreen_buffer b = {};
 	b.Memory = VirtualAlloc(0, RENDER_WIDTH * RENDER_HEIGHT * 4, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
+	
 	HotLoadBuffer(&GlobalBuffer);
 	//RenderWeirdGradient(&GlobalBuffer, 32, 42);
 	LARGE_INTEGER LastCounter;
@@ -358,6 +361,16 @@ void HotLoadBuffer(win32_offscreen_buffer *Buffer)
 		return;
 	}
 	ShouldRender = false;
+	file.read((char*)Buffer->SizeInfo, 4);
+	/*
+	uint8* b = (uint8*)Buffer->SizeInfo;
+	int a = (*b++ << 8);
+	int c = (int)(*b++);
+	RENDER_WIDTH = a | c;
+	a = (*b++ << 8);
+	c = (int)(*b++);
+	RENDER_HEIGHT = a | c;
+	*/
 	file.read((char*)Buffer->Memory, ourBufferLen);
 	file.close();
 	

@@ -1486,8 +1486,8 @@ static int stbtt_InitFont_internal(stbtt_fontinfo *info, unsigned char *data, in
             break;
       }
    }
-   if (info->index_map == 0)
-      return 0;
+   //if (info->index_map == 0)
+     // return 0;
 
    info->indexToLocFormat = ttUSHORT(data+info->head + 50);
    return 1;

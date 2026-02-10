@@ -11,6 +11,7 @@
     public static string HelloTiff { get; set; }
     public static string BilevelTiff { get; set; }
     public static string CreateTestTiff { get; set; }
+    public static string Type1FontFileDecoded { get; set; }
     static Files()
     { 
       RootFolder = Path.Combine(Directory.GetParent(Directory.GetCurrentDirectory()).Parent.Parent.Parent.FullName, "Files");
@@ -22,6 +23,7 @@
       HelloTiff = Path.Combine(RootFolder, "HelloTiff.tif");
       BilevelTiff = Path.Combine(RootFolder, "BilevelTiff.tif");
       CreateTestTiff = Path.Combine(RootFolder, "testCreateTIFF.tif");
+      Type1FontFileDecoded = Path.Combine(RootFolder, "testCreateTIFF.tif");
     }
   }
 }

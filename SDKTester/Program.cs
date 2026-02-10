@@ -3,7 +3,7 @@ using Converter;
 using MuPDFCore;
 // See https://aka.ms/new-console-template for more information
 
-PdfRasterizer rasterizer = new PdfRasterizer(Files.Sample);
+PdfRasterizer rasterizer = new PdfRasterizer(@"W:\PDFToImageConverter\Files\greek.pdf");
 
 // Call the Draw method with output image name, image format and the DPI
 rasterizer.Draw("EachPage.tiff", ImageFormat.TiffWithLzw, ImageSize.Dpi72);

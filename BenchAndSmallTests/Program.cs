@@ -9,6 +9,7 @@ using Converter.Writers.TIFF;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.Diagnostics.Tracing.Parsers.MicrosoftWindowsWPF;
 using System.Security.Cryptography.X509Certificates;
+using System.Text;
 //int count1 = 0b_0000_0001;
 //int count2 = 0b_1110_0010;
 
@@ -214,7 +215,14 @@ using System.Security.Cryptography.X509Certificates;
 //pdfParser.Parse(Files.BaseDocFilePath);
 //var runner = BenchmarkRunner.Run<MyBenches>();
 
+//byte[] b = File.ReadAllBytes("bytes.txt");
+//string s = Encoding.Unicode.GetString(b);
+string s = "020";
+int codePoint = Char.ConvertToUtf32(s, 0);
 
-PdfParser parser = new PdfParser();
+//PdfParser parser = new PdfParser();
+//PDF_Options options = new PDF_Options();
+//parser.Parse(Files.RootFolder + "\\Prijemni-1.pdf", ref options);
+PdfParser pdfParser = new PdfParser();
 PDF_Options options = new PDF_Options();
-parser.Parse(Files.RootFolder + "\\Prijemni-1.pdf", ref options);
+pdfParser.Parse(Files.BaseDocFilePath, ref options);
