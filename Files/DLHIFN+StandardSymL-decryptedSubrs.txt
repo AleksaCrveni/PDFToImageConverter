@@ -1,33 +1,0 @@
-dup 0 15 ��!
-dup 1 9 ��
-dup 2 9 ��
-dup 3 5 
-dup 4 5 
-dup 5 5 
-dup 6 5 
-dup 7 5 
-dup 8 5 
-dup 9 5 
-dup 10 5 
-dup 11 5 
-dup 12 5 
-dup 13 5 
-dup 14 5 
-dup 15 5 
-dup 16 5 
-dup 17 5 
-dup 18 5 
-dup 19 5 
-dup 20 5 
-dup 21 5 
-dup 22 5 
-dup 23 5 
-dup 24 5 
-dup 25 5 
-dup 26 5 
-dup 27 5 
-dup 28 5 
-dup 29 5 
-dup 30 5 
-dup 31 11 ~���
-dup 32 15 ~��j���
