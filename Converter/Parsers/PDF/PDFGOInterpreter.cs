@@ -48,7 +48,7 @@ namespace Converter.Parsers.PDF
     public byte[] _outputBuffer;
 
     // TODO: maybe NULL check is redundant if we let it throw to end?
-    public PDFGOInterpreter(ReadOnlySpan<byte> contentBuffer, ref PDF_ResourceDict resourceDict, ref Span<byte> fourByteSlice, IConverter converter)
+    public PDFGOInterpreter(ReadOnlySpan<byte> contentBuffer, PDF_ResourceDict resourceDict, ref Span<byte> fourByteSlice, IConverter converter)
     {
       _buffer = contentBuffer;
       intOperands = new Stack<int>();
@@ -914,8 +914,17 @@ namespace Converter.Parsers.PDF
         int y = Y + c_y0;
         // I think that this should be replaced from value in Widths array
         // NOTE: widths array wont work since this width is not in units but in pixels after its been scaled down
-        int glyphWidth = c_x1 - c_x0; 
+        int glyphWidth = c_x1 - c_x0;
         int glyphHeight = c_y1 - c_y0;
+
+        //// Added when type1 interpreter had height 0 and caused issues, I didnt see impact on TTF files 
+        //if (glyphHeight == 0)
+        //  glyphHeight = 2;
+
+        //if (glyphWidth == 0)
+        //  glyphWidth = 2;
+        //Debug.Assert(glyphWidth > 0);
+        //Debug.Assert(glyphHeight > 0);
 
         #endregion
 

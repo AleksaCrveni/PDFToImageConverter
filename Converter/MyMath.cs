@@ -27,7 +27,7 @@
       return ret;
     }
 
-    public static void MultiplyMatrixes3x3(double[,] mA, double[,] mB, ref double[,] mR)
+    public static void MultiplyMatrixes3x3(double[,] mA, double[,] mB, double[,] mR)
     {
       mR[0, 0] = mA[0, 0] * mB[0, 0] + mA[0, 1] * mB[1, 0] + mA[0, 2] * mB[2, 0];
       mR[0, 1] = mA[0, 0] * mB[0, 1] + mA[0, 1] * mB[1, 1] + mA[0, 2] * mB[2, 1];
@@ -41,7 +41,23 @@
       mR[2, 1] = mA[2, 0] * mB[0, 1] + mA[2, 1] * mB[1, 1] + mA[2, 2] * mB[2, 1];
       mR[2, 2] = mA[2, 0] * mB[0, 2] + mA[2, 1] * mB[1, 2] + mA[2, 2] * mB[2, 2];
     }
-
+    /// <summary>
+    /// Copies data from matrix A to matrix B
+    /// </summary>
+    /// <param name="mA">From </param>
+    /// <param name="mB">To </param>
+    public static void CopyMatrix3x3Data(double[,] mA, double [,] mB)
+    {
+      mA[0, 0] = mB[0, 0];
+      mA[0, 1] = mB[0, 1];
+      mA[0, 2] = mB[0, 2];
+      mA[1, 0] = mB[1, 0];
+      mA[1, 1] = mB[1, 1];
+      mA[1, 2] = mB[1, 2];
+      mA[2, 0] = mB[2, 0];
+      mA[2, 1] = mB[2, 1];
+      mA[2, 2] = mB[2, 2];
+    }
     public static float FPart(float x) => x - MathF.Floor(x);
     public static float RFPart(float x) => 1 - FPart(x);
   }
