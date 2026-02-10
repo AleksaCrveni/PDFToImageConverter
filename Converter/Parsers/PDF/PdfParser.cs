@@ -341,13 +341,13 @@ namespace Converter.Parsers.PDF
             info = ReadIntoDirectOrIndirectDict(file, ref helper);
             if (info.isDirect)
             {
-              ParseFontIRDictionary(file, ref helper, true, ref fontData);
+              ParseFontIRDictionary(file, ref helper, true, fontData);
             }
             else
             {
               ReadOnlySpan<byte> irBuffer = info.allocator!.Buffer.AsSpan(info.allocator.Range);
               PDFSpanParseHelper irHelper = new PDFSpanParseHelper(ref irBuffer);
-              ParseFontIRDictionary(file, ref irHelper, false, ref fontData);
+              ParseFontIRDictionary(file, ref irHelper, false, fontData);
             }
             FreeAllocator(info.allocator);
             resourceDict.Font = fontData;
@@ -521,7 +521,7 @@ namespace Converter.Parsers.PDF
     }
 
     
-    private void ParseFontIRDictionary(PDFFile file, ref PDFSpanParseHelper helper, bool dictOpen, ref List<PDF_FontData> fontData)
+    private void ParseFontIRDictionary(PDFFile file, ref PDFSpanParseHelper helper, bool dictOpen, List<PDF_FontData> fontData)
     {
       bool dictStartFound = dictOpen;
       while (!dictStartFound)

@@ -214,7 +214,7 @@ namespace Converter.FileStructures.PDF
     public PDF_ColorSpaceDictionary Dict;
   }
 
-  public struct PDF_FontData
+  public class PDF_FontData
   {
     public string Key;
     public PDF_FontInfo FontInfo;
