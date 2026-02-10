@@ -1,0 +1,15 @@
+﻿namespace Converter.FileStructures.BMP
+{
+  public enum BMP_DIB_HEADER_TYPE
+  {
+    NULL,
+    BITMAPCOREHEADER = 12,
+    OS22XBITMAPHEADER = 16,
+    BITMAPINFOHEADER = 40,
+    BITMAPV2INFOHEADER = 52,
+    BITMAPV3INFOHEADER = 56,
+    BITMAPV4HEADER = 108,
+    BITMAPV5HEADER = 124
+  }
+
+}
