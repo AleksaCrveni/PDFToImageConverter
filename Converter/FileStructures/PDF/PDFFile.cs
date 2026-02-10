@@ -132,7 +132,7 @@ namespace Converter.FileStructures.PDF
 
   // Table 29
   // TODO: Add page atrributes
-  public struct PDF_PageTree
+  public class PDF_PageTree
   {
     public List<(int, int)> KidsIRs;
     public (int, int) ParentIR;

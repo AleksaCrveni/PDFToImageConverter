@@ -1239,14 +1239,14 @@ namespace Converter.Parsers.PDF
       // make linked list or just flatten references????
       // ok for now just load all and store it, later be smarter
       PDF_PageTree rootPageTree = new PDF_PageTree();
-      FillRootPageTreeFrom(file, ref helper, ref rootPageTree);
+      FillRootPageTreeFrom(file, ref helper, rootPageTree);
       FreeAllocator(allocator);
     }
 
-    private void FillRootPageTreeFrom(PDFFile file, ref PDFSpanParseHelper helper, ref PDF_PageTree root)
+    private void FillRootPageTreeFrom(PDFFile file, ref PDFSpanParseHelper helper, PDF_PageTree root)
     {
       //
-      FillRootPageTreeInfo(ref helper, ref root);
+      FillRootPageTreeInfo(ref helper, root);
       List<PDF_PageTree> pageTrees = new List<PDF_PageTree>();
       List<PDF_PageInfo> pages = new List<PDF_PageInfo>();
       pageTrees.Add(root);
@@ -1260,7 +1260,7 @@ namespace Converter.Parsers.PDF
       file.PageInformation = pages;
     }
 
-    private void FillRootPageTreeInfo(ref PDFSpanParseHelper helper, ref PDF_PageTree pageTree)
+    private void FillRootPageTreeInfo(ref PDFSpanParseHelper helper, PDF_PageTree pageTree)
     {
       bool dictStartFound = false;
       while (!dictStartFound)
