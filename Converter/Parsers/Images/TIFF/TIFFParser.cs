@@ -1,6 +1,6 @@
 ﻿using Converter.FileStructures.TIFF;
 
-namespace Converter.Parsers.TIFF
+namespace Converter.Parsers.Images.TIFF
 {
   // NOTE: FOR NOW JUST SUPPORT LITTLE ENDIAN
   public class TIFFParser
