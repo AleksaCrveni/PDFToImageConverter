@@ -392,8 +392,7 @@ namespace Converter.FileStructures.PDF
   }
 
   // 7.9.5
-  // TODO: check if we can use 16 bit ints
-  public struct PDF_Rect()
+  public class PDF_Rect()
   {
     public void FillRect(double a, double b, double c, double d)
     {
