@@ -95,7 +95,7 @@ namespace Converter.FileStructures.PDF
   // TODO: Implement Extenions, PageLabels, Names,ViewerPreferences, OpenAction, AA, AcroForm, URI, StructTreeRoot
   // MarkInfo, SpiderInfo, PieceInfo, OCProperties, Perms, Legal, Collection, Requirements, OutputIntent parsing
   // Note: Docs on Page 81 - Table 28
-  public struct PDF_Catalog
+  public class PDF_Catalog
   {
     public PDF_Catalog() { }
     public PDF_Version Version = PDF_Version.Null;

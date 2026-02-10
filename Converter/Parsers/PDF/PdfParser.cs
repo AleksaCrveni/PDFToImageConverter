@@ -1495,7 +1495,7 @@ namespace Converter.Parsers.PDF
       // I think that reading in bulk should be faster than reading 1 char by 1 from stream
       PDF_Catalog catalog = new PDF_Catalog();
 
-      FillCatalog(ref helper, ref catalog);
+      FillCatalog(ref helper, catalog);
 
       // we maybe read a bit more sicne we read last object diff so make sure we are in correct position
       // TODO: verify if this stupid line below can be deleted
@@ -1508,7 +1508,7 @@ namespace Converter.Parsers.PDF
       FreeAllocator(allocator);
     }
 
-    private void FillCatalog(ref PDFSpanParseHelper helper, ref PDF_Catalog catalog)
+    private void FillCatalog(ref PDFSpanParseHelper helper, PDF_Catalog catalog)
     {
       bool startOfDictFound = false;
       while (!startOfDictFound)
