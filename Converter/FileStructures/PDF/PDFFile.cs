@@ -29,14 +29,14 @@ namespace Converter.FileStructures.PDF
     }
   }
 
-  public struct PDF_Options
+  public class PDF_Options
   {
     public PDF_Options() { }
     public bool AllowStack = false;
   }
   // Spec reference on page 51
   // Table 15
-  public struct PDF_Trailer
+  public class PDF_Trailer
   {
 
     public int Size;
@@ -53,7 +53,7 @@ namespace Converter.FileStructures.PDF
 
   // Cross reference entry
   // This should maybe be ref struct
-  public struct PDF_XrefEntry
+  public class PDF_XrefEntry
   {
     public int Index; // may later be refactored not to use this
     public long TenDigitValue;
@@ -257,7 +257,7 @@ namespace Converter.FileStructures.PDF
   // Table 111 + other Fonts tables
   // This table contains all fields that appear in any of the /Font dictionaries 
   // and are only filled based on subtype
-  public struct PDF_FontInfo()
+  public class PDF_FontInfo()
   {
     public PDF_FontType SubType;
     public string Name;

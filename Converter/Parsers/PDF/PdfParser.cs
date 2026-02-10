@@ -1644,10 +1644,12 @@ namespace Converter.Parsers.PDF
       int endObj = parseHelper.GetNextInt32();
       int sectionLen = endObj - startObj;
 
-      // TODO: Think if you want list or array and fix this later
-      PDF_XrefEntry[] entryArr = new PDF_XrefEntry[sectionLen];
-      Array.Fill(entryArr, new PDF_XrefEntry());
-      List<PDF_XrefEntry> cRefEntries = entryArr.ToList();
+      List<PDF_XrefEntry> cRefEntries = new List<PDF_XrefEntry>(sectionLen);
+      for (int i = 0; i < sectionLen; i++)
+      {
+        cRefEntries.Add(new PDF_XrefEntry());
+      }
+
       Span<byte> cRefEntryBuffer = stackalloc byte[20];
       readBytes = 0;
       PDF_XrefEntry entry;
@@ -1668,7 +1670,6 @@ namespace Converter.Parsers.PDF
           entry.EntryType = PDF_XrefEntryType.NORMAL;
         else
           entry.EntryType = PDF_XrefEntryType.FREE;
-        cRefEntries[i] = entry;
       }
 
       file.CrossReferenceEntries = cRefEntries;
