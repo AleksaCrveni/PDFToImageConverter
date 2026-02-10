@@ -110,7 +110,7 @@ namespace Converter.Parsers.PDF
         TargetConversion.TIFF_RGB => throw new NotImplementedException(),
       };
     
-      PDFGOInterpreter pdfGo = new PDFGOInterpreter(rawContent.AsSpan(), ref rDict, ref fourByteSlice, converter);
+      PDFGOInterpreter pdfGo = new PDFGOInterpreter(rawContent.AsSpan(), rDict, ref fourByteSlice, converter);
 
       pdfGo.ConvertToPixelData();
     }
@@ -132,7 +132,7 @@ namespace Converter.Parsers.PDF
         //File.WriteAllBytes(Path.Join(Files.RootFolder, "Prijemni-1_content.txt"), contentDict.RawStreamData);
         // Process Resources
         PDF_ResourceDict resourceDict = new PDF_ResourceDict();
-        ParseResourceDictionary(file, file.PageInformation[i].ResourcesIR, ref resourceDict);
+        ParseResourceDictionary(file, file.PageInformation[i].ResourcesIR, resourceDict);
         pInfo.ResourceDict = resourceDict;
 
         file.PageInformation[i] = pInfo;
@@ -280,17 +280,17 @@ namespace Converter.Parsers.PDF
       }
     }
 
-    private void ParseResourceDictionary(PDFFile file, (int objIndex, int generation) objPosition, ref PDF_ResourceDict resourceDict)
+    private void ParseResourceDictionary(PDFFile file, (int objIndex, int generation) objPosition, PDF_ResourceDict resourceDict)
     {
       SharedAllocator allocator = GetObjBuffer(file, objPosition);
       ReadOnlySpan<byte> buffer = allocator.Buffer.AsSpan(allocator.Range);
 
       PDFSpanParseHelper helper = new PDFSpanParseHelper(ref buffer);
-      ParseResourceDictionary(file, ref helper, true, ref resourceDict);
+      ParseResourceDictionary(file, ref helper, true, resourceDict);
       FreeAllocator(allocator);
      }
 
-    private void ParseResourceDictionary(PDFFile file, ref PDFSpanParseHelper helper, bool isIndirect, ref PDF_ResourceDict resourceDict)
+    private void ParseResourceDictionary(PDFFile file, ref PDFSpanParseHelper helper, bool isIndirect, PDF_ResourceDict resourceDict)
     {
       bool dictStartFound = !isIndirect;
       while (!dictStartFound)
@@ -1380,7 +1380,7 @@ namespace Converter.Parsers.PDF
               if (info.isDirect)
               {
                 PDF_ResourceDict rDict = new PDF_ResourceDict();
-                ParseResourceDictionary(file, ref helper, false, ref rDict);
+                ParseResourceDictionary(file, ref helper, false, rDict);
                 pageInfo.ResourceDict = rDict;
               }
               else 

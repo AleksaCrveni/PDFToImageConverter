@@ -142,7 +142,7 @@ namespace Converter.FileStructures.PDF
   }
   // Table 30
   // Resources - 
-  public struct PDF_PageInfo
+  public class PDF_PageInfo
   {
     public PDF_PageInfo() { }
     public (int, int) ParentIR;
@@ -180,7 +180,7 @@ namespace Converter.FileStructures.PDF
   }
 
   // Table 33
-  public struct PDF_ResourceDict()
+  public class PDF_ResourceDict()
   {
     public Dictionary<object, object> ExtGState;
     public List<PDF_ColorSpaceData> ColorSpace;
