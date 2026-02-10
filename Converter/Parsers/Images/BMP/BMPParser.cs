@@ -1,12 +1,12 @@
 ﻿using Converter.FileStructures.BMP;
-using System.Buffers.Binary;
-using System.Text;
 using Converter.Utils;
+using System.Text;
 
 namespace Converter.Parsers.Images.BMP
 {
   public class BMPParser
   {
+    // TODO: idk if we can just read all in one bufferwhat if image is too big?, do we even care for that scenario?
     public BMPParser()
     {
       
@@ -19,6 +19,8 @@ namespace Converter.Parsers.Images.BMP
       file.Stream = stream;
       ParseHeaderAndDIBSize(file);
       ParseDIBHeader(file);
+      ParseColorTable(file);
+      ParseRasterData(file);
     }
 
     public void ParseHeaderAndDIBSize(BMPFile file)
@@ -81,15 +83,33 @@ namespace Converter.Parsers.Images.BMP
     }
     public void ParseDIBInfoHeader(BMPFile file, ref Span<byte> buffer)
     {
+      BMP_DIBHeader h = file.DIBHeader;
+      h.Width = BufferReader.ReadInt32LE(ref buffer, ref file.Pos);
+      h.Height = BufferReader.ReadInt32LE(ref buffer, ref file.Pos);
+      h.NumOfColorPlanes = BufferReader.ReadUInt16LE(ref buffer, ref file.Pos);
+      h.BitsPerPixel = BufferReader.ReadUInt16LE(ref buffer, ref file.Pos);
+      uint compVal = BufferReader.ReadUInt32LE(ref buffer, ref file.Pos);
+      // support 0, 1, 2
+      BMP_COMPRESSION compression = (BMP_COMPRESSION)compVal;
+      if (compVal != 0 && compression == BMP_COMPRESSION.BI_RGB
+        && (compVal == 0 || compVal == 1 || compVal == 2))
+        throw new InvalidDataException("Invalid Compression Method");
+      h.Compression = compression;
+      h.ImageSize = BufferReader.ReadUInt32LE(ref buffer, ref file.Pos);
+      h.XRes = BufferReader.ReadInt32LE(ref buffer, ref file.Pos);
+      h.YRes = BufferReader.ReadInt32LE(ref buffer, ref file.Pos);
+      h.NumOfColors = BufferReader.ReadUInt32LE(ref buffer, ref file.Pos);
+      h.NumOfImportantColors = BufferReader.ReadUInt32LE(ref buffer, ref file.Pos);
+      // no support for extra masks
 
     }
     public void ParseDIBV2Header(BMPFile file)
     {
-
+      throw new NotImplementedException();
     }
     public void ParseDIBV3Header(BMPFile file)
     {
-
+      throw new NotImplementedException();
     }
     public void ParseDIBOS22Header64B(BMPFile file)
     {
@@ -97,13 +117,38 @@ namespace Converter.Parsers.Images.BMP
     }
     public void ParseDIBV4Header(BMPFile file)
     {
-
+      throw new NotImplementedException();
     }
 
     public void ParseDIBV5Header(BMPFile file)
     {
-
+      throw new NotImplementedException();
     }
 
+    public void ParseColorTable(BMPFile file)
+    {
+      if (file.DIBHeader.NumOfColors == 0)
+        return;
+
+      byte[] buffer = new byte[file.DIBHeader.NumOfColors * 4];
+      int bytesRead = file.Stream.Read(buffer, 0, buffer.Length);
+      file.Pos = 0;
+
+      if (bytesRead != buffer.Length)
+        throw new InvalidDataException("Invalid ColorTable data!");
+      file.DIBHeader.ColorTable = buffer;
+    }
+
+    public void ParseRasterData(BMPFile file)
+    {
+      byte[] buffer = new byte[file.DIBHeader.ImageSize];
+      file.Stream.Position = file.Header.ImageDataOffset;
+      int bytesRead = file.Stream.Read(buffer, 0, buffer.Length);
+      file.Pos = 0;
+
+      if (bytesRead != buffer.Length)
+        throw new InvalidDataException("Invalid Raster Data!");
+      file.RasterData = buffer;
+    }
   }
 }

@@ -8,6 +8,7 @@
     public BMP_DIB_HEADER_TYPE DIBHeaderType;
     public uint DIBHeaderSize;
     public BMP_DIBHeader DIBHeader;
+    public byte[] RasterData;
   }
 
   public class BMP_Header()
@@ -31,5 +32,6 @@
     public int YRes; // Vertical resolution Pixel per metre
     public uint NumOfColors; // Or 0 to default 2^n
     public uint NumOfImportantColors; // 0 if all colors are important, generally ignored
+    public byte[]? ColorTable;
   }
 }

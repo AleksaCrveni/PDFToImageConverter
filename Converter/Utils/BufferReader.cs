@@ -5,8 +5,24 @@ namespace Converter.Utils
   // TODO: Force inline?
   public static class BufferReader
   {
+    #region General
+    /// <summary>
+    /// Copies
+    /// </summary>
+    /// <param name="buffer"></param>
+    /// <param name="pos"></param>
+    /// <param name="n"></param>
+    /// <returns></returns>
+    public static byte[] ReadNextNBytes(ref Span<byte> buffer, ref int pos, int n)
+    {
+      byte[] arr = buffer.Slice(pos, n).ToArray();
+      pos += n;
+      return arr;`
+    }
+    #endregion General
+
     #region LittleEndian
-    public static int ReadInt32IntLE(ref Span<byte> buffer, ref int pos)
+    public static int ReadInt32LE(ref Span<byte> buffer, ref int pos)
     {
       int num = BinaryPrimitives.ReadInt32LittleEndian(buffer.Slice(pos, 4));
       pos += 4;
