@@ -12,6 +12,10 @@
     public static string BilevelTiff { get; set; }
     public static string CreateTestTiff { get; set; }
     public static string Type1FontFileDecoded { get; set; }
+    public static string BMPMonochrome { get; set; }
+    public static string BMP24b { get; set; }
+    public static string BMP16b { get; set; }
+    public static string BMP256b { get; set; }
     static Files()
     { 
       RootFolder = Path.Combine(Directory.GetParent(Directory.GetCurrentDirectory()).Parent.Parent.Parent.FullName, "Files");
@@ -24,6 +28,10 @@
       BilevelTiff = Path.Combine(RootFolder, "BilevelTiff.tif");
       CreateTestTiff = Path.Combine(RootFolder, "testCreateTIFF.tif");
       Type1FontFileDecoded = Path.Combine(RootFolder, "testCreateTIFF.tif");
+      BMPMonochrome = Path.Combine(RootFolder, "testBmpMono.bmp");
+      BMP16b = Path.Combine(RootFolder, "testBmp16B.bmp");
+      BMP24b = Path.Combine(RootFolder, "testBmp.bmp");
+      BMP256b = Path.Combine(RootFolder, "testBmp256.bmp");
     }
   }
 }
