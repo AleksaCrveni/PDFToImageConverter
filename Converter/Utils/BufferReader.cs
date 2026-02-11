@@ -17,7 +17,7 @@ namespace Converter.Utils
     {
       byte[] arr = buffer.Slice(pos, n).ToArray();
       pos += n;
-      return arr;`
+      return arr;
     }
     #endregion General
 

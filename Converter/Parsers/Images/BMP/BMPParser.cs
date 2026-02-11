@@ -33,6 +33,7 @@ namespace Converter.Parsers.Images.BMP
         throw new InvalidDataException("Header too short!");
 
       header.Identifier = Encoding.ASCII.GetString(buff.Slice(file.Pos, 2));
+      file.Pos += 2;
       header.FileSize = BufferReader.ReadUInt32LE(ref buff, ref file.Pos);
       header.Res1 = BufferReader.ReadUInt16LE(ref buff, ref file.Pos);
       header.Res2 = BufferReader.ReadUInt16LE(ref buff, ref file.Pos);
@@ -60,16 +61,34 @@ namespace Converter.Parsers.Images.BMP
         throw new InvalidDataException("Invalid DIBHeader size!");
 
       file.Pos = 0;
-      _ = file.DIBHeaderType switch
+      switch (file.DIBHeaderType)
       {
-        BMP_DIB_HEADER_TYPE.BITMAPCOREHEADER => ParseDIBCoreHeader(file),
-        BMP_DIB_HEADER_TYPE.OS22XBITMAPHEADER16B => ParseDIBOS22Header16B(file),
-        BMP_DIB_HEADER_TYPE.BITMAPINFOHEADER => ParseDIBInfoHeader(file, ref buffer),
-        BMP_DIB_HEADER_TYPE.BITMAPV2INFOHEADER => ParseDIBV2Header(file),
-        BMP_DIB_HEADER_TYPE.BITMAPV3INFOHEADER => ParseDIBV3Header(file),
-        BMP_DIB_HEADER_TYPE.OS22XBITMAPHEADER64B => ParseDIBOS22Header64B(file),
-        BMP_DIB_HEADER_TYPE.BITMAPV4INFOHEADER => ParseDIBV4Header(file),
-        BMP_DIB_HEADER_TYPE.BITMAPV5INFOHEADER => ParseDIBV5Header(file),
+        case BMP_DIB_HEADER_TYPE.BITMAPCOREHEADER : 
+          ParseDIBCoreHeader(file);
+          break;
+        case BMP_DIB_HEADER_TYPE.OS22XBITMAPHEADER16B : 
+          ParseDIBOS22Header16B(file);
+          break;
+        case BMP_DIB_HEADER_TYPE.BITMAPINFOHEADER : 
+          ParseDIBInfoHeader(file, ref buffer);
+          break;
+        case BMP_DIB_HEADER_TYPE.BITMAPV2INFOHEADER : 
+          ParseDIBV2Header(file);
+          break;
+        case BMP_DIB_HEADER_TYPE.BITMAPV3INFOHEADER : 
+          ParseDIBV3Header(file);
+          break;
+        case BMP_DIB_HEADER_TYPE.OS22XBITMAPHEADER64B : 
+          ParseDIBOS22Header64B(file);
+          break;
+        case BMP_DIB_HEADER_TYPE.BITMAPV4INFOHEADER : 
+          ParseDIBV4Header(file);
+          break;
+        case BMP_DIB_HEADER_TYPE.BITMAPV5INFOHEADER:
+          ParseDIBV5Header(file);
+          break;
+        default:
+          break;
       };
     }
 
