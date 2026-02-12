@@ -34,4 +34,13 @@
     public uint NumOfImportantColors; // 0 if all colors are important, generally ignored
     public byte[]? ColorTable;
   }
+
+  public struct BMPWriterOptions()
+  {
+    public int Width;
+    public int Height;
+    public BMP_TYPE Type;
+    public BMP_COMPRESSION Compression;
+    public BMP_DIRECTION Direction;
+  }
 }

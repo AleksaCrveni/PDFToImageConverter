@@ -31,7 +31,7 @@ namespace Converter.Utils
     #endregion LittleEndian
 
     #region BigEndian
-    public static void WriteInt32IntBE(ref Span<byte> buffer, ref int pos, int value)
+    public static void WriteInt32BE(ref Span<byte> buffer, ref int pos, int value)
     {
       BinaryPrimitives.WriteInt32BigEndian(buffer.Slice(pos, 4), value);
       pos += 4;

@@ -26,4 +26,20 @@
     BI_CMYKRLE8 = 12,
     BI_CMYKRLE4 = 13
   }
+
+  public enum BMP_TYPE
+  {
+    MONO = 1,
+    PAL4 = 4,
+    PAL8 = 8,
+    RGB16 = 16,
+    RGB24 = 24
+  }
+
+  public enum BMP_DIRECTION : byte
+  {
+    TOP_DOWN,
+    BOTTOM_UP 
+  }
+
 }
