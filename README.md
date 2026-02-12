@@ -21,7 +21,7 @@ No color processing supported yet.
 Small number of PDF Graphics Object operators supported currently.
 
 Example and comparison
-![Comparison](./Files/SampleFileCmp.png)
+![Comparison](./Public/SampleFileCmp.png)
 As you can see, my version has some issues with AA estimation that will be fixed along the way
 
 # Rasterizer
