@@ -1,4 +1,5 @@
 ﻿using Converter.FileStructures.TIFF;
+using Converter.Utils;
 
 namespace Converter.Writers.TIFF
 {
@@ -46,7 +47,7 @@ namespace Converter.Writers.TIFF
 
       // use one buffer, always write in 8K intervals
       Span<byte> writeBuffer = options.AllowStackAlloct ? stackalloc byte[8192] : new byte[8192];
-      BufferWriter writer = new BufferWriter(ref writeBuffer, options.IsLittleEndian);
+      SelfContainedBufferWriter writer = new SelfContainedBufferWriter(ref writeBuffer, options.IsLittleEndian);
       TIFFInternals.WriteHeader(ref fs, ref writeBuffer, options.IsLittleEndian);
 
       switch (tiffType)
@@ -70,13 +71,13 @@ namespace Converter.Writers.TIFF
 
 
     // TODO: fix all these castings and stuff about var sizes
-    static void WriteRandomBilevelImageAndMetadata(ref Stream fs, ref BufferWriter writer, ref TIFFWriterOptions options, TIFF_Compression compression = TIFF_Compression.NoCompression)
+    static void WriteRandomBilevelImageAndMetadata(ref Stream fs, ref SelfContainedBufferWriter writer, ref TIFFWriterOptions options, TIFF_Compression compression = TIFF_Compression.NoCompression)
     {
       
       fs.Dispose();
     }
 
-    static void WriteRandomGrayScaleImageAndMetadata(ref Stream fs, ref BufferWriter writer, ref TIFFWriterOptions
+    static void WriteRandomGrayScaleImageAndMetadata(ref Stream fs, ref SelfContainedBufferWriter writer, ref TIFFWriterOptions
       options, TIFF_Compression compression = TIFF_Compression.NoCompression)
     {
       int pos = 0;
@@ -196,7 +197,7 @@ namespace Converter.Writers.TIFF
       fs.Dispose();
     }
 
-    static void WriteRandomPaletteImageAndMetadata(ref Stream fs, ref BufferWriter writer, ref TIFFWriterOptions options, TIFF_Compression compression = TIFF_Compression.NoCompression)
+    static void WriteRandomPaletteImageAndMetadata(ref Stream fs, ref SelfContainedBufferWriter writer, ref TIFFWriterOptions options, TIFF_Compression compression = TIFF_Compression.NoCompression)
     {
       int pos = 0;
       // allowed either 4 or 8
@@ -326,7 +327,7 @@ namespace Converter.Writers.TIFF
       fs.Dispose();
     }
 
-    static void WriteRandomRGBImageAndMetadata(ref Stream fs, ref BufferWriter writer, ref TIFFWriterOptions
+    static void WriteRandomRGBImageAndMetadata(ref Stream fs, ref SelfContainedBufferWriter writer, ref TIFFWriterOptions
       options, TIFF_Compression compression = TIFF_Compression.NoCompression)
     {
       int pos = 0;

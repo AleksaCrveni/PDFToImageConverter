@@ -1,14 +1,17 @@
-﻿namespace Converter.Writers.TIFF
+﻿using System.Buffers.Binary;
+
+namespace Converter.Utils
 {
   /// <summary>
   /// Helper struct to write to buffer with specified options that are passed in constructor
   /// So we don't have to pass little/big endian and other future settings at each function call
+  /// Difference betwween this and BufferWriter is that this object can hold some state (like little endian)
   /// </summary>
-  public ref struct BufferWriter
+  public ref struct SelfContainedBufferWriter
   {
     public Span<byte> _buffer;
     public bool _isLittleEndian;
-    public  BufferWriter(ref Span<byte> buffer, bool isLittleEndian = true)
+    public  SelfContainedBufferWriter(ref Span<byte> buffer, bool isLittleEndian = true)
     {
       _buffer = buffer;
       _isLittleEndian = isLittleEndian;
@@ -26,12 +29,12 @@
       // that way as well
       if (_isLittleEndian)
       {
-        _buffer[pos++] = (byte)value;
-        _buffer[pos++] = (byte)(value >> 8);
+        BinaryPrimitives.WriteUInt16LittleEndian(_buffer.Slice(pos, 2), value);
+        pos += 2;
       } else
       {
-        _buffer[pos++] = (byte)(value >> 8);
-        _buffer[pos++] = (byte)value;
+        BinaryPrimitives.WriteUInt16BigEndian(_buffer.Slice(pos, 2), value);
+        pos += 2;
       }
     }
 
@@ -49,17 +52,13 @@
       // that way as well
       if (_isLittleEndian)
       {
-        _buffer[pos++] = (byte)value;
-        _buffer[pos++] = (byte)(value >> 8);
-        _buffer[pos++] = (byte)(value >> 16);
-        _buffer[pos++] = (byte)(value >> 24);
+        BinaryPrimitives.WriteUInt32LittleEndian(_buffer.Slice(pos, 4), value);
+        pos += 4;
       }
       else
       {
-        _buffer[pos++] = (byte)(value >> 24);
-        _buffer[pos++] = (byte)(value >> 16);
-        _buffer[pos++] = (byte)(value >> 8);
-        _buffer[pos++] = (byte)value;
+        BinaryPrimitives.WriteUInt32BigEndian(_buffer.Slice(pos, 4), value);
+        pos += 4;
       }
     }
   }

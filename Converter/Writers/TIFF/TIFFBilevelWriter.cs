@@ -1,4 +1,5 @@
 ﻿using Converter.FileStructures.TIFF;
+using Converter.Utils;
 
 namespace Converter.Writers.TIFF
 {
@@ -55,12 +56,12 @@ namespace Converter.Writers.TIFF
     private void WriteImageMain(ref TIFFWriterOptions options, TIFF_ImgDataMode mode, byte[]? suppliedBuffer = null)
     {
       Span<byte> writeBuffer = options.AllowStackAlloct ? stackalloc byte[8192] : new byte[8192];
-      BufferWriter writer = new BufferWriter(ref writeBuffer, options.IsLittleEndian);
+      SelfContainedBufferWriter writer = new SelfContainedBufferWriter(ref writeBuffer, options.IsLittleEndian);
       TIFFInternals.WriteHeader(ref _stream, ref writeBuffer, options.IsLittleEndian);
       WriteRandomImage(ref writer, ref options, mode, suppliedBuffer);
     }
 
-    private void WriteEmptyImageData(ref BufferWriter writer, ulong byteCount, ulong stripSize, int remainder)
+    private void WriteEmptyImageData(ref SelfContainedBufferWriter writer, ulong byteCount, ulong stripSize, int remainder)
     {
       writer._buffer.Fill(0);
       // TODO: Fill with 1 depending on isZero
@@ -76,7 +77,7 @@ namespace Converter.Writers.TIFF
       _stream.Write(remainderSizeBuffer);
     }
 
-    private void WriteRandomImageData(ref BufferWriter writer, ulong byteCount, ulong stripSize, int remainder)
+    private void WriteRandomImageData(ref SelfContainedBufferWriter writer, ulong byteCount, ulong stripSize, int remainder)
     {
       for (ulong i = 0; i < byteCount; i += (ulong)stripSize)
       {
@@ -91,7 +92,7 @@ namespace Converter.Writers.TIFF
       Random.Shared.NextBytes(remainderSizeBuffer);
       _stream.Write(remainderSizeBuffer);
     }
-    private void WriteRandomImage(ref BufferWriter writer, ref TIFFWriterOptions options, TIFF_ImgDataMode mode, byte[]? suppliedBuffer = null)
+    private void WriteRandomImage(ref SelfContainedBufferWriter writer, ref TIFFWriterOptions options, TIFF_ImgDataMode mode, byte[]? suppliedBuffer = null)
     {
       int pos = 0;
       // support later
@@ -99,6 +100,7 @@ namespace Converter.Writers.TIFF
         throw new NotImplementedException("This Compression not suppported yet!");
 
       // divide by 8 because with no compression and bilevel values are either 0 or 1 and they are packed in bits
+      // TODO: I think here can be rounding error bug
       ulong byteCount = (uint)options.Width * (uint)options.Height / 8;
       imageDataLength = byteCount;
       // write in ~8k Strips
@@ -179,7 +181,7 @@ namespace Converter.Writers.TIFF
       _stream.Flush();
         }
 
-    private void WriteIFD(ref BufferWriter writer,ref TIFFWriterOptions options, ref TIFF_BilevelData data, ref int pos)
+    private void WriteIFD(ref SelfContainedBufferWriter writer,ref TIFFWriterOptions options, ref TIFF_BilevelData data, ref int pos)
     {
       int tagCount = 11;
       // write IFD 'header' lenght
