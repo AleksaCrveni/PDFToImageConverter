@@ -377,7 +377,7 @@ namespace Converter.FileStructures.PDF
     // for some reason some pdf files have this as IR instead of direct value
     // so just in case i will support both for length
     public long Length;
-    public List<PDF_Filter> Filters = new List<PDF_Filter>() { PDF_Filter.Null };
+    public List<ENCODING_FILTER> Filters = new List<ENCODING_FILTER>() { ENCODING_FILTER.Null };
     public byte[] RawStreamData;
   }
 

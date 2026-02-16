@@ -175,7 +175,7 @@ namespace Converter.Parsers.PDF
       helper.SkipNextToken(); // stream
       helper.SkipWhiteSpace();
       ReadOnlySpan<byte> encodedSpan = buffer.Slice(helper._position, (int)dict.Length);
-      dict.RawStreamData = DecompressionHelper.DecodeFilter(ref encodedSpan, dict.Filters);
+      dict.RawStreamData = DecompressionHelper.DecodeFilters(ref encodedSpan, dict.Filters);
       FreeAllocator(allocator);
     }
 
@@ -236,7 +236,7 @@ namespace Converter.Parsers.PDF
       // go to next line
       helper.SkipWhiteSpace();
       ReadOnlySpan<byte> encodedSpan = buffer.Slice(helper._position, (int)encodedStreamLen);
-      commonStreamDict.RawStreamData = DecompressionHelper.DecodeFilter(ref encodedSpan, commonStreamDict.Filters);
+      commonStreamDict.RawStreamData = DecompressionHelper.DecodeFilters(ref encodedSpan, commonStreamDict.Filters);
       fontFileInfo.CommonStreamInfo = commonStreamDict;
       FreeAllocator(allocator);
     }
@@ -273,7 +273,7 @@ namespace Converter.Parsers.PDF
           break;
         case "Filter":
           // this will work even if there is one filter and its not date
-          dict.Filters = helper.GetListOfNames<PDF_Filter>();
+          dict.Filters = helper.GetListOfNames<ENCODING_FILTER>();
           break;
         default:
           break;
@@ -426,7 +426,7 @@ namespace Converter.Parsers.PDF
       helper.SkipNextToken(); // skip stream
       helper.SkipWhiteSpace(); // skip LF
       ReadOnlySpan<byte> encodedSpan = buffer.Slice(helper._position, (int)commonStreamDict.Length);
-      commonStreamDict.RawStreamData = DecompressionHelper.DecodeFilter(ref encodedSpan, commonStreamDict.Filters);
+      commonStreamDict.RawStreamData = DecompressionHelper.DecodeFilters(ref encodedSpan, commonStreamDict.Filters);
 // this is interfering with tests, it should be appended with fontname and logged outside of this function 
 //#if DEBUG
 //      File.WriteAllBytes(Path.Join(Files.RootFolder, "-ColorSpaceDecodedSample.txt"), commonStreamDict.RawStreamData);
@@ -1907,7 +1907,7 @@ namespace Converter.Parsers.PDF
       if (readBytes != arr.Length)
         throw new InvalidDataException("Invalid cross reference stream!");
       buffer = arr.AsSpan();
-      byte[] decoded = DecompressionHelper.DecodeFilter(ref buffer, commonStreamDict.Filters);
+      byte[] decoded = DecompressionHelper.DecodeFilters(ref buffer, commonStreamDict.Filters);
 
       if (indexes.Count == 0)
         indexes.Add((0, size));
@@ -2217,7 +2217,7 @@ namespace Converter.Parsers.PDF
         helper = new PDFSpanParseHelper(ref buffer);
         // TODO: this isnt used
       }
-      commonStreamDict.RawStreamData = DecompressionHelper.DecodeFilter(ref buffer, commonStreamDict.Filters);
+      commonStreamDict.RawStreamData = DecompressionHelper.DecodeFilters(ref buffer, commonStreamDict.Filters);
       objStreamInfo.CommonStreamDict = commonStreamDict;
 
       // Parse offsets

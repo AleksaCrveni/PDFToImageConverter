@@ -102,21 +102,6 @@
     UltraExpanded
   }
 
-  public enum PDF_Filter
-  {
-    Null = 0,
-    ASCIIHexDecode,
-    ASCII85Decode,
-    LZWDecode,
-    FlateDecode,
-    RunLengthDecode,
-    CCITTFaxDecode,
-    JBIG2Decode,
-    DCTDecode,
-    JPXDecode,
-    Crypt
-  }
-
   public enum PDF_FontType
   {
     Null = 0,

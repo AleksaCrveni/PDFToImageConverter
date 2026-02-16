@@ -1,33 +1,32 @@
-﻿using Converter.FileStructures.PDF;
+﻿using Converter.FileStructures.General;
 using System.IO.Compression;
 
 namespace Converter.Utils
 {
   public static class DecompressionHelper
   {
-    public static byte[] DecodeFilter(ref ReadOnlySpan<byte> inputBuffer, List<PDF_Filter> filters)
+    public static byte[] DecodeFilter(ref ReadOnlySpan<byte> inputBuffer, ENCODING_FILTER filter)
     {
       // first just do single filter
-      PDF_Filter f = filters[0];
-      if (f == PDF_Filter.Null)
+      if (filter == ENCODING_FILTER.Null)
         return new byte[1];
 
       byte[] decoded;
-      switch (f)
+      switch (filter)
       {
-        case PDF_Filter.Null:
+        case ENCODING_FILTER.Null:
           decoded = Array.Empty<byte>();
           break;
-        case PDF_Filter.ASCIIHexDecode:
+        case ENCODING_FILTER.ASCIIHexDecode:
           decoded = Array.Empty<byte>();
           break;
-        case PDF_Filter.ASCII85Decode:
+        case ENCODING_FILTER.ASCII85Decode:
           decoded = Array.Empty<byte>();
           break;
-        case PDF_Filter.LZWDecode:
+        case ENCODING_FILTER.LZWDecode:
           decoded = Array.Empty<byte>();
           break;
-        case PDF_Filter.FlateDecode:
+        case ENCODING_FILTER.FlateDecode:
           // figure out if its gzip, base deflate or zlib decompression
           Stream decompressor;
 
@@ -65,22 +64,22 @@ namespace Converter.Utils
           decoded = stream.ToArray();
           stream.Dispose();
           break;
-        case PDF_Filter.RunLengthDecode:
+        case ENCODING_FILTER.RunLengthDecode:
           decoded = Array.Empty<byte>();
           break;
-        case PDF_Filter.CCITTFaxDecode:
+        case ENCODING_FILTER.CCITTFaxDecode:
           decoded = Array.Empty<byte>();
           break;
-        case PDF_Filter.JBIG2Decode:
+        case ENCODING_FILTER.JBIG2Decode:
           decoded = Array.Empty<byte>();
           break;
-        case PDF_Filter.DCTDecode:
+        case ENCODING_FILTER.DCTDecode:
           decoded = Array.Empty<byte>();
           break;
-        case PDF_Filter.JPXDecode:
+        case ENCODING_FILTER.JPXDecode:
           decoded = Array.Empty<byte>();
           break;
-        case PDF_Filter.Crypt:
+        case ENCODING_FILTER.Crypt:
           decoded = Array.Empty<byte>();
           break;
         default:
@@ -89,6 +88,14 @@ namespace Converter.Utils
       }
 
       return decoded;
+    }
+
+    // TODO: Expand this to work with multiple filters
+    public static byte[] DecodeFilters(ref ReadOnlySpan<byte> inputBuffer, List<ENCODING_FILTER> filters)
+    {
+      // first just do single filter
+      ENCODING_FILTER f = filters[0];
+      return DecodeFilter(ref inputBuffer, f);
     }
   }
 }
