@@ -56,12 +56,12 @@ namespace Converter.Writers.TIFF
     private void WriteImageMain(ref TIFFWriterOptions options, TIFF_ImgDataMode mode, byte[]? suppliedBuffer = null)
     {
       Span<byte> writeBuffer = options.AllowStackAlloct ? stackalloc byte[8192] : new byte[8192];
-      SelfContainedBufferWriter writer = new SelfContainedBufferWriter(ref writeBuffer, options.IsLittleEndian);
+      PositionIncrBufferWriter writer = new PositionIncrBufferWriter(ref writeBuffer, options.IsLittleEndian);
       TIFFInternals.WriteHeader(ref _stream, ref writeBuffer, options.IsLittleEndian);
       WriteRandomImage(ref writer, ref options, mode, suppliedBuffer);
     }
 
-    private void WriteEmptyImageData(ref SelfContainedBufferWriter writer, ulong byteCount, ulong stripSize, int remainder)
+    private void WriteEmptyImageData(ref PositionIncrBufferWriter writer, ulong byteCount, ulong stripSize, int remainder)
     {
       writer._buffer.Fill(0);
       // TODO: Fill with 1 depending on isZero
@@ -77,7 +77,7 @@ namespace Converter.Writers.TIFF
       _stream.Write(remainderSizeBuffer);
     }
 
-    private void WriteRandomImageData(ref SelfContainedBufferWriter writer, ulong byteCount, ulong stripSize, int remainder)
+    private void WriteRandomImageData(ref PositionIncrBufferWriter writer, ulong byteCount, ulong stripSize, int remainder)
     {
       for (ulong i = 0; i < byteCount; i += (ulong)stripSize)
       {
@@ -92,7 +92,7 @@ namespace Converter.Writers.TIFF
       Random.Shared.NextBytes(remainderSizeBuffer);
       _stream.Write(remainderSizeBuffer);
     }
-    private void WriteRandomImage(ref SelfContainedBufferWriter writer, ref TIFFWriterOptions options, TIFF_ImgDataMode mode, byte[]? suppliedBuffer = null)
+    private void WriteRandomImage(ref PositionIncrBufferWriter writer, ref TIFFWriterOptions options, TIFF_ImgDataMode mode, byte[]? suppliedBuffer = null)
     {
       int pos = 0;
       // support later
@@ -181,7 +181,7 @@ namespace Converter.Writers.TIFF
       _stream.Flush();
         }
 
-    private void WriteIFD(ref SelfContainedBufferWriter writer,ref TIFFWriterOptions options, ref TIFF_BilevelData data, ref int pos)
+    private void WriteIFD(ref PositionIncrBufferWriter writer,ref TIFFWriterOptions options, ref TIFF_BilevelData data, ref int pos)
     {
       int tagCount = 11;
       // write IFD 'header' lenght

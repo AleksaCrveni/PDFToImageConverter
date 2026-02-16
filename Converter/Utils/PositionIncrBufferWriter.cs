@@ -7,11 +7,11 @@ namespace Converter.Utils
   /// So we don't have to pass little/big endian and other future settings at each function call
   /// Difference betwween this and BufferWriter is that this object can hold some state (like little endian)
   /// </summary>
-  public ref struct SelfContainedBufferWriter
+  public ref struct PositionIncrBufferWriter
   {
     public Span<byte> _buffer;
     public bool _isLittleEndian;
-    public  SelfContainedBufferWriter(ref Span<byte> buffer, bool isLittleEndian = true)
+    public  PositionIncrBufferWriter(ref Span<byte> buffer, bool isLittleEndian = true)
     {
       _buffer = buffer;
       _isLittleEndian = isLittleEndian;

@@ -6,7 +6,7 @@ namespace Converter.Writers.TIFF
   public class TIFFInternals
   {
     public static readonly int DEFAULT_STRIP_SIZE = 8192;
-    public static void WriteIFDEntryToBuffer(ref SelfContainedBufferWriter writer, ref int pos, TIFF_TagType tag, TIFF_TagSize t, uint count, uint valueOrOffset)
+    public static void WriteIFDEntryToBuffer(ref PositionIncrBufferWriter writer, ref int pos, TIFF_TagType tag, TIFF_TagSize t, uint count, uint valueOrOffset)
     {
       // 12 bytes
       // tag
