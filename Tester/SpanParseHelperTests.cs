@@ -1,4 +1,5 @@
-﻿using Converter.FileStructures.PDF;
+﻿using Converter.FileStructures.General;
+using Converter.FileStructures.PDF;
 using Converter.Parsers.PDF;
 using Newtonsoft.Json.Converters;
 using System.Buffers.Binary;
@@ -165,8 +166,8 @@ namespace Tester
         buffer[i] = (byte)input[i];
       PDFSpanParseHelper helper = new PDFSpanParseHelper(ref buffer);
 
-      PDF_Filter f = helper.GetNextName<PDF_Filter>();
-      Assert.IsTrue(f == PDF_Filter.LZWDecode);
+      ENCODING_FILTER f = helper.GetNextName<ENCODING_FILTER>();
+      Assert.IsTrue(f == ENCODING_FILTER.LZWDecode);
 }
 
     [TestMethod]
