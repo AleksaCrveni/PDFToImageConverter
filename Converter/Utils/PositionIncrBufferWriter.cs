@@ -61,5 +61,19 @@ namespace Converter.Utils
         pos += 4;
       }
     }
+
+    public void WriteSigned32ToBuffer(ref int pos, int value)
+    {
+      if (_isLittleEndian)
+      {
+        BinaryPrimitives.WriteInt32LittleEndian(_buffer.Slice(pos, 4), value);
+        pos += 4;
+      }
+      else
+      {
+        BinaryPrimitives.WriteInt32BigEndian(_buffer.Slice(pos, 4), value);
+        pos += 4;
+      }
+    }
   }
 }

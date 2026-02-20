@@ -30,13 +30,38 @@
     zTXt = 2052348020
   }
 
+  /// <summary>
+  /// Example Naming -> G8 : G = Grayscale 8 = 8 bit depth per sample
+  /// A -> Alpha
+  /// TC -> True Color
+  /// P -> Pallete
+  /// </summary>
+  public enum PNG_COLOR_SCHEME : byte
+  {
+    G1,
+    G2,
+    G4,
+    G8,
+    G16,
+    GA8,
+    GA16,
+    P1,
+    P2,
+    P4,
+    P8,
+    TC8,
+    TC16,
+    TCA8,
+    TCA16
+  }
+
   public enum PNG_COLOR_TYPE : byte
   {
     GRAYSCALE = 0,
-    RGB = 2,
+    TRUECOLOR = 2,
     PALLETE = 3,
     GRAYSCALE_ALPHA = 4,
-    RGB_ALPHA = 6
+    TRUECOLOR_ALPHA = 6
   }
   public enum PNG_COMPRESSION : byte
   {
@@ -45,7 +70,11 @@
 
   public enum PNG_FILTER : byte
   {
-    ADAPTIVE
+    NONE,
+    SUB,
+    UP,
+    AVERAGE,
+    PAETH
   }
 
   public enum PNG_INTERLANCE : byte

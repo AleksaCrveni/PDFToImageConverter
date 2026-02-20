@@ -1,16 +1,19 @@
-﻿namespace Converter.Utils
+﻿using System.Net.Http.Headers;
+using System.Reflection.Metadata.Ecma335;
+
+namespace Converter.Utils
 {
   public class CRC32Impl
   {
     public ulong[] Table;
     public ulong c;
-    
     public CRC32Impl()
     {
       InitCRC32Table();
       Reset();
     }
 
+    // TODO: Make this constant somewhere
     public void InitCRC32Table()
     {
       Table = new ulong[256];
@@ -54,6 +57,7 @@
       UpdateCRC(buffer);
       return c ^ 0xFFFFFFFF;
     }
+    public ulong GetFinalCRC() => c ^ 0xFFFFFFFF;
 
     public bool VerifyCheckSum(uint crc32) => crc32 == (c ^ 0xFFFFFFFF);
 

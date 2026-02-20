@@ -1,7 +1,10 @@
 ﻿using Converter.FileStructures.PNG;
 using Converter.Utils;
+using Converter.Utils.PNG;
+using System.Buffers;
 using System.Buffers.Binary;
 using System.Diagnostics;
+using System.IO.Compression;
 
 namespace Converter.Parsers.Images.PNG
 {
@@ -52,11 +55,15 @@ namespace Converter.Parsers.Images.PNG
       // TODO: this may not work for isnanely large pictures
       crc.UpdateCRC(buffer.Slice(4, 4 + (int)len));
       ParseIHDR(file, ref buffer, crc);
-      bool EOF = false;
+      
 
       len = BinaryPrimitives.ReadUInt32BigEndian(buffer.Slice(25, 4));
       chunkType = (PNG_CHUNK_TYPE)BinaryPrimitives.ReadUInt32BigEndian(buffer.Slice(29, 4));
+
+      PNG_CHUNK_TYPE lastChunk = PNG_CHUNK_TYPE.IHDR;
+      bool seenIDAT = false;
       uint currCrc = 0;
+      bool EOF = false;
       while (!EOF)
       {
         crc.Reset();
@@ -96,18 +103,28 @@ namespace Converter.Parsers.Images.PNG
           case PNG_CHUNK_TYPE.IHDR:
             throw new InvalidDataException("IHDR chunk already processed");
           case PNG_CHUNK_TYPE.IDAT:
-            // call updateCRC over buffer and return CrC value
-            // 
-            //currCrc = ParseIDAT(crc);
-            // read next 8
-            bytesRead = stream.Read(buffer.Slice(0, 8));
-            if (bytesRead != 8)
+            if (seenIDAT && lastChunk != PNG_CHUNK_TYPE.IDAT)
+              throw new InvalidDataException("IDAT chunks must appear consecutively!");
+            seenIDAT = true;
+            ParseIDAT(file, stream, len, crc);
+            // read next 8 so that can be used
+            bytesRead = stream.Read(buffer.Slice(0, 12));
+            if (bytesRead != 12)
               throw new InvalidDataException("IDAT can't be last chunk!");
+            currCrc = BinaryPrimitives.ReadUInt32BigEndian(buffer.Slice(0, 4));
+            break;
+          case PNG_CHUNK_TYPE.PLTE:
+            throw new NotImplementedException();
+            break;
+          case PNG_CHUNK_TYPE.tRNS:
+            throw new NotImplementedException();
             break;
           case PNG_CHUNK_TYPE.NULL:
             throw new InvalidDataException("Unknown chunk!");
+            break;
           default:
             // skip
+            // we calcualted CRC already
             break;
         }
         // shortcut
@@ -116,6 +133,8 @@ namespace Converter.Parsers.Images.PNG
 
         if (!crc.VerifyCheckSum(currCrc))
           throw new InvalidDataException($"Invalid CRC32 for {chunkType} chunk!");
+
+        lastChunk = chunkType;
         // this is safe because at this point we know that bytesToRead is always expected
         len = BinaryPrimitives.ReadUInt32BigEndian(buffer.Slice(bytesRead - 8, 4));
         chunkType = (PNG_CHUNK_TYPE)BinaryPrimitives.ReadUInt32BigEndian(buffer.Slice(bytesRead - 4, 4));
@@ -127,26 +146,99 @@ namespace Converter.Parsers.Images.PNG
       int pos = 8;
       file.Width = BufferReader.ReadInt32BE(ref buffer, ref pos);
       file.Height = BufferReader.ReadInt32BE(ref buffer, ref pos);
-      byte bitDepth = buffer[pos++];
-      if (bitDepth != 1 && bitDepth != 2 && bitDepth != 4 && bitDepth != 8 && bitDepth != 16)
-        throw new InvalidDataException("Invalid BitDepth value!");
+      file.BitDepth = buffer[pos++];
       byte colorType = buffer[pos++];
-      if (colorType != 0 && colorType != 2 && colorType != 3 && colorType != 4 && colorType != 6)
-        throw new InvalidDataException("Invalid ColorType value!");
-
-      // Don't check for 0 because we already parsed bitDepth
-      // TODO: Maybe we can just check combinations here instead of doing separate checks
-      if ((colorType == 2 || colorType == 4 || colorType == 8) && bitDepth != 8 && bitDepth != 16)
-          throw new InvalidDataException("Invalid BitDepth and ColorType combination!");
-      else if (colorType == 3 && bitDepth != 1 && bitDepth != 2 && bitDepth != 4 && bitDepth != 8)
-        throw new InvalidDataException("Invalid BitDepth and ColorType combination!");
-
-      file.BitDepth = bitDepth;
+      if (colorType == 1 || colorType == 5 || colorType > 6)
+        throw new InvalidDataException("Invalid ColorType!");
       file.ColorType = (PNG_COLOR_TYPE)colorType;
       if ((byte)file.ColorType == 3)
         file.SampleDepth = 8;
       else
-        file.SampleDepth = bitDepth;
+        file.SampleDepth = file.BitDepth;
+
+      switch (file.BitDepth)
+      {
+        case 1:
+          switch ((PNG_COLOR_TYPE) colorType)
+          {
+            case PNG_COLOR_TYPE.GRAYSCALE:
+              file.ColorSheme = PNG_COLOR_SCHEME.G1;
+              break;
+            case PNG_COLOR_TYPE.PALLETE:
+              file.ColorSheme = PNG_COLOR_SCHEME.P1;
+              break;
+            default:
+              throw new InvalidDataException("Invalid ColorType/BitDepth combination!");
+          }
+          break;
+        case 2:
+          switch ((PNG_COLOR_TYPE) colorType)
+          {
+            case PNG_COLOR_TYPE.GRAYSCALE:
+              file.ColorSheme = PNG_COLOR_SCHEME.G2;
+              break;
+            case PNG_COLOR_TYPE.PALLETE:
+              file.ColorSheme = PNG_COLOR_SCHEME.P2;
+              break;
+            default:
+              throw new InvalidDataException("Invalid ColorType/BitDepth combination!");
+          }
+          break;
+        case 4:
+          switch ((PNG_COLOR_TYPE) colorType)
+          {
+            case PNG_COLOR_TYPE.GRAYSCALE:
+              file.ColorSheme = PNG_COLOR_SCHEME.G4;
+              break;
+            case PNG_COLOR_TYPE.PALLETE:
+              file.ColorSheme = PNG_COLOR_SCHEME.P4;
+              break;
+            default:
+              throw new InvalidDataException("Invalid ColorType/BitDepth combination!");
+          }
+          break;
+        case 8:
+          switch ((PNG_COLOR_TYPE) colorType)
+          {
+            case PNG_COLOR_TYPE.GRAYSCALE:
+              file.ColorSheme = PNG_COLOR_SCHEME.G8;
+              break;
+            case PNG_COLOR_TYPE.TRUECOLOR:
+              file.ColorSheme = PNG_COLOR_SCHEME.TC8;
+              break;
+            case PNG_COLOR_TYPE.PALLETE:
+              file.ColorSheme = PNG_COLOR_SCHEME.P8;
+              break;
+            case PNG_COLOR_TYPE.GRAYSCALE_ALPHA:
+              file.ColorSheme = PNG_COLOR_SCHEME.GA8;
+              break;
+            case PNG_COLOR_TYPE.TRUECOLOR_ALPHA:
+              file.ColorSheme = PNG_COLOR_SCHEME.TCA8;
+              break;
+            default:
+              throw new InvalidDataException("Invalid ColorType/BitDepth combination!");
+          }
+          break;
+        case 16:
+          switch ((PNG_COLOR_TYPE) colorType)
+          {
+            case PNG_COLOR_TYPE.GRAYSCALE:
+              file.ColorSheme = PNG_COLOR_SCHEME.G16;
+              break;
+            case PNG_COLOR_TYPE.TRUECOLOR:
+              file.ColorSheme = PNG_COLOR_SCHEME.TC16;
+              break;
+            case PNG_COLOR_TYPE.GRAYSCALE_ALPHA:
+              file.ColorSheme = PNG_COLOR_SCHEME.GA16;
+              break;
+            case PNG_COLOR_TYPE.TRUECOLOR_ALPHA:
+              file.ColorSheme = PNG_COLOR_SCHEME.TCA16;
+              break;
+            default:
+              throw new InvalidDataException("Invalid ColorType/BitDepth combination!");
+          }
+          break;
+      }
 
       byte comp = buffer[pos++];
       if (comp != 0)
@@ -156,7 +248,6 @@ namespace Converter.Parsers.Images.PNG
       byte filter = buffer[pos++];
       if (filter != 0)
         throw new InvalidCastException("Invalid Filter!");
-      file.Filter = 0;
 
       byte interlance = buffer[pos++];
       if (interlance != 0 && interlance != 1)
@@ -166,5 +257,71 @@ namespace Converter.Parsers.Images.PNG
       if (!crc.VerifyCheckSum(BufferReader.ReadUInt32BE(ref buffer, ref pos)))
         throw new InvalidDataException("Invalid CRC32 for IHDR chunk!");
     }
+
+    public static void ParseIDAT(PNGFile file, Stream stream, uint len, CRC32Impl crc)
+    {
+      // TODO: support uint reads and not just int
+      Debug.Assert(len < Int32.MaxValue);
+      byte[] arr = ArrayPool<byte>.Shared.Rent((int)len);
+      int bytesRead = stream.Read(arr, 0, (int)len);
+      if (bytesRead != len)
+        throw new InvalidDataException("Invalid IDAT chunk data!");
+      crc.UpdateCRC(arr.AsSpan().Slice(0, (int)len));
+      ZLibStream zLib = DecompressionHelper.GetZLibStreamDecompress(arr);
+
+      byte bitsPerPixel = PNGHelper.GetBitsPerPixel(file.ColorSheme, file.BitDepth);
+      // do we really need this?? We should prob use this for rowSizeCalc
+      int bytesPerPixel = PNGHelper.GetBytesPerPixel(bitsPerPixel);
+
+      uint rowSize = PNGHelper.GetRowSize(bitsPerPixel, file.Width);
+      // maybe we should see if it overflowed and wrapped?
+      byte[] currRow = new byte[rowSize];
+      byte[] prevRow = new byte[rowSize];
+
+      byte[] output = new byte[(rowSize - 1) * file.Height];
+      if (file.Interlance == PNG_INTERLANCE.NONE)
+      {
+        // already decomposed
+        byte f = 0;
+        for (int i = 0; i < file.Height; i++)
+        {
+          // Read is limited to int but row can be uint..??
+          // TODO: see how to deal with this or just assume row that is over int max value is not valid..?(prob now)
+          bytesRead = zLib.Read(currRow);
+          if (bytesRead != currRow.Length)
+            throw new InvalidDataException("Invalid pixel data row length data!");
+
+          Span<byte> currData = currRow.AsSpan().Slice(1);
+          Span<byte> prevData = prevRow.AsSpan().Slice(1);
+
+          byte filter = currRow[0];
+          Debug.Assert(filter == 0);
+          switch (filter)
+          {
+            case (byte)PNG_FILTER.NONE:
+              break;
+
+            case (byte)PNG_FILTER.SUB:
+              break;
+            case (byte)PNG_FILTER.UP:
+              break;
+            case (byte)PNG_FILTER.AVERAGE:
+              break;
+            case (byte)PNG_FILTER.PAETH:
+              break;
+            default:
+              throw new InvalidDataException("Unknown Filter Type!");
+          }
+
+          Array.ConstrainedCopy(currRow, 1, output, i * currData.Length, currData.Length);
+          Array.Copy(currRow, prevRow, currRow.Length); // Set currentRow to be prev
+        }
+        file.RawIDAT = output;
+      }
+      else if (file.Interlance == PNG_INTERLANCE.ADAM7)
+      {
+        throw new NotSupportedException("ADAM7 not supported");
+      }
+    } 
   }
 }

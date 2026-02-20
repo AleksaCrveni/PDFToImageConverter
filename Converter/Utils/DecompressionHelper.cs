@@ -97,5 +97,11 @@ namespace Converter.Utils
       ENCODING_FILTER f = filters[0];
       return DecodeFilter(ref inputBuffer, f);
     }
+
+    public static ZLibStream GetZLibStreamDecompress(byte[] input)
+    {
+      var compressStream = new MemoryStream(input);
+      return new ZLibStream(compressStream, CompressionMode.Decompress);
+    }
   }
 }
