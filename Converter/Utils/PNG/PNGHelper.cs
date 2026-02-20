@@ -36,5 +36,74 @@ namespace Converter.Utils.PNG
     {
       return (uint)Math.Ceiling((bitsPerPixel * width) / (decimal)8) + 1; // + 1 is for filter type on the start
     }
+
+    public static PNG_COLOR_SCHEME GetColorScheme(byte bitDepth, PNG_COLOR_TYPE colorType)
+    {
+      switch (bitDepth)
+      {
+        case 1:
+          switch (colorType)
+          {
+            case PNG_COLOR_TYPE.GRAYSCALE:
+              return PNG_COLOR_SCHEME.G1;
+            case PNG_COLOR_TYPE.PALLETE:
+              return PNG_COLOR_SCHEME.P1;
+            default:
+              throw new InvalidDataException("Invalid ColorType/BitDepth combination!");
+          }
+        case 2:
+          switch (colorType)
+          {
+            case PNG_COLOR_TYPE.GRAYSCALE:
+              return PNG_COLOR_SCHEME.G2;
+            case PNG_COLOR_TYPE.PALLETE:
+              return PNG_COLOR_SCHEME.P2;
+            default:
+              throw new InvalidDataException("Invalid ColorType/BitDepth combination!");
+          }
+        case 4:
+          switch (colorType)
+          {
+            case PNG_COLOR_TYPE.GRAYSCALE:
+              return PNG_COLOR_SCHEME.G4;
+            case PNG_COLOR_TYPE.PALLETE:
+              return PNG_COLOR_SCHEME.P4;
+            default:
+              throw new InvalidDataException("Invalid ColorType/BitDepth combination!");
+          }
+        case 8:
+          switch (colorType)
+          {
+            case PNG_COLOR_TYPE.GRAYSCALE:
+              return PNG_COLOR_SCHEME.G8;
+            case PNG_COLOR_TYPE.TRUECOLOR:
+              return PNG_COLOR_SCHEME.TC8;
+            case PNG_COLOR_TYPE.PALLETE:
+              return PNG_COLOR_SCHEME.P8;
+            case PNG_COLOR_TYPE.GRAYSCALE_ALPHA:
+              return PNG_COLOR_SCHEME.GA8;
+            case PNG_COLOR_TYPE.TRUECOLOR_ALPHA:
+              return PNG_COLOR_SCHEME.TCA8;
+            default:
+              throw new InvalidDataException("Invalid ColorType/BitDepth combination!");
+          }
+        case 16:
+          switch (colorType)
+          {
+            case PNG_COLOR_TYPE.GRAYSCALE:
+              return PNG_COLOR_SCHEME.G16;
+            case PNG_COLOR_TYPE.TRUECOLOR:
+              return PNG_COLOR_SCHEME.TC16;
+            case PNG_COLOR_TYPE.GRAYSCALE_ALPHA:
+              return PNG_COLOR_SCHEME.GA16;
+            case PNG_COLOR_TYPE.TRUECOLOR_ALPHA:
+              return PNG_COLOR_SCHEME.TCA16;
+            default:
+              throw new InvalidDataException("Invalid ColorType/BitDepth combination!");
+          }
+        default:
+          throw new InvalidDataException("Invalid BitDepth!");
+      }
+    }
   }
 }

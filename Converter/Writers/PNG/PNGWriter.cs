@@ -1,17 +1,29 @@
-﻿using Converter.FileStructures.PNG;
+﻿using Converter.FileStructures.PDF;
+using Converter.FileStructures.PNG;
 using Converter.Utils;
 using Converter.Utils.PNG;
 using System.IO.Compression;
 
 namespace Converter.Writers.PNG
 {
+  // TODO: Optimize later when we suppoprt a lot more of PNG
   public static class PNGWriter
   {
     public static readonly byte[] MagicBytes = [137, 80, 78, 71, 13, 10, 26, 10];
     public static void Write(string filepath, PNGFile file)
     {
-      CRC32Impl crc = new CRC32Impl();
       Stream stream = File.Create(filepath);
+      WriteIHDR(stream, file);
+      WriteIDAT(stream, file);
+      WriteIEND(stream);
+      stream.Flush();
+      stream.Close();
+      stream.Dispose();
+    }
+
+    public static void WriteIHDR(Stream stream, PNGFile file)
+    {
+      CRC32Impl crc = new CRC32Impl();
       int pos = 0;
       byte[] mem = new byte[120];
       Span<byte> arr = mem.AsSpan();
@@ -30,15 +42,13 @@ namespace Converter.Writers.PNG
       uint crcVal = (uint)crc.CRC(arr.Slice(4, pos - 4));
       buffer.WriteUnsigned32ToBuffer(ref pos, crcVal);
       stream.Write(arr.Slice(0, pos));
-
-      WriteIDAT(stream, file, file.RawIDAT);
-      WriteIEND(stream);
-      stream.Flush();
     }
+
     // TODO: there is limit of writing singleadat and its Int32.MaxValue
     // Fix to split into multiple IDATs later
-    public static void WriteIDAT(Stream stream, PNGFile file, byte[] rawData)
+    public static void WriteIDAT(Stream stream, PNGFile file)
     {
+      file.ColorSheme = PNGHelper.GetColorScheme(file.BitDepth, file.ColorType);
       uint rowSize = PNGHelper.GetRowSize(PNGHelper.GetBitsPerPixel(file.ColorSheme, file.BitDepth), file.Width);
       byte[] mem = new byte[12];
       Span<byte> tempBuffer = mem.AsSpan();
@@ -51,15 +61,14 @@ namespace Converter.Writers.PNG
       stream.Write(tempBuffer.Slice(0, 8));
       // 2. We write compressedData and save position since we will have to go back 
       long startPos = stream.Position;
-      byte[] rowData = new byte[rowSize];
+      byte[] rowBuffer = new byte[rowSize];
       ZLibStream zLib = new ZLibStream(stream, CompressionMode.Compress);
-      for (int i = 0; i < file.Height; i++)
-      {
-        rowData[0] = 0; // no filter
-        //Random.Shared.NextBytes(rowData.AsSpan(1));
-        Array.ConstrainedCopy(rawData, (int)(rowSize - 1) * i, rowData, 1, rowData.Length - 1);
-        zLib.Write(rowData, 0, rowData.Length);
-      }
+
+      if (file.RawIDAT != null)
+        WriteSuppliedBuffer(file, zLib, file.RawIDAT, rowBuffer);
+      else
+        WriteRandomBuffer(file, zLib, rowBuffer);
+
       zLib.Flush();
       long endPos = stream.Position;
 
@@ -102,6 +111,27 @@ namespace Converter.Writers.PNG
       buffer.WriteUnsigned32ToBuffer(ref pos, cName);
       buffer.WriteUnsigned32ToBuffer(ref pos, crcVal);
       stream.Write(arr.Slice(0, 12));
+    }
+
+    public static void WriteSuppliedBuffer(PNGFile file, ZLibStream zLib, byte[] suppliedBuffer, byte[] row)
+    {
+
+      for (int i = 0; i < file.Height; i++)
+      {
+        row[0] = 0; // no filter
+        Array.ConstrainedCopy(suppliedBuffer, (int)(row.Length - 1) * i, row, 1, row.Length - 1);
+        zLib.Write(row, 0, row.Length);
+      }
+    }
+
+    public static void WriteRandomBuffer(PNGFile file, ZLibStream zLib, byte[] row)
+    {
+      for (int i = 0; i < file.Height; i++)
+      {
+        row[0] = 0; // no filter
+        Random.Shared.NextBytes(row.AsSpan(1));
+        zLib.Write(row, 0, row.Length);
+      }
     }
   }
 }
