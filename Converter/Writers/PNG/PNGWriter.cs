@@ -15,14 +15,17 @@ namespace Converter.Writers.PNG
     public static void Write(string filepath, PNGFile file)
     {
       Stream stream = File.Create(filepath);
-      int arrLen = 256 * 3;
+      int arrLen = 256 * 3 + 64; // PLTE + w/e
       byte[] rentedArr = ArrayPool<byte>.Shared.Rent(arrLen);
       Span<byte> arr = rentedArr.AsSpan();
       PositionIncrBufferWriter writer = new PositionIncrBufferWriter(ref arr, false);
       CRC32Impl crc = new CRC32Impl();
-
-
       WriteIHDR(stream, file, crc, ref writer);
+      if (file.ColorType == PNG_COLOR_TYPE.PALLETE)
+      {
+        int len = ComputeRandomPallete(file.BitDepth, rentedArr);
+        WriteChunk(stream, PNG_CHUNK_TYPE.PLTE, arr.Slice(0, len), crc, ref writer, true);
+      }
       WriteIDAT(stream, file, crc, ref writer);
       WriteIEND(stream, crc, ref writer);
       stream.Flush();
@@ -134,23 +137,61 @@ namespace Converter.Writers.PNG
         zLib.Write(row, 0, row.Length);
       }
     }
-
-    public static void WriteChunk(Stream stream, PNG_CHUNK_TYPE chunkType, byte[] data, CRC32Impl crc, ref PositionIncrBufferWriter writer)
+    /// <summary>
+    /// 
+    /// </summary>
+    /// <param name="stream"></param>
+    /// <param name="chunkType"></param>
+    /// <param name="data"></param>
+    /// <param name="crc"></param>
+    /// <param name="writer"></param>
+    /// <param name="writerShared">Means that writer and data are the same, so we have to do things  a bit differently</param>
+    public static void WriteChunk(Stream stream, PNG_CHUNK_TYPE chunkType, Span<byte> data, CRC32Impl crc, ref PositionIncrBufferWriter writer, bool writerShared)
     {
       crc.Reset();
-      int pos = 0;
-      writer.WriteUnsigned32ToBuffer(ref pos, (uint)data.Length);
-      writer.WriteUnsigned32ToBuffer(ref pos, (uint)chunkType);
-      crc.UpdateCRC(writer._buffer.Slice(4, 4));
+      int currPos = 0;
+      if (writerShared)
+        currPos = data.Length;
+      int startPos = currPos;
+      writer.WriteUnsigned32ToBuffer(ref currPos, (uint)data.Length);
+      writer.WriteUnsigned32ToBuffer(ref currPos, (uint)chunkType);
+      crc.UpdateCRC(writer._buffer.Slice(startPos + 4, 4));
       crc.UpdateCRC(data);
-      writer.WriteUnsigned32ToBuffer(ref pos, (uint)crc.GetFinalCRC());
+      writer.WriteUnsigned32ToBuffer(ref currPos, (uint)crc.GetFinalCRC());
 
       // Len + chunkType
-      stream.Write(writer._buffer.Slice(0, 8));
+      stream.Write(writer._buffer.Slice(startPos, 8));
       // Data
       stream.Write(data);
       // CRC
-      stream.Write(writer._buffer.Slice(8, 4));
+      stream.Write(writer._buffer.Slice(startPos + 8, 4));
     }
+
+    public static int ComputeGrayPallete(byte bitDepth, byte[] buffer)
+    {
+      bitDepth = bitDepth > 8 ? (byte)8 : bitDepth;
+      int numOfColors = MyMath.IntPow(2, bitDepth);
+      for (int i = 0; i < numOfColors * 3; i+= 3)
+      {
+        byte val = (byte)(i / 3);
+        buffer[i] = val;
+        buffer[i + 1] = val;
+        buffer[i + 2] = val;
+      }
+      return numOfColors * 3;
+    }
+
+    public static int ComputeRandomPallete(byte bitDepth, byte[] buffer)
+    {
+      bitDepth = bitDepth > 8 ? (byte)8 : bitDepth;
+      int numOfColors = MyMath.IntPow(2, bitDepth);
+      Span<byte> usableArr = buffer.AsSpan().Slice(0, numOfColors * 3);
+      for (int i = 0; i < numOfColors * 3; i += 3)
+      {
+        Random.Shared.NextBytes(usableArr.Slice(i, 3));
+      }
+      return numOfColors * 3;
+    }
+
   }
 }
