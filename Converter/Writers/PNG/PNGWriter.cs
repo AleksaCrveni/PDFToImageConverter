@@ -2,6 +2,8 @@
 using Converter.FileStructures.PNG;
 using Converter.Utils;
 using Converter.Utils.PNG;
+using System.Buffers;
+using System.ComponentModel.DataAnnotations;
 using System.IO.Compression;
 
 namespace Converter.Writers.PNG
@@ -13,52 +15,55 @@ namespace Converter.Writers.PNG
     public static void Write(string filepath, PNGFile file)
     {
       Stream stream = File.Create(filepath);
-      WriteIHDR(stream, file);
-      WriteIDAT(stream, file);
-      WriteIEND(stream);
+      int arrLen = 256 * 3;
+      byte[] rentedArr = ArrayPool<byte>.Shared.Rent(arrLen);
+      Span<byte> arr = rentedArr.AsSpan();
+      PositionIncrBufferWriter writer = new PositionIncrBufferWriter(ref arr, false);
+      CRC32Impl crc = new CRC32Impl();
+
+
+      WriteIHDR(stream, file, crc, ref writer);
+      WriteIDAT(stream, file, crc, ref writer);
+      WriteIEND(stream, crc, ref writer);
       stream.Flush();
       stream.Close();
       stream.Dispose();
+      ArrayPool<byte>.Shared.Return(rentedArr);
     }
 
-    public static void WriteIHDR(Stream stream, PNGFile file)
+    public static void WriteIHDR(Stream stream, PNGFile file, CRC32Impl crc, ref PositionIncrBufferWriter writer)
     {
-      CRC32Impl crc = new CRC32Impl();
+      crc.Reset();
       int pos = 0;
-      byte[] mem = new byte[120];
-      Span<byte> arr = mem.AsSpan();
-      PositionIncrBufferWriter buffer = new PositionIncrBufferWriter(ref arr, false);
-      Array.Copy(MagicBytes, mem, MagicBytes.Length);
-      pos += MagicBytes.Length;
-      buffer.WriteUnsigned32ToBuffer(ref pos, 13);
-      buffer.WriteUnsigned32ToBuffer(ref pos, (uint)PNG_CHUNK_TYPE.IHDR);
-      buffer.WriteSigned32ToBuffer(ref pos, file.Width);
-      buffer.WriteSigned32ToBuffer(ref pos, file.Height);
-      arr[pos++] = file.BitDepth;
-      arr[pos++] = (byte)file.ColorType;
-      arr[pos++] = (byte)file.Compression;
-      arr[pos++] = 0;
-      arr[pos++] = (byte)PNG_INTERLANCE.NONE;
-      uint crcVal = (uint)crc.CRC(arr.Slice(4, pos - 4));
-      buffer.WriteUnsigned32ToBuffer(ref pos, crcVal);
-      stream.Write(arr.Slice(0, pos));
+      stream.Write(MagicBytes);
+      writer.WriteUnsigned32ToBuffer(ref pos, 13);
+      writer.WriteUnsigned32ToBuffer(ref pos, (uint)PNG_CHUNK_TYPE.IHDR);
+      writer.WriteSigned32ToBuffer(ref pos, file.Width);
+      writer.WriteSigned32ToBuffer(ref pos, file.Height);
+      writer._buffer[pos++] = file.BitDepth;
+      writer._buffer[pos++] = (byte)file.ColorType;
+      writer._buffer[pos++] = (byte)file.Compression;
+      writer._buffer[pos++] = 0;
+      writer._buffer[pos++] = (byte)PNG_INTERLANCE.NONE;
+      uint crcVal = (uint)crc.CRC(writer._buffer.Slice(4, pos - 4));
+      writer.WriteUnsigned32ToBuffer(ref pos, crcVal);
+      stream.Write(writer._buffer.Slice(0, pos));
     }
 
     // TODO: there is limit of writing singleadat and its Int32.MaxValue
     // Fix to split into multiple IDATs later
-    public static void WriteIDAT(Stream stream, PNGFile file)
+    public static void WriteIDAT(Stream stream, PNGFile file, CRC32Impl crc, ref PositionIncrBufferWriter writer)
     {
+      crc.Reset();
+
       file.ColorSheme = PNGHelper.GetColorScheme(file.BitDepth, file.ColorType);
       uint rowSize = PNGHelper.GetRowSize(PNGHelper.GetBitsPerPixel(file.ColorSheme, file.BitDepth), file.Width);
-      byte[] mem = new byte[12];
-      Span<byte> tempBuffer = mem.AsSpan();
-      PositionIncrBufferWriter buffer = new PositionIncrBufferWriter(ref tempBuffer, false);
       int pos = 0;
       // 1. We write dummy len and IDAT value 
-      buffer.WriteUnsigned32ToBuffer(ref pos, 0);
-      buffer.WriteUnsigned32ToBuffer(ref pos, (uint)PNG_CHUNK_TYPE.IDAT);
+      writer.WriteUnsigned32ToBuffer(ref pos, 0);
+      writer.WriteUnsigned32ToBuffer(ref pos, (uint)PNG_CHUNK_TYPE.IDAT);
 
-      stream.Write(tempBuffer.Slice(0, 8));
+      stream.Write(writer._buffer.Slice(0, 8));
       // 2. We write compressedData and save position since we will have to go back 
       long startPos = stream.Position;
       byte[] rowBuffer = new byte[rowSize];
@@ -83,34 +88,30 @@ namespace Converter.Writers.PNG
       if (readBytes != compressedData.Length)
         throw new Exception("Invalid compression of data!");
 
-      CRC32Impl crc = new CRC32Impl();
-      crc.UpdateCRC(tempBuffer.Slice(4, 4)); // IDAT value
+      crc.UpdateCRC(writer._buffer.Slice(4, 4)); // IDAT value
       crc.UpdateCRC(compressedData);
 
       stream.Position = startPos - 8;
       pos = 0;
-      buffer.WriteUnsigned32ToBuffer(ref pos, (uint)compressedData.Length);
-      stream.Write(tempBuffer.Slice(0, 4));
+      writer.WriteUnsigned32ToBuffer(ref pos, (uint)compressedData.Length);
+      stream.Write(writer._buffer.Slice(0, 4));
 
       // 4. Go back and write CRC on the end of the chunk
-      buffer.WriteUnsigned32ToBuffer(ref pos, (uint)crc.GetFinalCRC());
+      writer.WriteUnsigned32ToBuffer(ref pos, (uint)crc.GetFinalCRC());
       stream.Position = endPos;
-      stream.Write(tempBuffer.Slice(4, 4));
+      stream.Write(writer._buffer.Slice(4, 4));
     }
 
-    public static void WriteIEND(Stream stream)
+    public static void WriteIEND(Stream stream, CRC32Impl crc, ref PositionIncrBufferWriter writer)
     {
-      CRC32Impl crc = new CRC32Impl();
-      byte[] mem = new byte[12];
-      Span<byte> arr = mem.AsSpan();
-      PositionIncrBufferWriter buffer = new PositionIncrBufferWriter(ref arr, false);
+      crc.Reset();
       int pos = 0;
-      buffer.WriteUnsigned32ToBuffer(ref pos, 0);
+      writer.WriteUnsigned32ToBuffer(ref pos, 0);
       uint cName = (uint)PNG_CHUNK_TYPE.IEND;
-      uint crcVal = (uint)crc.CRC(arr.Slice(4, 4));
-      buffer.WriteUnsigned32ToBuffer(ref pos, cName);
-      buffer.WriteUnsigned32ToBuffer(ref pos, crcVal);
-      stream.Write(arr.Slice(0, 12));
+      uint crcVal = (uint)crc.CRC(writer._buffer.Slice(4, 4));
+      writer.WriteUnsigned32ToBuffer(ref pos, cName);
+      writer.WriteUnsigned32ToBuffer(ref pos, crcVal);
+      stream.Write(writer._buffer.Slice(0, 12));
     }
 
     public static void WriteSuppliedBuffer(PNGFile file, ZLibStream zLib, byte[] suppliedBuffer, byte[] row)
@@ -132,6 +133,24 @@ namespace Converter.Writers.PNG
         Random.Shared.NextBytes(row.AsSpan(1));
         zLib.Write(row, 0, row.Length);
       }
+    }
+
+    public static void WriteChunk(Stream stream, PNG_CHUNK_TYPE chunkType, byte[] data, CRC32Impl crc, ref PositionIncrBufferWriter writer)
+    {
+      crc.Reset();
+      int pos = 0;
+      writer.WriteUnsigned32ToBuffer(ref pos, (uint)data.Length);
+      writer.WriteUnsigned32ToBuffer(ref pos, (uint)chunkType);
+      crc.UpdateCRC(writer._buffer.Slice(4, 4));
+      crc.UpdateCRC(data);
+      writer.WriteUnsigned32ToBuffer(ref pos, (uint)crc.GetFinalCRC());
+
+      // Len + chunkType
+      stream.Write(writer._buffer.Slice(0, 8));
+      // Data
+      stream.Write(data);
+      // CRC
+      stream.Write(writer._buffer.Slice(8, 4));
     }
   }
 }
