@@ -1,14 +1,13 @@
-﻿using Converter.FileStructures.PDF;
-using Converter.FileStructures.PNG;
+﻿using Converter.FileStructures.PNG;
 using Converter.Utils;
 using Converter.Utils.PNG;
 using System.Buffers;
-using System.ComponentModel.DataAnnotations;
 using System.IO.Compression;
 
 namespace Converter.Writers.PNG
 {
   // TODO: Optimize later when we suppoprt a lot more of PNG
+  // TODO: Support tRNS
   public static class PNGWriter
   {
     public static readonly byte[] MagicBytes = [137, 80, 78, 71, 13, 10, 26, 10];
@@ -22,10 +21,9 @@ namespace Converter.Writers.PNG
       CRC32Impl crc = new CRC32Impl();
       WriteIHDR(stream, file, crc, ref writer);
       if (file.ColorType == PNG_COLOR_TYPE.PALLETE)
-      {
-        int len = ComputeRandomPallete(file.BitDepth, rentedArr);
-        WriteChunk(stream, PNG_CHUNK_TYPE.PLTE, arr.Slice(0, len), crc, ref writer, true);
-      }
+        WritePLTE(stream, file, crc, ref writer, rentedArr);
+      if (file.TransparencyData != null)
+        WriteTRNS(stream, file, crc, ref writer);
       WriteIDAT(stream, file, crc, ref writer);
       WriteIEND(stream, crc, ref writer);
       stream.Flush();
@@ -116,7 +114,50 @@ namespace Converter.Writers.PNG
       writer.WriteUnsigned32ToBuffer(ref pos, crcVal);
       stream.Write(writer._buffer.Slice(0, 12));
     }
+    public static void WriteTRNS(Stream stream, PNGFile file, CRC32Impl crc, ref PositionIncrBufferWriter writer)
+    {
+      if (file.ColorType == PNG_COLOR_TYPE.PALLETE && file.TransparencyData.PalleteSamples != null)
+      {
+        byte bDepth = file.BitDepth > 8 ? (byte)8 : file.BitDepth;
+        int sampleCount = MyMath.IntPow(2, bDepth);
+        if (sampleCount > file.TransparencyData.PalleteSamples.Length)
+          throw new InvalidDataException("PalleteSample too large!");
+        WriteChunk(stream, PNG_CHUNK_TYPE.tRNS, file.TransparencyData.PalleteSamples.AsSpan(), crc, ref writer);
+      }
+      else if (file.ColorType == PNG_COLOR_TYPE.GRAYSCALE && file.TransparencyData.GreySample != -1)
+      {
+        ushort gSample = (ushort)file.TransparencyData.GreySample;
+        if (gSample > MyMath.IntPow(2, file.BitDepth) - 1)
+          throw new InvalidDataException("Gray sample out of range!");
+        int pos = 0;
+        writer.WriteUnsigned16ToBuffer(ref pos, gSample);
+        WriteChunk(stream, PNG_CHUNK_TYPE.tRNS, writer._buffer.Slice(0, 2), crc, ref writer, true);
+      }
+      else if (file.ColorType == PNG_COLOR_TYPE.TRUECOLOR && file.TransparencyData.RGBSamples != (-1, -1, -1))
+      {
+        (ushort R, ushort G, ushort B) rgbSamples = ((ushort)file.TransparencyData.RGBSamples.R, (ushort)file.TransparencyData.RGBSamples.G, (ushort)file.TransparencyData.RGBSamples.B);
+        if (rgbSamples.R > MyMath.IntPow(2, file.BitDepth) - 1)
+          throw new InvalidDataException("Red sample out of range!");
+        if (rgbSamples.G > MyMath.IntPow(2, file.BitDepth) - 1)
+          throw new InvalidDataException("Red sample out of range!");
+        if (rgbSamples.B > MyMath.IntPow(2, file.BitDepth) - 1)
+          throw new InvalidDataException("Red sample out of range!");
+        int pos = 0;
+        writer.WriteUnsigned16ToBuffer(ref pos, rgbSamples.R);
+        writer.WriteUnsigned16ToBuffer(ref pos, rgbSamples.G);
+        writer.WriteUnsigned16ToBuffer(ref pos, rgbSamples.B);
+        WriteChunk(stream, PNG_CHUNK_TYPE.tRNS, writer._buffer.Slice(0, 6), crc, ref writer, true);
+      } else
+      {
+        throw new InvalidDataException("Invalid Transparacy data!");
+      }
+    }
 
+    public static void WritePLTE(Stream stream, PNGFile file, CRC32Impl crc, ref PositionIncrBufferWriter writer, byte[] arr)
+    {
+      int len = ComputeRandomPallete(file.BitDepth, arr);
+      WriteChunk(stream, PNG_CHUNK_TYPE.PLTE, arr.AsSpan().Slice(0, len), crc, ref writer, true);
+    }
     public static void WriteSuppliedBuffer(PNGFile file, ZLibStream zLib, byte[] suppliedBuffer, byte[] row)
     {
 
@@ -146,7 +187,7 @@ namespace Converter.Writers.PNG
     /// <param name="crc"></param>
     /// <param name="writer"></param>
     /// <param name="writerShared">Means that writer and data are the same, so we have to do things  a bit differently</param>
-    public static void WriteChunk(Stream stream, PNG_CHUNK_TYPE chunkType, Span<byte> data, CRC32Impl crc, ref PositionIncrBufferWriter writer, bool writerShared)
+    public static void WriteChunk(Stream stream, PNG_CHUNK_TYPE chunkType, Span<byte> data, CRC32Impl crc, ref PositionIncrBufferWriter writer, bool writerShared = false)
     {
       crc.Reset();
       int currPos = 0;
@@ -192,6 +233,5 @@ namespace Converter.Writers.PNG
       }
       return numOfColors * 3;
     }
-
   }
 }

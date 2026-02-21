@@ -1,13 +1,20 @@
 ﻿using BenchAndSmallTests;
 using BenchmarkDotNet.Running;
 using Converter;
+using Converter.FileStructures.BMP;
 using Converter.FileStructures.PDF;
+using Converter.FileStructures.PNG;
+using Converter.Parsers.Images.BMP;
+using Converter.Parsers.Images.PNG;
 using Converter.Parsers.PDF;
 using Converter.Rasterizers;
 using Converter.Writers;
+using Converter.Writers.BMP;
+using Converter.Writers.PNG;
 using Converter.Writers.TIFF;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.Diagnostics.Tracing.Parsers.MicrosoftWindowsWPF;
+using System.IO.Compression;
 using System.Security.Cryptography.X509Certificates;
 using System.Text;
 //int count1 = 0b_0000_0001;
@@ -223,6 +230,16 @@ int codePoint = Char.ConvertToUtf32(s, 0);
 //PdfParser parser = new PdfParser();
 //PDF_Options options = new PDF_Options();
 //parser.Parse(Files.RootFolder + "\\Prijemni-1.pdf", ref options);
-PdfParser pdfParser = new PdfParser();
-PDF_Options options = new PDF_Options();
-pdfParser.Parse(Files.BaseDocFilePath, ref options);
+
+//BMPParser p = new BMPParser();
+//p.Parse(@$"W:\PDFToImageConverter\Files\testBmpMono.bmp");
+
+//BMPWriterOptions options = new BMPWriterOptions();
+//options.Direction = BMP_DIRECTION.BOTTOM_UP;
+//options.Width = 595;
+//options.Height = 313;
+//options.Type = BMP_TYPE.MONO;
+//BMPWriter.WriteRandomBMP("myRandomBMP.bmp", ref options);
+
+PNGFile file = PNGParser.Parse(Files.PNGSample);
+PNGWriter.Write("test.png", file);

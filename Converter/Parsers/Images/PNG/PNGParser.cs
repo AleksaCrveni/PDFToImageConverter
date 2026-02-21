@@ -8,6 +8,7 @@ using System.IO.Compression;
 
 namespace Converter.Parsers.Images.PNG
 {
+  // TODO: Support tRNS
   public static class PNGParser
   {
     public static PNGFile Parse(string filename)

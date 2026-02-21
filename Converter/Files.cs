@@ -16,6 +16,7 @@
     public static string BMP24b { get; set; }
     public static string BMP16b { get; set; }
     public static string BMP256b { get; set; }
+    public static string PNGSample { get; set; }
     static Files()
     { 
       RootFolder = Path.Combine(Directory.GetParent(Directory.GetCurrentDirectory()).Parent.Parent.Parent.FullName, "Files");
@@ -32,6 +33,7 @@
       BMP16b = Path.Combine(RootFolder, "testBmp16B.bmp");
       BMP24b = Path.Combine(RootFolder, "testBmp.bmp");
       BMP256b = Path.Combine(RootFolder, "testBmp256.bmp");
+      PNGSample = Path.Combine(RootFolder, "pngSample.png");
     }
   }
 }
