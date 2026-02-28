@@ -13,24 +13,24 @@ namespace Converter.Rasterizers
   // This class should not hold any font file specific things
   public abstract class STBRasterizer
   {
-    protected byte[] _buffer;
-    protected int[] _encodingArray;
-    protected PDF_FontEncodingType _encodingType;
-    protected PDF_FontEncodingSource _encodingSource; // we don't use this right now
-    protected TrueTypeFont _ttf;
-    private TTF_RASTERIZER_VERSION _rasterVersion;
-    protected int _byteSize;
-    protected int _beginOfSfnt;
+    protected byte[] __buffer;
+    protected int[] __encodingArray;
+    protected PDF_FontEncodingType __encodingType;
+    protected PDF_FontEncodingSource __encodingSource; // we don't use this right now
+    protected TrueTypeFont __ttf;
+    private TTF_RASTERIZER_VERSION __rasterVersion;
+    protected int __byteSize;
+    protected int __beginOfSfnt;
     protected STBRasterizer(byte[] rawFontBuffer, string? encodingType)
     {
-      _buffer = rawFontBuffer;
-      _rasterVersion = TTF_RASTERIZER_VERSION.V2;
-      _byteSize = 8;
-      _beginOfSfnt = 0;
+      __buffer = rawFontBuffer;
+      __rasterVersion = TTF_RASTERIZER_VERSION.V2;
+      __byteSize = 8;
+      __beginOfSfnt = 0;
       SetCorrectEncoding(encodingType);
     }
 
-    protected void SetRasterizerVersion(TTF_RASTERIZER_VERSION v) => _rasterVersion = v;
+    protected void SetRasterizerVersion(TTF_RASTERIZER_VERSION v) => __rasterVersion = v;
     protected abstract void InitFont();
 
     public virtual void SetCorrectEncoding(string? encoding)
@@ -38,25 +38,25 @@ namespace Converter.Rasterizers
       // set PDF_FontEncodingSource
       if (encoding == PDF_FontEncodingType.WinAnsiEncoding.ToString())
       {
-        _encodingArray = PDFEncodings.WinAnsiEncoding; // shouldn't this be adobe encoding??
-        _encodingSource = PDF_FontEncodingSource.ENCODING;
+        __encodingArray = PDFEncodings.WinAnsiEncoding; // shouldn't this be adobe encoding??
+        __encodingSource = PDF_FontEncodingSource.ENCODING;
       }
       else if (encoding == PDF_FontEncodingType.MacRomanEncoding.ToString())
       {
-        _encodingArray = PDFEncodings.MacRomanEncoding;
-        _encodingSource = PDF_FontEncodingSource.ENCODING;
+        __encodingArray = PDFEncodings.MacRomanEncoding;
+        __encodingSource = PDF_FontEncodingSource.ENCODING;
       }
       else if (string.IsNullOrEmpty(encoding))
       {
-        _encodingArray = new int[0];
-        _encodingSource = PDF_FontEncodingSource.CMAP;
+        __encodingArray = new int[0];
+        __encodingSource = PDF_FontEncodingSource.CMAP;
         // TODO: These should be some more work done with prepending cmap data with some bytes, but figure out that later
 
       }
       else if (encoding == PDF_FontEncodingType.StandardEncoding.ToString())
       {
-        _encodingArray = PDFEncodings.AdobeSandardEncoding;
-        _encodingSource = PDF_FontEncodingSource.ENCODING;
+        __encodingArray = PDFEncodings.AdobeSandardEncoding;
+        __encodingSource = PDF_FontEncodingSource.ENCODING;
       }
       else
       {
@@ -67,47 +67,47 @@ namespace Converter.Rasterizers
 
     public virtual void STB_GetGlyphHMetrics(int glyphIndex, ref int advanceWidth, ref int leftSideBearing)
     {
-      ReadOnlySpan<byte> buffer = _buffer.AsSpan();
-      ushort numOfLongHorMetrics = ReadUInt16(ref buffer, _ttf.Offsets.hhea.Position + 34);
+      ReadOnlySpan<byte> buffer = __buffer.AsSpan();
+      ushort numOfLongHorMetrics = ReadUInt16(ref buffer, __ttf.Offsets.hhea.Position + 34);
       if (glyphIndex < numOfLongHorMetrics)
       {
         // 4 * glyph index because each HorMetrics struct is 4 bytes (2 for advancedWidth and 2 for leftSideBearing)
-        advanceWidth = ReadSignedInt16(ref buffer, _ttf.Offsets.hmtx.Position + 4 * glyphIndex);
-        leftSideBearing = ReadSignedInt16(ref buffer, _ttf.Offsets.hmtx.Position + 4 * glyphIndex + 2);
+        advanceWidth = ReadSignedInt16(ref buffer, __ttf.Offsets.hmtx.Position + 4 * glyphIndex);
+        leftSideBearing = ReadSignedInt16(ref buffer, __ttf.Offsets.hmtx.Position + 4 * glyphIndex + 2);
       }
       else
       {
-        advanceWidth = ReadSignedInt16(ref buffer, _ttf.Offsets.hmtx.Position + 4 * (numOfLongHorMetrics - 1));
-        leftSideBearing = ReadSignedInt16(ref buffer, _ttf.Offsets.hmtx.Position + 4 * numOfLongHorMetrics + 2 * (glyphIndex - numOfLongHorMetrics));
+        advanceWidth = ReadSignedInt16(ref buffer, __ttf.Offsets.hmtx.Position + 4 * (numOfLongHorMetrics - 1));
+        leftSideBearing = ReadSignedInt16(ref buffer, __ttf.Offsets.hmtx.Position + 4 * numOfLongHorMetrics + 2 * (glyphIndex - numOfLongHorMetrics));
       }
     }
 
     // TODO: See if caching format data is better
     public virtual int STB_FindGlyphIndex(int unicodeCodepoint)
     {
-      ReadOnlySpan<byte> buffer = _buffer.AsSpan();
-      if (_ttf.CmapFormat == 0)
+      ReadOnlySpan<byte> buffer = __buffer.AsSpan();
+      if (__ttf.CmapFormat == 0)
       {
-        ushort len = ReadUInt16(ref buffer, _ttf.IndexMapOffset + 2);
+        ushort len = ReadUInt16(ref buffer, __ttf.IndexMapOffset + 2);
         if (unicodeCodepoint < len - 6)
-          return ReadByte(ref buffer, _ttf.IndexMapOffset + 6 + unicodeCodepoint);
+          return ReadByte(ref buffer, __ttf.IndexMapOffset + 6 + unicodeCodepoint);
         return 0;
       }
-      else if (_ttf.CmapFormat == 2)
+      else if (__ttf.CmapFormat == 2)
       {
         throw new NotImplementedException();
       }
-      else if (_ttf.CmapFormat == 4)
+      else if (__ttf.CmapFormat == 4)
       {
         // std mapping for windows fonts: binary search collection of ranges (indexes are not tight as in format 6)
         // TODO: instead of >> 1, just /2 ??
-        ushort segCount = (ushort)(ReadUInt16(ref buffer, _ttf.IndexMapOffset + 6) >> 1); // >> 1 is basically / 2 
-        ushort searchRange = (ushort)(ReadUInt16(ref buffer, _ttf.IndexMapOffset + 8) >> 1);
-        ushort entrySelector = ReadUInt16(ref buffer, _ttf.IndexMapOffset + 10);
-        ushort rangeShift = (ushort)(ReadUInt16(ref buffer, _ttf.IndexMapOffset + 12) >> 1);
+        ushort segCount = (ushort)(ReadUInt16(ref buffer, __ttf.IndexMapOffset + 6) >> 1); // >> 1 is basically / 2 
+        ushort searchRange = (ushort)(ReadUInt16(ref buffer, __ttf.IndexMapOffset + 8) >> 1);
+        ushort entrySelector = ReadUInt16(ref buffer, __ttf.IndexMapOffset + 10);
+        ushort rangeShift = (ushort)(ReadUInt16(ref buffer, __ttf.IndexMapOffset + 12) >> 1);
 
         // do a binary search of the segments
-        uint endCount = (uint)_ttf.IndexMapOffset + 14;
+        uint endCount = (uint)__ttf.IndexMapOffset + 14;
         uint search = endCount;
 
         if (unicodeCodepoint > ushort.MaxValue)
@@ -115,7 +115,7 @@ namespace Converter.Rasterizers
 
         // they lie from endCount .. endCount + segCount
         // but searchRange is the nearest power of two, so...
-        if (unicodeCodepoint >= ReadUInt16(ref buffer, (int)(_ttf.StartOffset + search + rangeShift * 2)))
+        if (unicodeCodepoint >= ReadUInt16(ref buffer, (int)(__ttf.StartOffset + search + rangeShift * 2)))
           search += (uint)rangeShift * 2;
 
         // now decrement to bias correctly to find smaallest
@@ -124,7 +124,7 @@ namespace Converter.Rasterizers
         {
           ushort end;
           searchRange >>= 1;
-          end = ReadUInt16(ref buffer, (int)(_ttf.StartOffset + search + searchRange * 2));
+          end = ReadUInt16(ref buffer, (int)(__ttf.StartOffset + search + searchRange * 2));
           if (unicodeCodepoint > end)
             search += (uint)searchRange * 2;
           entrySelector--;
@@ -136,53 +136,53 @@ namespace Converter.Rasterizers
           ushort offset, start, last;
           ushort item = (ushort)(search - endCount >> 1);
 
-          start = ReadUInt16(ref buffer, (int)(_ttf.StartOffset + _ttf.IndexMapOffset + 14 + segCount * 2 + 2 + 2 * item));
-          last = ReadUInt16(ref buffer, (int)(_ttf.StartOffset + endCount + 2 * item));
+          start = ReadUInt16(ref buffer, (int)(__ttf.StartOffset + __ttf.IndexMapOffset + 14 + segCount * 2 + 2 + 2 * item));
+          last = ReadUInt16(ref buffer, (int)(__ttf.StartOffset + endCount + 2 * item));
           if (unicodeCodepoint < start || unicodeCodepoint > last)
             return 0;
 
-          offset = ReadUInt16(ref buffer, (int)(_ttf.StartOffset + _ttf.IndexMapOffset + 14 + segCount * 6 + 2 + 2 * item));
+          offset = ReadUInt16(ref buffer, (int)(__ttf.StartOffset + __ttf.IndexMapOffset + 14 + segCount * 6 + 2 + 2 * item));
           if (offset == 0)
-            return (ushort)(unicodeCodepoint + ReadUInt16(ref buffer, (int)(_ttf.StartOffset + _ttf.IndexMapOffset + 14 + segCount * 4 + 2 + 2 * item)));
+            return (ushort)(unicodeCodepoint + ReadUInt16(ref buffer, (int)(__ttf.StartOffset + __ttf.IndexMapOffset + 14 + segCount * 4 + 2 + 2 * item)));
 
-          return ReadUInt16(ref buffer, (int)(_ttf.StartOffset + offset + (unicodeCodepoint - start) * 2 + _ttf.IndexMapOffset + 14 + segCount * 6 + 2 + 2 * item));
+          return ReadUInt16(ref buffer, (int)(__ttf.StartOffset + offset + (unicodeCodepoint - start) * 2 + __ttf.IndexMapOffset + 14 + segCount * 6 + 2 + 2 * item));
         }
       }
-      else if (_ttf.CmapFormat == 6)
+      else if (__ttf.CmapFormat == 6)
       {
-        ushort length = ReadUInt16(ref buffer, _ttf.IndexMapOffset + 2);
-        ushort lang = ReadUInt16(ref buffer, _ttf.IndexMapOffset + 4);
-        ushort firstCode = ReadUInt16(ref buffer, _ttf.IndexMapOffset + 6);
-        ushort entryCount = ReadUInt16(ref buffer, _ttf.IndexMapOffset + 8);
+        ushort length = ReadUInt16(ref buffer, __ttf.IndexMapOffset + 2);
+        ushort lang = ReadUInt16(ref buffer, __ttf.IndexMapOffset + 4);
+        ushort firstCode = ReadUInt16(ref buffer, __ttf.IndexMapOffset + 6);
+        ushort entryCount = ReadUInt16(ref buffer, __ttf.IndexMapOffset + 8);
         // ensure its in range, codepoints are desnly packed, which means they are in continuous array in order
         if (unicodeCodepoint >= firstCode && unicodeCodepoint - firstCode < entryCount)
           // * 2 because data in 2 bytes each in this format
-          return ReadUInt16(ref buffer, _ttf.IndexMapOffset + 10 + (unicodeCodepoint - firstCode) * 2);
+          return ReadUInt16(ref buffer, __ttf.IndexMapOffset + 10 + (unicodeCodepoint - firstCode) * 2);
         return 0;
       }
-      else if (_ttf.CmapFormat == 8)
+      else if (__ttf.CmapFormat == 8)
       {
         throw new NotImplementedException();
       }
-      else if (_ttf.CmapFormat == 10)
+      else if (__ttf.CmapFormat == 10)
       {
         throw new NotImplementedException();
       }
-      else if (_ttf.CmapFormat == 12)
+      else if (__ttf.CmapFormat == 12)
       {
         throw new NotImplementedException();
       }
-      else if (_ttf.CmapFormat == 13)
+      else if (__ttf.CmapFormat == 13)
       {
         throw new NotImplementedException();
       }
-      else if (_ttf.CmapFormat == 14)
+      else if (__ttf.CmapFormat == 14)
       {
         throw new NotImplementedException();
       }
       else
       {
-        throw new InvalidDataException($"Format {_ttf.CmapFormat} is not valid CMAP format!");
+        throw new InvalidDataException($"Format {__ttf.CmapFormat} is not valid CMAP format!");
       }
 
       return 0;
@@ -190,11 +190,11 @@ namespace Converter.Rasterizers
 
     public virtual void STB_GetFontBoundingBox(ref int x0, ref int y0, ref int x1, ref int y1)
     {
-      ReadOnlySpan<byte> buffer = _buffer.AsSpan();
-      x0 = (int)ReadSignedInt16(ref buffer, _ttf.Offsets.head.Position + 36);
-      y0 = (int)ReadSignedInt16(ref buffer, _ttf.Offsets.head.Position + 38);
-      x1 = (int)ReadSignedInt16(ref buffer, _ttf.Offsets.head.Position + 40);
-      y1 = (int)ReadSignedInt16(ref buffer, _ttf.Offsets.head.Position + 42);
+      ReadOnlySpan<byte> buffer = __buffer.AsSpan();
+      x0 = (int)ReadSignedInt16(ref buffer, __ttf.Offsets.head.Position + 36);
+      y0 = (int)ReadSignedInt16(ref buffer, __ttf.Offsets.head.Position + 38);
+      x1 = (int)ReadSignedInt16(ref buffer, __ttf.Offsets.head.Position + 40);
+      y1 = (int)ReadSignedInt16(ref buffer, __ttf.Offsets.head.Position + 42);
     }
 
 
@@ -210,45 +210,45 @@ namespace Converter.Rasterizers
 
     public virtual void STB_GetFontVMetrics(ref int ascent, ref int descent, ref int lineGap)
     {
-      ReadOnlySpan<byte> buffer = _buffer.AsSpan();
-      ascent = ReadSignedInt16(ref buffer, _ttf.Offsets.hhea.Position + 4);
-      descent = ReadSignedInt16(ref buffer, _ttf.Offsets.hhea.Position + 6);
-      lineGap = ReadSignedInt16(ref buffer, _ttf.Offsets.hhea.Position + 8);
+      ReadOnlySpan<byte> buffer = __buffer.AsSpan();
+      ascent = ReadSignedInt16(ref buffer, __ttf.Offsets.hhea.Position + 4);
+      descent = ReadSignedInt16(ref buffer, __ttf.Offsets.hhea.Position + 6);
+      lineGap = ReadSignedInt16(ref buffer, __ttf.Offsets.hhea.Position + 8);
     }
 
     public virtual float STB_ScaleForPixelHeight(float size)
     {
-      ReadOnlySpan<byte> buffer = _buffer.AsSpan();
-      int fHeight = ReadSignedInt16(ref buffer, _ttf.Offsets.hhea.Position + 4) - ReadSignedInt16(ref buffer, _ttf.Offsets.hhea.Position + 6);
+      ReadOnlySpan<byte> buffer = __buffer.AsSpan();
+      int fHeight = ReadSignedInt16(ref buffer, __ttf.Offsets.hhea.Position + 4) - ReadSignedInt16(ref buffer, __ttf.Offsets.hhea.Position + 6);
       return size / fHeight;
     }
 
     public virtual float STB_ScaleForPixelHeight(double size)
     {
-      ReadOnlySpan<byte> buffer = _buffer.AsSpan();
-      int fHeight = ReadSignedInt16(ref buffer, _ttf.Offsets.hhea.Position + 4) - ReadSignedInt16(ref buffer, _ttf.Offsets.hhea.Position + 6);
+      ReadOnlySpan<byte> buffer = __buffer.AsSpan();
+      int fHeight = ReadSignedInt16(ref buffer, __ttf.Offsets.hhea.Position + 4) - ReadSignedInt16(ref buffer, __ttf.Offsets.hhea.Position + 6);
       return (float)size / fHeight;
     }
     public virtual int STB_GetGlyphOffset(ref ReadOnlySpan<byte> buffer, int glyphIndex)
     {
       int g1, g2;
       // glyph index out of range
-      if (glyphIndex >= _ttf.NumOfGlyphs)
+      if (glyphIndex >= __ttf.NumOfGlyphs)
         return -1;
       // uknown index -> glyph map format
-      if (_ttf.IndexToLocFormat >= 2)
+      if (__ttf.IndexToLocFormat >= 2)
         return -1;
 
-      if (_ttf.IndexToLocFormat == 0)
+      if (__ttf.IndexToLocFormat == 0)
       {
-        g1 = _ttf.Offsets.glyf.Position + ReadUInt16(ref buffer, _ttf.Offsets.loca.Position + glyphIndex * 2) * 2;
-        g2 = _ttf.Offsets.glyf.Position + ReadUInt16(ref buffer, _ttf.Offsets.loca.Position + glyphIndex * 2 + 2) * 2;
+        g1 = __ttf.Offsets.glyf.Position + ReadUInt16(ref buffer, __ttf.Offsets.loca.Position + glyphIndex * 2) * 2;
+        g2 = __ttf.Offsets.glyf.Position + ReadUInt16(ref buffer, __ttf.Offsets.loca.Position + glyphIndex * 2 + 2) * 2;
       }
       else
       {
         // not sure about this cast
-        g1 = _ttf.Offsets.glyf.Position + (int)ReadUInt32(ref buffer, _ttf.Offsets.loca.Position + glyphIndex * 4);
-        g2 = _ttf.Offsets.glyf.Position + (int)ReadUInt32(ref buffer, _ttf.Offsets.loca.Position + glyphIndex * 4 + 4);
+        g1 = __ttf.Offsets.glyf.Position + (int)ReadUInt32(ref buffer, __ttf.Offsets.loca.Position + glyphIndex * 4);
+        g2 = __ttf.Offsets.glyf.Position + (int)ReadUInt32(ref buffer, __ttf.Offsets.loca.Position + glyphIndex * 4 + 4);
       }
 
       // if length is 0 return -1??
@@ -260,14 +260,14 @@ namespace Converter.Rasterizers
     public virtual bool STB_GetGlyphBox(int glyphIndex, ref int xMin, ref int yMin, ref int xMax, ref int yMax)
     {
       // TODO: if cff = true its open type font?
-      if (_ttf.Cff)
+      if (__ttf.Cff)
       {
         throw new NotImplementedException();
       }
       else
       {
 
-        ReadOnlySpan<byte> buffer = _buffer.AsSpan();
+        ReadOnlySpan<byte> buffer = __buffer.AsSpan();
         int g = STB_GetGlyphOffset(ref buffer, glyphIndex);
         if (g < 0)
           return false;
@@ -326,7 +326,7 @@ namespace Converter.Rasterizers
 
     public virtual int STB_GetGlyphKernInfoAdvance(int glyphIndex1, int glyphIndex2)
     {
-      ReadOnlySpan<byte> buffer = _buffer.AsSpan(_ttf.Offsets.kern.Position, _ttf.Offsets.kern.Length);
+      ReadOnlySpan<byte> buffer = __buffer.AsSpan(__ttf.Offsets.kern.Position, __ttf.Offsets.kern.Length);
       uint needle, straw;
 
       int l, r, m;
@@ -362,16 +362,16 @@ namespace Converter.Rasterizers
     public virtual int STB_GetGlyphKernAdvance(int glyphIndex1, int glyphIndex2)
     {
       int xAdvance = 0;
-      if (_ttf.Offsets.gpos.Length > 0)
+      if (__ttf.Offsets.gpos.Length > 0)
         xAdvance += STB_GetGlyphGPOSInfoAdvance(glyphIndex1, glyphIndex2);
-      else if (_ttf.Offsets.kern.Length > 0)
+      else if (__ttf.Offsets.kern.Length > 0)
         xAdvance += STB_GetGlyphKernInfoAdvance(glyphIndex1, glyphIndex2);
       return xAdvance;
     }
 
     public virtual int STB_GetCodepointKernAdvance(int ch1, int ch2)
     {
-      if (_ttf.Offsets.kern.Length == 0 && _ttf.Offsets.gpos.Length == 0) // if no kerning table, don't waste time looking up both codepoint->glyphs
+      if (__ttf.Offsets.kern.Length == 0 && __ttf.Offsets.gpos.Length == 0) // if no kerning table, don't waste time looking up both codepoint->glyphs
         return 0;
       return STB_GetGlyphKernAdvance(STB_FindGlyphIndex(ch1), STB_FindGlyphIndex(ch2));
     }
@@ -959,7 +959,7 @@ namespace Converter.Rasterizers
       int n, i, j, k, m;
 
       int vSubSample;
-      if (_rasterVersion == TTF_RASTERIZER_VERSION.V1)
+      if (__rasterVersion == TTF_RASTERIZER_VERSION.V1)
       {
         vSubSample = result.H < 8 ? 15 : 5;
       }
@@ -1015,7 +1015,7 @@ namespace Converter.Rasterizers
       STB_SortEdges(ref edges, n);
 
       // TODO:  scanelines rasterization for both V1 and V2
-      if (_rasterVersion == TTF_RASTERIZER_VERSION.V1)
+      if (__rasterVersion == TTF_RASTERIZER_VERSION.V1)
       {
 
       }
@@ -1236,10 +1236,10 @@ namespace Converter.Rasterizers
       short numOfContours;
       int endPtsOfContoursOffset;
       // *data
-      int startOffset = (int)_ttf.StartOffset;
+      int startOffset = (int)__ttf.StartOffset;
       int numOfVertices = 0;
       TTFVertex vertex;
-      ReadOnlySpan<byte> buffer = _buffer.AsSpan();
+      ReadOnlySpan<byte> buffer = __buffer.AsSpan();
       int g = STB_GetGlyphOffset(ref buffer, glyphIndex);
 
       if (g < 0)
@@ -1450,7 +1450,7 @@ namespace Converter.Rasterizers
       {
         // Compound shapes
         bool more = true;
-        int compOffset = (int)_ttf.StartOffset + g + 10;
+        int compOffset = (int)__ttf.StartOffset + g + 10;
         numOfVertices = 0;
         vertex = new TTFVertex();
         List<TTFVertex> compVertex = new List<TTFVertex>();
@@ -1577,7 +1577,7 @@ namespace Converter.Rasterizers
     /// <exception cref="NotImplementedException"></exception>
     public virtual int STB_GetGlyphShape(int glyphIndex, ref List<TTFVertex> vertices)
     {
-      if (_ttf.Cff)
+      if (__ttf.Cff)
       {
         throw new NotImplementedException();
         return 0;
@@ -1645,7 +1645,7 @@ namespace Converter.Rasterizers
     #endregion reader functions
     private uint CalculateCheckSum(ref FakeSpan dataPos, uint numOfBytesInTable)
     {
-      ReadOnlySpan<byte> tableBuffer = new ReadOnlySpan<byte>(_buffer, dataPos.Position, dataPos.Length);
+      ReadOnlySpan<byte> tableBuffer = new ReadOnlySpan<byte>(__buffer, dataPos.Position, dataPos.Length);
       uint sum = 0;
       uint nLongs = (numOfBytesInTable + 3) / 4;
       int i = 0;

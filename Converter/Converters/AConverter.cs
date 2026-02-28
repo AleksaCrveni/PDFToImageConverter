@@ -7,28 +7,28 @@ namespace Converter.Converters
 {
   public abstract class AConverter : IConverter
   {
-    protected TargetConversion _target;
-    protected SourceConversion _source;
-    protected List<PDF_FontData> _fontDataRecords;
-    protected PDF_ResourceDict _rDict;
-    protected PDF_PageInfo _pInfo;
-    protected TIFFWriterOptions _options;
-    protected Stream _outputStream;
+    protected TargetConversion __target;
+    protected SourceConversion __source;
+    protected List<PDF_FontData> __fontDataRecords;
+    protected PDF_ResourceDict __rDict;
+    protected PDF_PageInfo __pInfo;
+    protected TIFFWriterOptions __options;
+    protected Stream __outputStream;
 
     public AConverter(List<PDF_FontData> fontDataRecords, PDF_ResourceDict rDict, PDF_PageInfo pInfo, SourceConversion source, TIFFWriterOptions options)
     {
-      _fontDataRecords = fontDataRecords;
-      _rDict = rDict;
-      _pInfo = pInfo;
-      _source = source;
-      _options = options;
+      __fontDataRecords = fontDataRecords;
+      __rDict = rDict;
+      __pInfo = pInfo;
+      __source = source;
+      __options = options;
       SetupConverter();
     }
     public abstract void SetupConverter();
 
     public abstract void Save(byte[] buffer);
 
-    public virtual int GetHeight() => _options.Height;
-    public virtual int GetWidth() => _options.Width;
+    public virtual int GetHeight() => __options.Height;
+    public virtual int GetWidth() => __options.Width;
   }
 }

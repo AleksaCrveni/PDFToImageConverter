@@ -25,7 +25,7 @@ namespace Converter.Rasterizers
 
     protected override void InitFont()
     {
-      ReadOnlySpan<byte> buffer = _buffer.AsSpan();
+      ReadOnlySpan<byte> buffer = __buffer.AsSpan();
       FontDirectory fd = new FontDirectory();
       TableOffsets tOff = new TableOffsets();
       int mainPos = 0;
@@ -60,7 +60,7 @@ namespace Converter.Rasterizers
         tag = ReadUInt32(ref buffer, mainPos);
         checkSum = ReadUInt32(ref buffer, mainPos + 4);
         // offset from beggning of sfnt , thats why we add here
-        offset = ReadUInt32(ref buffer, mainPos + 4 + 4) + (uint)_beginOfSfnt;
+        offset = ReadUInt32(ref buffer, mainPos + 4 + 4) + (uint)__beginOfSfnt;
         // does not include padded bytes, so i want to include them as well to stay on long boundary
         // and tight as possible 
         length = ReadUInt32(ref buffer, mainPos + 4 + 4 + 4);
@@ -159,8 +159,8 @@ namespace Converter.Rasterizers
         throw new InvalidDataException("Missing one of the required tables!");
       }
       ReadOnlySpan<byte> slice = buffer.Slice(tOff.maxp.Position, tOff.maxp.Length);
-      _ttf.NumOfGlyphs = ReadUInt16(ref slice, 4);
-      _ttf.Svg = -1; // ??
+      __ttf.NumOfGlyphs = ReadUInt16(ref slice, 4);
+      __ttf.Svg = -1; // ??
       slice = buffer.Slice(tOff.cmap.Position, tOff.cmap.Length);
       // Find number of cmap subtables and check encodings
       ushort numOfCmapSubtables = ReadUInt16(ref slice, 2);
@@ -186,30 +186,30 @@ namespace Converter.Rasterizers
             {
               case (ushort)TTF_MSPlatformSpecificID.MS_Symbol:
                 _ttfTableCMAP.Index30SubtableOffset = tOff.cmap.Position + (int)offset;
-                _ttf.IndexMapOffset = _ttfTableCMAP.Index30SubtableOffset;
+                __ttf.IndexMapOffset = _ttfTableCMAP.Index30SubtableOffset;
                 break;
               case (ushort)TTF_MSPlatformSpecificID.MS_UnicodeBMP:
                 _ttfTableCMAP.Index31SubtableOffset = tOff.cmap.Position + (int)offset;
-                _ttf.IndexMapOffset = _ttfTableCMAP.Index31SubtableOffset;
+                __ttf.IndexMapOffset = _ttfTableCMAP.Index31SubtableOffset;
                 break;
               case (ushort)TTF_MSPlatformSpecificID.MS_UnicodeFULL:
-                _ttf.IndexMapOffset = tOff.cmap.Position + (int)offset;
+                __ttf.IndexMapOffset = tOff.cmap.Position + (int)offset;
                 break;
 
             }
             break;
           case (ushort)TTF_PlatformID.Unicode:
-            _ttf.IndexMapOffset = tOff.cmap.Position + (int)offset;
+            __ttf.IndexMapOffset = tOff.cmap.Position + (int)offset;
             break;
           case (ushort)TTF_PlatformID.Macintosh:
             switch (platformSpecificID)
             {
               case 0:
                 _ttfTableCMAP.Index10SubtableOffset = tOff.cmap.Position + (int)offset;
-                _ttf.IndexMapOffset = _ttfTableCMAP.Index10SubtableOffset;
+                __ttf.IndexMapOffset = _ttfTableCMAP.Index10SubtableOffset;
                 break;
               default:
-                _ttf.IndexMapOffset = tOff.cmap.Position + (int)offset;
+                __ttf.IndexMapOffset = tOff.cmap.Position + (int)offset;
                 break;
             }
             break;
@@ -226,14 +226,14 @@ namespace Converter.Rasterizers
         _ttfTableCMAP.Format10 = ReadUInt16(ref buffer, _ttfTableCMAP.Index10SubtableOffset);
 
 
-      if (_ttf.IndexMapOffset == 0)
+      if (__ttf.IndexMapOffset == 0)
         throw new InvalidDataException("Missing index map!");
-      _ttf.CmapFormat = ReadUInt16(ref buffer, _ttf.IndexMapOffset);
+      __ttf.CmapFormat = ReadUInt16(ref buffer, __ttf.IndexMapOffset);
       slice = buffer.Slice(tOff.head.Position, tOff.head.Length);
-      _ttf.IndexToLocFormat = ReadUInt16(ref slice, 50);
+      __ttf.IndexToLocFormat = ReadUInt16(ref slice, 50);
 
-      _ttf.FontDirectory = fd;
-      _ttf.Offsets = tOff;
+      __ttf.FontDirectory = fd;
+      __ttf.Offsets = tOff;
     }
 
     public override void RasterizeGlyph(byte[] bitmapArr, int byteOffset, int glyphWidth, int glyphHeight, int glyphStride, float scaleX, float scaleY, float shiftX, float shiftY, ref GlyphInfo glyphInfo)
@@ -268,9 +268,9 @@ namespace Converter.Rasterizers
       // check from cmap if encoding is not defined
       if (glyphName == string.Empty)
       {
-        if (b < _encodingArray.Length)
+        if (b < __encodingArray.Length)
         {
-          int glyphNameIndex = _encodingArray[b];
+          int glyphNameIndex = __encodingArray[b];
           glyphName = PDFEncodings.GetGlyphName(glyphNameIndex);
         } else
         {
@@ -282,7 +282,7 @@ namespace Converter.Rasterizers
       // 2.
       int glyphIndex = 0;
       // first check if its post, if it  iseant read fyom Adobe Glyph List and cmap
-      if (_ttf.Offsets.post.Position != 0)
+      if (__ttf.Offsets.post.Position != 0)
       {
         glyphIndex = GetGlyphIndexFromPostTable(glyphName);
         if (glyphIndex != 0)
@@ -394,7 +394,7 @@ namespace Converter.Rasterizers
     }
     private int GetGlyphIndexFromCmap(int unicodeCodepoint, int subTableOffset, int format)
     {
-      ReadOnlySpan<byte> buffer = _buffer.AsSpan().Slice(subTableOffset);
+      ReadOnlySpan<byte> buffer = __buffer.AsSpan().Slice(subTableOffset);
       int startOffset = 0;
       if (format == 0)
       {
@@ -503,7 +503,7 @@ namespace Converter.Rasterizers
     private TTF_Table_POST ParsePostTable()
     {
       TTF_Table_POST t = new TTF_Table_POST();
-      ReadOnlySpan<byte> buffer = _buffer.AsSpan().Slice(_ttf.Offsets.post.Position, _ttf.Offsets.post.Length);
+      ReadOnlySpan<byte> buffer = __buffer.AsSpan().Slice(__ttf.Offsets.post.Position, __ttf.Offsets.post.Length);
       int format = ReadUInt16(ref buffer, 0); // 1, 2, 2.5, 3, 4
       t.Format = format;
       // Intial parsing only needed for second format

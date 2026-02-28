@@ -11,14 +11,14 @@ namespace Converter.Converters.Image.TIFF
 
     public override void SetupConverter()
     {
-      int width = (int)_pInfo.MediaBox.urX;
-      int height = (int)_pInfo.MediaBox.urY;
+      int width = (int)__pInfo.MediaBox.urX;
+      int height = (int)__pInfo.MediaBox.urY;
       // make sure that buffer is big enough;
-      if (_options.Width == 0 || _options.Width < width)
-        _options.Width = width;
+      if (__options.Width == 0 || __options.Width < width)
+        __options.Width = width;
 
-      if (_options.Height == 0 || _options.Height < height)
-        _options.Height = height;
+      if (__options.Height == 0 || __options.Height < height)
+        __options.Height = height;
 
       // temp workaround
       long rnd = Random.Shared.NextInt64();
@@ -28,8 +28,8 @@ namespace Converter.Converters.Image.TIFF
         _writer = new TIFFGrayscaleWriter($"convertTest.tiff");
       TIFFWriterOptions tiffOptions = new TIFFWriterOptions()
         {
-          Width = _options.Width,
-          Height = _options.Height
+          Width = __options.Width,
+          Height = __options.Height
         };
     }
 
@@ -38,8 +38,8 @@ namespace Converter.Converters.Image.TIFF
 
       TIFFWriterOptions tiffOptions = new TIFFWriterOptions()
       {
-        Width = _options.Width,
-        Height = _options.Height
+        Width = __options.Width,
+        Height = __options.Height
       };
       _writer.WriteImageWithBuffer(ref tiffOptions, buffer);
     }

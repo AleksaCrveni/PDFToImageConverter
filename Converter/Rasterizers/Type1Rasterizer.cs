@@ -22,7 +22,7 @@ namespace Converter.Rasterizers
     public Type1Rasterizer(byte[] rawFontBuffer, ref PDF_FontInfo fontInfo) : base(rawFontBuffer, fontInfo.EncodingData.BaseEncoding)
     {
       _fontInfo = fontInfo;
-      _interpreter = new Type1Interpreter(_buffer, _fontInfo);
+      _interpreter = new Type1Interpreter(__buffer, _fontInfo);
       InitFont();
     }
 
@@ -33,9 +33,9 @@ namespace Converter.Rasterizers
       glyphName = _fontInfo.EncodingData.GetGlyphNameFromDifferences(codepoint);
       if (glyphName == string.Empty)
       {
-        if (codepoint < _encodingArray.Length)
+        if (codepoint < __encodingArray.Length)
         {
-          int glyphNameIndex = _encodingArray[codepoint];
+          int glyphNameIndex = __encodingArray[codepoint];
           glyphName = PDFEncodings.GetGlyphName(glyphNameIndex);
         }
         else
