@@ -65,6 +65,7 @@ namespace Converter.Parsers.Fonts
     // TODO optimize if checks and can shift right by 8 instead of multipyling by 256
     public override void InterpretCharString(byte[] data, Stack<float> opStack, TYPE1_Point2D lsb, TYPE1_Point2D currPoint, PSShape outShape, string name)
     {
+      // false is for relative
       ReadOnlySpan<byte> buffer = data.AsSpan();
       byte v = 0;
       int num = 0;
@@ -75,26 +76,26 @@ namespace Converter.Parsers.Fonts
         {
           num = v - 139;
           opStack.Push(num);
-          Log(num.ToString());
+          //Log(num.ToString());
         }
         else if (v >= 247 && v <= 250)
         {
           num = ((v - 247) * 256) + buffer[++i] + 108;
           opStack.Push(num);
-          Log(num.ToString());
+          //Log(num.ToString());
         }
         else if (v >= 251 && v <= 254)
         {
           num = (-((v - 251) * 256)) - buffer[++i] - 108;
           opStack.Push(num);
-          Log(num.ToString());
+          //Log(num.ToString());
         }
         else if (v == 255)
         {
           num = BinaryPrimitives.ReadInt32BigEndian(buffer.Slice(++i, 4));
           i += 3;
           opStack.Push(num);
-          Log(num.ToString());
+          //Log(num.ToString());
         }
         else
         {
@@ -115,11 +116,13 @@ namespace Converter.Parsers.Fonts
               {
                 _flexArr[_flexIndex++] = currPoint.X;
                 _flexArr[_flexIndex++] = currPoint.Y;
+                Log("FLEX");
               }
               else
               {
                 outShape.MoveTo(currPoint.X, currPoint.Y);
               }
+              Log($"X:{currPoint.X} Y:{currPoint.Y}");
               opStack.Clear();
               Log("vmoveto");
               break;
@@ -128,18 +131,21 @@ namespace Converter.Parsers.Fonts
               currPoint.X += opStack.Pop();
               outShape.LineTo(currPoint.X, currPoint.Y);
               opStack.Clear();
+              Log($"X:{currPoint.X} Y:{currPoint.Y}");
               Log("rlineto");
               break;
             case 6: // hlineto
               currPoint.X += opStack.Pop();
               outShape.LineTo(currPoint.X, currPoint.Y);
               opStack.Clear();
+              Log($"X:{currPoint.X} Y:{currPoint.Y}");
               Log("hlineto");
               break;
             case 7: // vlineto
               currPoint.Y += opStack.Pop();
               outShape.LineTo(currPoint.X, currPoint.Y);
               opStack.Clear();
+              Log($"X:{currPoint.X} Y:{currPoint.Y}");
               Log("vlineto");
               break;
             case 8: // rrcurveto
@@ -155,6 +161,10 @@ namespace Converter.Parsers.Fonts
               outShape.CurveTo(currPoint.X + dx1, currPoint.Y + dy1,
                 currPoint.X + dx1 + dx2, currPoint.Y + dy1 + dy2,
                 currPoint.X + dx1 + dx2 + dx3, currPoint.Y + dy1 + dy2 + dy3);
+
+              Log($"X:{currPoint.X + dx1} Y:{currPoint.Y + dy1}");
+              Log($"X:{currPoint.X + dx1 + dx2} Y:{currPoint.Y + dy1 + dy2}");
+              Log($"X:{currPoint.X + dx1 + dx2 + dx3} Y:{currPoint.Y + dy1 + dy2 + dy3}");
               currPoint.X += dx1 + dx2 + dx3;
               currPoint.Y += dy1 + dy2 + dy3;
               opStack.Clear();
@@ -192,6 +202,8 @@ namespace Converter.Parsers.Fonts
               outShape.LineTo(targetX, targetY); // draw line
               outShape.MoveTo(currPoint.X, currPoint.Y); // move it back so that when we convert to vertexes we stay in same place
               outShape._actualLast = PS_COMMAND.CLOSEPATH; // assign close path so that we can check if last one was closepath
+              Log($"TargetX: {targetX} TargetY: {targetY}");
+              Log($"X:{currPoint.X} Y:{currPoint.Y}");
               Log("closepath");
               break;
             case 10: // callsubr
@@ -202,15 +214,26 @@ namespace Converter.Parsers.Fonts
                 // Flex uses 2 bezier curves to create one precise shallow curve
                 outShape.CurveTo(_flexArr[2], _flexArr[3], _flexArr[4], _flexArr[5], _flexArr[6], _flexArr[7]);
                 outShape.CurveTo(_flexArr[8], _flexArr[9], _flexArr[10], _flexArr[11], _flexArr[12], _flexArr[13]);
+                Log($"FLEX_VALUES");
+                Log($"X:{_flexArr[2]} Y:{_flexArr[3]}");
+                Log($"X:{_flexArr[4]} Y:{_flexArr[5]}");
+                Log($"X:{_flexArr[6]} Y:{_flexArr[7]}");
+                Log($"curveto");
+                Log($"X:{_flexArr[8]} Y:{_flexArr[9]}");
+                Log($"X:{_flexArr[10]} Y:{_flexArr[11]}");
+                Log($"X:{_flexArr[12]} Y:{_flexArr[13]}");
+                Log($"curveto");
                 _flex = false;
                 _flexIndex = 0;
                 opStack.Clear();
+                Log("FLEX_OFF");
               }
               else if (subr == 1)
               {
                 _flex = true;
                 _flexIndex = 0;
                 opStack.Clear();
+                Log("FLEX_ON");
               }
               else if (subr == 2)
               {
@@ -226,12 +249,14 @@ namespace Converter.Parsers.Fonts
                   throw new Exception("Limit of MAX 10 subroutine calls at once exceeded!");
                 else
                 {
+                  Log($"Call_Interpret_Char_String");
                   InterpretCharString(font.FontDict.Private.Subrs[subr], opStack, lsb, currPoint, outShape, $"othersubr_{subr}");
+                  Log($"Finish_Interpret_Char_String");
                 }
                 _subroutineCallCount--;
                   
               }
-              
+              Log($"Subr {subr}");
               Log("callsubr");
               break;
             case 11: // return
@@ -271,12 +296,14 @@ namespace Converter.Parsers.Fonts
                   lsb.X = currPoint.X;
                   lsb.Y = currPoint.Y;
                   opStack.Clear();
+                  Log($"X:{currPoint.X} Y:{currPoint.Y}");
                   Log("sbw");
                   break;
                 case 12: // div
                   float num1 = opStack.Pop();
                   float num2 = opStack.Pop();
                   opStack.Push(num1 / num2);
+                  Log($"{num1/num2}");
                   Log("div");
                   break;
                 case 16: // callothersubr
@@ -304,11 +331,13 @@ namespace Converter.Parsers.Fonts
                       __operandTypes.Push(PDF.OperandType.DOUBLE);
                     }
                   }
+                  Log($"OSubr: {oSubr}");
                   Log("callothersubr");
                   break;
                 case 17: // pop
                   // push number from interpreter stack to buildchar stack
                   opStack.Push((float)PopNumber());
+                  Log($"{opStack.Peek()}");
                   Log("pop");
                   break;
                 case 33: // setcurrentpoint
@@ -317,6 +346,7 @@ namespace Converter.Parsers.Fonts
                   // even tho docs say not to do this, we have to so that we know what to do when we are drawing
                   outShape.MoveTo(currPoint.X, currPoint.Y);
                   opStack.Clear();
+                  Log($"X:{currPoint.X} Y:{currPoint.Y}");
                   Log("setcurrentpoint");
                   break;
                 default:
@@ -330,6 +360,7 @@ namespace Converter.Parsers.Fonts
               currPoint.X = opStack.Pop();
               lsb.X = currPoint.X;
               opStack.Clear();
+              Log($"X:{currPoint.X} Y:{currPoint.Y}");
               Log("hsbw");
               break;
             case 14: // endchar
@@ -344,6 +375,7 @@ namespace Converter.Parsers.Fonts
               {
                 _flexArr[_flexIndex++] = currPoint.X;
                 _flexArr[_flexIndex++] = currPoint.Y;
+                Log("FLEX");
               }
               else
               {
@@ -351,6 +383,7 @@ namespace Converter.Parsers.Fonts
               }
                 
               opStack.Clear();
+              Log($"X:{currPoint.X} Y:{currPoint.Y}");
               Log("rmoveto");
               break;
             case 22: // hmoveto
@@ -359,12 +392,14 @@ namespace Converter.Parsers.Fonts
               {
                 _flexArr[_flexIndex++] = currPoint.X;
                 _flexArr[_flexIndex++] = currPoint.Y;
+                Log("FLEX");
               }
               else
               {
                 outShape.MoveTo(currPoint.X, currPoint.Y);
               }
               opStack.Clear();
+              Log($"X:{currPoint.X} Y:{currPoint.Y}");
               Log("hmoveto");
               break;
             case 30: // vhcurveto
@@ -379,6 +414,9 @@ namespace Converter.Parsers.Fonts
 
               currPoint.X += dx2 + dx3;
               currPoint.Y += dy1 + dy2;
+              Log($"X:{currPoint.X} Y:{currPoint.Y + dy1}");
+              Log($"X:{currPoint.X + dx2} Y:{currPoint.Y + dy1 + dy2}");
+              Log($"X:{currPoint.X + dx2 + dx3} Y:{currPoint.Y + dy1 + dy2}");
               opStack.Clear();
               Log("vhcurveto");
               break;
@@ -394,6 +432,9 @@ namespace Converter.Parsers.Fonts
 
               currPoint.X += dx1 + dx2;
               currPoint.Y += dy2 + dy3;
+              Log($"X:{currPoint.X + dx1} Y:{currPoint.Y}");
+              Log($"X:{currPoint.X + dx1 + dx2} Y:{currPoint.Y + dy2}");
+              Log($"X:{currPoint.X + dx1 + dx2} Y:{currPoint.Y + dy2 + dy3}");
               opStack.Clear();
               Log("hvcurveto");
               break;

@@ -1,15 +1,18 @@
 ﻿using Converter;
 using Converter.FileStructures.PDF;
+using Converter.FileStructures.PostScript;
 using Converter.FileStructures.TTF;
 using Converter.FileStructures.Type1;
 using Converter.Rasterizers;
 using Converter.Writers.TIFF;
 using RasterPlayground;
 using System.Diagnostics;
+using System.Security.Cryptography;
+using System.Text;
 int WIDTH =  1500;
 int HEIGHT = 1500;
 float objspaceFlatnessSquared = 0.0000000035f;
-float scale = 1f;
+float scale = 0.00034f;
 string equal = "equal";
 string bracket = "bracketleft";
 string leftParen = "parenleft";
@@ -42,13 +45,40 @@ byte[] input = File.ReadAllBytes(Files.RootFolder + @$"\{fontName}-fontFile.txt"
 
 Type1Rasterizer r = new Type1Rasterizer(input, ref fontInfo);
 //r.GetGlyphInfo();
-string name = "bracketleft";
+string name = equal;
 TYPE1_Point2D width = new TYPE1_Point2D();
 PSShape? shape = r.InterpretByName(name);
 Debug.Assert(shape != null);
 
 // already scaled
 List<TTFVertex> vertices = r.ConvertToTTFVertexFormat(shape, scale);
+StringBuilder sb = new StringBuilder();
+int j = 0;
+for (int i = 0; i < shape._moves.Count; i++)
+{
+  PS_COMMAND v = shape._moves[i];
+  if (v == PS_COMMAND.MOVE_TO)
+  {
+    sb.Append($"{vertices[i].x} {vertices[i].y} ");
+    sb.Append("MOVE_TO ");
+  } else if (v == PS_COMMAND.LINE_TO)
+  {
+    sb.Append($"{vertices[i].x} {vertices[i].y} ");
+    sb.Append("LINE_TO ");
+  }
+  else if (v == PS_COMMAND.CURVE_TO)
+  {
+    sb.Append($"{vertices[i].cx} {vertices[i].cy} {vertices[i].cx1} {vertices[i].cy1} {vertices[i].x} {vertices[i].y} ");
+    sb.Append("CURVE_TO ");
+  } else
+  {
+    throw new InvalidDataException("Invalid PS_COMMAND!");
+  }
+  
+}
+
+File.WriteAllText($"TTF_VERTEX_FROM_TYPE1__{name}__{scale.ToString()}.txt", sb.ToString());
+
 List<int> windingLengths = new List<int>();
 int windingCount = 0;
 
@@ -69,16 +99,7 @@ result.W = (int)(shape._width.X * scale);
 result.Offset = 20 * HEIGHT + 20; // draw at 20,20
 result.Pixels = bitmap;
 result.Stride = WIDTH;
-r.STB_InternalRasterize(ref result, ref windings, ref windingLengths, windingCount, 1, 1, 0, 0, ix0, iy0, true);
+r.STB_InternalRasterize(ref result, ref windings, ref windingLengths, windingCount, scale, scale, 1, 1, ix0, iy0, true);
 
 byte[] buff = Utils.ConvertToWin32RGBBuffer(bitmap, HEIGHT, WIDTH);
 File.WriteAllBytes("Single\\data.txt", buff);
-byte[] b = new byte[buff.Length + 4]; // icnlude size
-
-return;
-buff.CopyTo(b, 4);
-b[0] = (byte)(WIDTH >> 8);
-b[1] = (byte)WIDTH;
-b[2] = (byte)(HEIGHT >> 8);
-b[3] = (byte)(HEIGHT);
-File.WriteAllBytes("Single\\data.txt", b);
