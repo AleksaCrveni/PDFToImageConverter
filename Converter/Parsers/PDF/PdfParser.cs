@@ -51,22 +51,48 @@ namespace Converter.Parsers.PDF
       File.WriteAllLines(filepath.Replace("pdf", "txt"), lines);
     }
 
-    // return some kind of struct
+    // Maybe i shouldn't tie input stream to PDFFIle and just pass it separately
+    /// <summary>
+    /// File.Stream will be closed and disposed eventually, do not write to it
+    /// </summary>
+    /// <param name="filepath"></param>
+    /// <param name="options"></param>
+    /// <returns>
+    /// 
+    /// </returns>
     public PDFFile Parse(string filepath, ref PDF_Options options)
     {
       PDFFile file = new PDFFile();
-      file.Stream = File.OpenRead(filepath);
-      file.Options = options;
-      
+      Stream inStream = File.OpenRead(filepath);
+      // have this better just hardcode for now
+      Stream outStream = File.Create("convertTest.tiff");
       // go to end to find byte offset to cross refernce table
-      
-      ReadInitialData(file);
+      Parse(file, inStream, outStream, ref options);
+      inStream.Close();
+      outStream.Flush();
+      outStream.Close();
       return file;
 
     }
+
+    /// <summary>
+    /// Whoever passes the streams is responsible for disposing them
+    /// </summary>
+    /// <param name="file"></param>
+    /// <param name="inputStream"></param>
+    /// <param name="outputStream"></param>
+    /// <param name="options"></param>
+    public void Parse(PDFFile file, Stream inputStream, Stream outputStream, ref PDF_Options options)
+    {
+      file.Stream = inputStream;
+      file.Options = options;
+      ReadInitialData(file, outputStream);
+    }
+
+
     // Read PDFVersion, Byte offset for last cross reference table, file trailer
 
-    void ReadInitialData(PDFFile file)
+    void ReadInitialData(PDFFile file, Stream outStream)
     {
       file.PdfVersion = ParsePdfVersionFromHeader(file.Stream);
       // Read last 1024 bytes and trailer, startxref, (last)cross reference tables bytes and %%EOF
@@ -91,10 +117,10 @@ namespace Converter.Parsers.PDF
       ParseCatalogDictionary(file, (file.Trailer.RootIR.Item1, file.Trailer.RootIR.Item2));
       ParseRootPageTree(file, (file.Catalog.PagesIR.Item1, file.Catalog.PagesIR.Item2));
       ParsePagesData(file);
-      ConvertPageDataToImage(file);
+      ConvertPageDataToImage(file, outStream);
     }
 
-    private void ConvertPageDataToImage(PDFFile file)
+    private void ConvertPageDataToImage(PDFFile file, Stream outStream)
     {
       byte[] rawContent = file.PageInformation[0].ContentDict.RawStreamData;
       Span<byte> fourByteSlice = stackalloc byte[4];
@@ -105,7 +131,7 @@ namespace Converter.Parsers.PDF
       IConverter converter = file.Target switch
       {
         TargetConversion.TIFF_BILEVEL => throw new NotImplementedException(),
-        TargetConversion.TIFF_GRAYSCALE => new TIFFGrayscaleConverter(rDict.Font, rDict, file.PageInformation[0], SourceConversion.PDF, new TIFFWriterOptions()),
+        TargetConversion.TIFF_GRAYSCALE => new TIFFGrayscaleConverter(rDict.Font, rDict, file.PageInformation[0], SourceConversion.PDF, new TIFFWriterOptions(), outStream),
         TargetConversion.TIFF_PALLETE => throw new NotImplementedException(),
         TargetConversion.TIFF_RGB => throw new NotImplementedException(),
       };
