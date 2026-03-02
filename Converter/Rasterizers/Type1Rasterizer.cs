@@ -58,6 +58,13 @@ namespace Converter.Rasterizers
       glyphInfo.Name = glyphName;
     }
 
+    /// <summary>
+    /// 
+    /// </summary>
+    /// <param name="glyphName"></param>
+    /// <param name="textRenderingMatrix"></param>
+    /// <param name="width"></param>
+    /// <returns></returns>
     public (float scaleX, float scaleY) GetScale(int glyphName, double[,] textRenderingMatrix, float width)
     {
       // in type 1 font units are already scaled including width are already scaled
@@ -78,13 +85,13 @@ namespace Converter.Rasterizers
       Debug.Assert(shape != null);
       float scale = scaleX > scaleY ? scaleX : scaleY;
       // we scale here
-      List<TTFVertex> vertices = ConvertToTTFVertexFormat(shape, scale); // for now we only support aspect ratio scaling
+      List<TTFVertex> vertices = ConvertToTTFVertexFormat(shape); // for now we only support aspect ratio scaling
       List<int> windingLengths = new List<int>();
       int windingCount = 0;
 
       List<PointF> windings = STB_FlattenCurves(ref vertices, vertices.Count, 0.35f / scale, ref windingLengths, ref windingCount);
 
-      GetFakeBoundingBoxFromPoints(windings, ref ix0, ref iy0, ref ix1, ref iy1);
+      GetFakeBoundingBoxFromPoints(windings, ref ix0, ref iy0, ref ix1, ref iy1, scale);
       shape._windingCount = windingCount;
       shape._windingLengths = windingLengths;
       shape._windings = windings;
@@ -121,7 +128,7 @@ namespace Converter.Rasterizers
     }
  
     // temp
-    public List<TTFVertex> ConvertToTTFVertexFormat(PSShape s, float scale)
+    public List<TTFVertex> ConvertToTTFVertexFormat(PSShape s)
     {
       List<TTFVertex> vertices = new List<TTFVertex>();
       int i = 0;
@@ -135,14 +142,14 @@ namespace Converter.Rasterizers
           case PS_COMMAND.MOVE_TO:
             v = new TTFVertex();
             v.type = (byte)TTF_VMove.VMOVE;
-            v.x = (short)(s._shapePoints[i++] * scale);
-            v.y = (short)(s._shapePoints[i++] * scale);
+            v.x = (short)(s._shapePoints[i++]);
+            v.y = (short)(s._shapePoints[i++]);
             break;
           case PS_COMMAND.LINE_TO:
             v = new TTFVertex();
             v.type = (byte)TTF_VMove.VLINE;
-            v.x = (short)(s._shapePoints[i++] * scale);
-            v.y = (short)(s._shapePoints[i++] * scale);
+            v.x = (short)(s._shapePoints[i++]);
+            v.y = (short)(s._shapePoints[i++]);
             break;
           // cubic Bezier
           case PS_COMMAND.CURVE_TO:
@@ -150,12 +157,12 @@ namespace Converter.Rasterizers
             v.type = (byte)TTF_VMove.VCUBIC;
             
             // This is correct order for converting from PS CurveTo arguments to Vertex format that will be passed to TesselateCubic
-            v.cx = (short)(s._shapePoints[i++] * scale);
-            v.cy = (short)(s._shapePoints[i++] * scale);
-            v.cx1 = (short)(s._shapePoints[i++] * scale);
-            v.cy1 = (short)(s._shapePoints[i++] * scale);
-            v.x = (short)(s._shapePoints[i++] * scale);
-            v.y = (short)(s._shapePoints[i++] * scale);
+            v.cx = (short)(s._shapePoints[i++]);
+            v.cy = (short)(s._shapePoints[i++]);
+            v.cx1 = (short)(s._shapePoints[i++]);
+            v.cy1 = (short)(s._shapePoints[i++]);
+            v.x = (short)(s._shapePoints[i++]);
+            v.y = (short)(s._shapePoints[i++]);
           
             break;
           default:
@@ -168,7 +175,7 @@ namespace Converter.Rasterizers
 
 
     // TODO
-    public void GetFakeBoundingBoxFromPoints(List<PointF> points, ref int ix0, ref int iy0, ref int ix1, ref int iy1)
+    public void GetFakeBoundingBoxFromPoints(List<PointF> points, ref int ix0, ref int iy0, ref int ix1, ref int iy1, float scale)
     {
       // Units are already scaled
       float fx0 = float.MaxValue; // min X
@@ -190,10 +197,10 @@ namespace Converter.Rasterizers
       }
 
       // Y axis is ivnerted
-      ix0 = (int)MathF.Floor(fx0);
-      iy0 = (int)Math.Floor(-fy1);
-      ix1 = (int)Math.Floor(fx1);
-      iy1 = (int)Math.Ceiling(-fy0);
+      ix0 = (int)MathF.Floor(fx0 * scale);
+      iy0 = (int)Math.Floor(-fy1 * scale);
+      ix1 = (int)Math.Floor(fx1 * scale);
+      iy1 = (int)Math.Ceiling(-fy0 * scale);
     }
 
 
@@ -205,7 +212,7 @@ namespace Converter.Rasterizers
       result.Offset = byteOffset;
       result.Pixels = bitmapArr;
       result.Stride = glyphStride;
-      STB_InternalRasterize(ref result, ref _currentShape._windings, ref _currentShape._windingLengths, _currentShape._windingCount, 1, 1, 0, 0, _currentShape._xMin, _currentShape._yMin, true);
+      STB_InternalRasterize(ref result, ref _currentShape._windings, ref _currentShape._windingLengths, _currentShape._windingCount, scaleX, scaleY, 0, 0, _currentShape._xMin, _currentShape._yMin, true);
     }
   }
 }

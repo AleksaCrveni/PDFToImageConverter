@@ -366,6 +366,7 @@ namespace Converter.Parsers.Fonts
             case 14: // endchar
               Log("endchar");
               SaveLog(name);
+              //outShape.ScaleAll(0.001f);
               return;
             case 21: // rmoveto
               currPoint.Y += opStack.Pop();
@@ -447,6 +448,7 @@ namespace Converter.Parsers.Fonts
       }
 
       SaveLog(name);
+     // outShape.ScaleAll(0.001f);
     }
     // this should probably be virtual as well as font dict
     public byte[] DecryptPrivateDictionary()

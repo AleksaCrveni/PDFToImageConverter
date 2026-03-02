@@ -66,5 +66,15 @@ namespace Converter.Rasterizers
       _moves.Add(PS_COMMAND.CURVE_TO);
       _actualLast = PS_COMMAND.CURVE_TO;
     }
+
+    /// <summary>
+    /// Do this for compute it, or maybe we scale down each point when we add them and not all affter
+    /// </summary>
+    /// <param name="scale"></param>
+    public void ScaleAll(float scale)
+    {
+      for (int i = 0; i < _shapePoints.Count; i++)
+        _shapePoints[i] = _shapePoints[i] * scale;
+    }
   }
 }
