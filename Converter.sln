@@ -15,6 +15,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SDKTester", "SDKTester\SDKT
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "RasterPlayground", "RasterPlayground\RasterPlayground.csproj", "{3D7B1DBA-16C0-4119-9A84-41DF610DE1A7}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "RasterizeDebugger", "RasterizeDebugger\RasterizeDebugger.csproj", "{4216CF9C-A6F7-4719-8997-4B2FF13BFAE1}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -45,6 +47,10 @@ Global
 		{3D7B1DBA-16C0-4119-9A84-41DF610DE1A7}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{3D7B1DBA-16C0-4119-9A84-41DF610DE1A7}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{3D7B1DBA-16C0-4119-9A84-41DF610DE1A7}.Release|Any CPU.Build.0 = Release|Any CPU
+		{4216CF9C-A6F7-4719-8997-4B2FF13BFAE1}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{4216CF9C-A6F7-4719-8997-4B2FF13BFAE1}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{4216CF9C-A6F7-4719-8997-4B2FF13BFAE1}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{4216CF9C-A6F7-4719-8997-4B2FF13BFAE1}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

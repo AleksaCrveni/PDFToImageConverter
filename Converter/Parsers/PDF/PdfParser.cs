@@ -82,17 +82,17 @@ namespace Converter.Parsers.PDF
     /// <param name="inputStream"></param>
     /// <param name="outputStream"></param>
     /// <param name="options"></param>
-    public void Parse(PDFFile file, Stream inputStream, Stream outputStream, ref PDF_Options options)
+    public void Parse(PDFFile file, Stream inputStream, Stream outputStream, ref PDF_Options options, bool DEBUG = false)
     {
       file.Stream = inputStream;
       file.Options = options;
-      ReadInitialData(file, outputStream);
+      ReadInitialData(file, outputStream, DEBUG);
     }
 
 
     // Read PDFVersion, Byte offset for last cross reference table, file trailer
 
-    void ReadInitialData(PDFFile file, Stream outStream)
+    void ReadInitialData(PDFFile file, Stream outStream, bool DEBUG)
     {
       file.PdfVersion = ParsePdfVersionFromHeader(file.Stream);
       // Read last 1024 bytes and trailer, startxref, (last)cross reference tables bytes and %%EOF
@@ -117,13 +117,13 @@ namespace Converter.Parsers.PDF
       ParseCatalogDictionary(file, (file.Trailer.RootIR.Item1, file.Trailer.RootIR.Item2));
       ParseRootPageTree(file, (file.Catalog.PagesIR.Item1, file.Catalog.PagesIR.Item2));
       ParsePagesData(file);
-      ConvertPageDataToImage(file, outStream);
+      if (!DEBUG)
+        ConvertPageDataToImage(file, outStream);
     }
 
     private void ConvertPageDataToImage(PDFFile file, Stream outStream)
     {
       byte[] rawContent = file.PageInformation[0].ContentDict.RawStreamData;
-      Span<byte> fourByteSlice = stackalloc byte[4];
       PDF_ResourceDict rDict = file.PageInformation[0].ResourceDict;
 
       // TODO: make this later based on some mode, to be to convert to other file formats as well
@@ -136,7 +136,7 @@ namespace Converter.Parsers.PDF
         TargetConversion.TIFF_RGB => throw new NotImplementedException(),
       };
     
-      PDFGOInterpreter pdfGo = new PDFGOInterpreter(rawContent.AsSpan(), rDict, ref fourByteSlice, converter);
+      PDFGOInterpreter pdfGo = new PDFGOInterpreter(rawContent, rDict, converter);
 
       pdfGo.ConvertToPixelData();
     }

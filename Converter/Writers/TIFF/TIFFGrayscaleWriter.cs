@@ -8,7 +8,7 @@ namespace Converter.Writers.TIFF
     Stream _stream;
     private bool disposedValue;
     private ulong imageDataLength;
-    private TIFF_GrayscaleData data;
+    public TIFF_GrayscaleData data;
 
     public TIFFGrayscaleWriter(string destination)
     {
@@ -113,7 +113,7 @@ namespace Converter.Writers.TIFF
       data.StripCount = (int)stripCount;
       data.RowsPerStrip = (int)rowsPerStrip;
       data.ImageDataOffset = (int)_stream.Position;
-
+      data.InitialImageDataOffset = (int)_stream.Position;
       // write data
       switch (mode)
       {

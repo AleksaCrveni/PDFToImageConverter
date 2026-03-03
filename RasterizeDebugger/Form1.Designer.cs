@@ -41,8 +41,10 @@
       lbl_currFilename = new Label();
       label3 = new Label();
       lbl_contentLength = new Label();
-      label4 = new Label();
       lbl_currPosition = new Label();
+      label_5 = new Label();
+      lbl_readPos = new Label();
+      label_7 = new Label();
       ((System.ComponentModel.ISupportInitialize)pb_mainImage).BeginInit();
       SuspendLayout();
       // 
@@ -93,6 +95,7 @@
       btn_nextChar.TabIndex = 4;
       btn_nextChar.Text = "Next Char";
       btn_nextChar.UseVisualStyleBackColor = true;
+      btn_nextChar.Click += btn_nextChar_Click;
       // 
       // btn_nextText
       // 
@@ -103,6 +106,7 @@
       btn_nextText.TabIndex = 5;
       btn_nextText.Text = "Next Text";
       btn_nextText.UseVisualStyleBackColor = true;
+      btn_nextText.Click += btn_nextText_Click;
       // 
       // label2
       // 
@@ -130,8 +134,9 @@
       btn_load.Name = "btn_load";
       btn_load.Size = new Size(75, 23);
       btn_load.TabIndex = 8;
-      btn_load.Text = "Load PDF:";
+      btn_load.Text = "Load PDF";
       btn_load.UseVisualStyleBackColor = true;
+      btn_load.Click += btn_load_Click;
       // 
       // btn_processAll
       // 
@@ -142,6 +147,7 @@
       btn_processAll.TabIndex = 9;
       btn_processAll.Text = "Process All";
       btn_processAll.UseVisualStyleBackColor = true;
+      btn_processAll.Click += btn_processAll_Click;
       // 
       // lbl_currFilename
       // 
@@ -158,47 +164,69 @@
       label3.AutoSize = true;
       label3.Location = new Point(600, 65);
       label3.Name = "label3";
-      label3.Size = new Size(93, 15);
+      label3.Size = new Size(50, 15);
       label3.TabIndex = 11;
-      label3.Text = "Content length :";
+      label3.Text = "Length :";
       // 
       // lbl_contentLength
       // 
       lbl_contentLength.Anchor = AnchorStyles.Top | AnchorStyles.Right;
       lbl_contentLength.AutoSize = true;
-      lbl_contentLength.Location = new Point(690, 65);
+      lbl_contentLength.Location = new Point(647, 65);
       lbl_contentLength.Name = "lbl_contentLength";
       lbl_contentLength.Size = new Size(13, 15);
       lbl_contentLength.TabIndex = 12;
       lbl_contentLength.Text = "0";
       // 
-      // label4
-      // 
-      label4.Anchor = AnchorStyles.Top | AnchorStyles.Right;
-      label4.AutoSize = true;
-      label4.Location = new Point(854, 65);
-      label4.Name = "label4";
-      label4.Size = new Size(13, 15);
-      label4.TabIndex = 14;
-      label4.Text = "0";
-      // 
       // lbl_currPosition
       // 
       lbl_currPosition.Anchor = AnchorStyles.Top | AnchorStyles.Right;
       lbl_currPosition.AutoSize = true;
-      lbl_currPosition.Location = new Point(759, 65);
+      lbl_currPosition.Location = new Point(710, 65);
       lbl_currPosition.Name = "lbl_currPosition";
-      lbl_currPosition.Size = new Size(99, 15);
-      lbl_currPosition.TabIndex = 13;
-      lbl_currPosition.Text = "Current position :";
+      lbl_currPosition.Size = new Size(13, 15);
+      lbl_currPosition.TabIndex = 14;
+      lbl_currPosition.Text = "0";
+      // 
+      // label_5
+      // 
+      label_5.Anchor = AnchorStyles.Top | AnchorStyles.Right;
+      label_5.AutoSize = true;
+      label_5.Location = new Point(681, 65);
+      label_5.Name = "label_5";
+      label_5.Size = new Size(32, 15);
+      label_5.TabIndex = 13;
+      label_5.Text = "Pos :";
+      // 
+      // lbl_readPos
+      // 
+      lbl_readPos.Anchor = AnchorStyles.Top | AnchorStyles.Right;
+      lbl_readPos.AutoSize = true;
+      lbl_readPos.Location = new Point(821, 65);
+      lbl_readPos.Name = "lbl_readPos";
+      lbl_readPos.Size = new Size(13, 15);
+      lbl_readPos.TabIndex = 16;
+      lbl_readPos.Text = "0";
+      // 
+      // label_7
+      // 
+      label_7.Anchor = AnchorStyles.Top | AnchorStyles.Right;
+      label_7.AutoSize = true;
+      label_7.Location = new Point(759, 65);
+      label_7.Name = "label_7";
+      label_7.Size = new Size(61, 15);
+      label_7.TabIndex = 15;
+      label_7.Text = "Read Pos :";
       // 
       // Form1
       // 
       AutoScaleDimensions = new SizeF(7F, 15F);
       AutoScaleMode = AutoScaleMode.Font;
       ClientSize = new Size(916, 578);
-      Controls.Add(label4);
+      Controls.Add(lbl_readPos);
+      Controls.Add(label_7);
       Controls.Add(lbl_currPosition);
+      Controls.Add(label_5);
       Controls.Add(lbl_contentLength);
       Controls.Add(label3);
       Controls.Add(lbl_currFilename);
@@ -235,7 +263,9 @@
     private Label lbl_currFilename;
     private Label label3;
     private Label lbl_contentLength;
-    private Label label4;
     private Label lbl_currPosition;
+    private Label label_5;
+    private Label lbl_readPos;
+    private Label label_7;
   }
 }

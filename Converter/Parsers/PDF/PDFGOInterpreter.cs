@@ -1,4 +1,5 @@
 ﻿using Converter.Converters;
+using Converter.FileStructures;
 using Converter.FileStructures.PDF;
 using Converter.FileStructures.PDF.GraphicsInterpreter;
 using Converter.Rasterizers;
@@ -19,11 +20,11 @@ namespace Converter.Parsers.PDF
   /// regardless if its decimal or not
   /// TODO: See if building AST first would be better and faster
   /// </summary>
-  public ref struct PDFGOInterpreter
+  public class PDFGOInterpreter
   {
-    private ReadOnlySpan<byte> _buffer;
-    private int _pos = 0;
-    private int _readPos = 0;
+    private byte[] _buffer;
+    public int _pos = 0;
+    public int _readPos = 0;
     private byte _char = PDFConstants.SP; // current char, init it to non null val
     private Stack<int> intOperands;
     private Stack<double> realOperands;
@@ -37,18 +38,19 @@ namespace Converter.Parsers.PDF
     private GraphicsState currentGS;
     private PDFGI_PathConstruction currentPC;
     private PDFGI_TextObject currentTextObject;
-    private Span<byte> _fourByteSlice;
     private PDF_ResourceDict _resourceDict;
     private long tokensParsed = 0; // for debugging
     private double[,] textRenderingMatrix;
     private double[,] reUsableMatrix1;
     private double[,] reUsableMatrix2;
-    private IConverter _converter;
+    public IConverter _converter;
     private (int Height, int Width) _targetSize;
     public byte[] _outputBuffer;
+    public bool _debug;
+    public PDFGO_DEBUG_STATE _debugState;
 
     // TODO: maybe NULL check is redundant if we let it throw to end?
-    public PDFGOInterpreter(ReadOnlySpan<byte> contentBuffer, PDF_ResourceDict resourceDict, ref Span<byte> fourByteSlice, IConverter converter)
+    public PDFGOInterpreter(byte[] contentBuffer, PDF_ResourceDict resourceDict,  IConverter converter, bool debug = false)
     {
       _buffer = contentBuffer;
       intOperands = new Stack<int>();
@@ -61,16 +63,16 @@ namespace Converter.Parsers.PDF
       currentGS = new GraphicsState();
       currentPC = new PDFGI_PathConstruction();
       _resourceDict = resourceDict;
-      // should be always 4 bytes
-      if (fourByteSlice.Length != 4)
-        throw new Exception("Four byte slice must be 4 in length!");
-      _fourByteSlice = fourByteSlice;
       textRenderingMatrix = new double[3,3];
       reUsableMatrix1 = new double[3, 3];
       reUsableMatrix2 = new double[3, 3];
       _converter = converter;
       _targetSize = (_converter.GetHeight(), _converter.GetWidth());
       _outputBuffer = new byte[_targetSize.Height * _targetSize.Width];
+      _debug = debug;
+      if (debug)
+        _debugState = new PDFGO_DEBUG_STATE();
+      InitGS();
     }
     public void InitGS()
     {
@@ -79,8 +81,9 @@ namespace Converter.Parsers.PDF
     }
     public void ConvertToPixelData()
     {
-      InitGS();
 
+      if (_debug)
+        _debugState.Literals.Clear();
       uint val = ReadNext();
       // TODO: instead of string, we can return hexadecimals or numbers
       // since they are all less than 4char strings
@@ -363,7 +366,19 @@ namespace Converter.Parsers.PDF
             state.CTM = currentGS.CTM;
             state.TextObject = currentTextObject;
             state.TextRenderingMatrix = textRenderingMatrix;
+            // for debug we willr return to give back control to the called
+            // we could also impelment semaphoreslim to stop processing but this is simpler/dumber version
+            if (_debug)
+            {
+              _debugState.FontRef = currentTextObject.FontRef;
+              LiteralToDrawState lState = new LiteralToDrawState(literal, 0);
+              _debugState.Literals.Add(lState);
+              _debugState.State = state;
+              return;
+            }
+              
             PDF_DrawText(currentTextObject.FontRef, literal, state);
+
             break;
           case 0x4a54: // TJ
             //TODO: This is very bad
@@ -397,6 +412,23 @@ namespace Converter.Parsers.PDF
               state.CTM = currentGS.CTM;
               state.TextObject = currentTextObject;
               state.TextRenderingMatrix = textRenderingMatrix;
+
+              // for debug we willr return to give back control to the called
+              // we could also impelment semaphoreslim to stop processing but this is simpler/dumber version
+              if (_debug)
+              {
+                _debugState.FontRef = currentTextObject.FontRef;
+                
+                for (int i = literalsList.Count - 1; i >= 0; i--)
+                {
+                  LiteralToDrawState lState = new LiteralToDrawState(literalsList[i].Literal, literalsList[i].PosCorrection);
+                  _debugState.Literals.Add(lState);
+                }
+                _debugState.State = state;
+                return;
+              }
+
+
               // read in proper order
               for (int i = literalsList.Count - 1; i >= 0; i--)
               {
@@ -534,10 +566,12 @@ namespace Converter.Parsers.PDF
         // TODO: this may have to be all more delimiters than '/'
         while (!IsCurrentCharPDFWhitespaceOrNewLine() && _char != '/')
           ReadChar();
-        _fourByteSlice.Fill(0);
+
+        Span<byte> fourByteSlice = stackalloc byte[4];
+        // we have to pass 4 bytes to bitconverter but some of the comands are 3 bytes so we need this buffer
         for (int i = 0; i < _pos - startPos; i++)
-          _fourByteSlice[i] = _buffer[startPos + i];
-        return BitConverter.ToUInt32(_fourByteSlice);
+          fourByteSlice[i] = _buffer[startPos + i];
+        return BitConverter.ToUInt32(fourByteSlice);
       }
 
       // is a number, either real or int
@@ -673,8 +707,7 @@ namespace Converter.Parsers.PDF
       {
         ReadChar();
       }
-
-     stringOperands.Push(Encoding.Default.GetString(_buffer.Slice(startPos, _pos - startPos)));
+     stringOperands.Push(Encoding.Default.GetString(_buffer, startPos, _pos - startPos));
      operandTypes.Push(OperandType.STRING);
     }
 
@@ -848,8 +881,8 @@ namespace Converter.Parsers.PDF
       // TODO: just do this once at opettor and assign ref to glolbal obj
       // Get right rasterizer
       PDF_FontData fd = GetFontDataFromKey(currentTextObject.FontRef);
-      IRasterizer activeParser = fd.Rasterizer;
-      double[] activeWidths = fd.FontInfo.Widths;
+      IRasterizer rasterizer = fd.Rasterizer;
+      double[] widths = fd.FontInfo.Widths;
 
       char c;
       int glyphIndex;
@@ -860,98 +893,102 @@ namespace Converter.Parsers.PDF
 
       for (int i = 0; i < textToWrite.Length; i++)
       {
-        c = textToWrite[i];
-        activeParser.SetDefaultGlyphInfoValues(ref glyphInfo);
-        // TODO: use this instead of c, FIX 
-        activeParser.GetGlyphInfo(c, ref glyphInfo);
-
-        ComputeTextRenderingMatrix(state.TextObject, state.CTM, ref state.TextRenderingMatrix);
-
-        // rounding makes it look a bit better?
-        int X = (int)MathF.Round((float)state.TextRenderingMatrix[2, 0]);
-        // because origin is bottom-left we have do bitmapHeight - , to get position on the top
-        int Y = _targetSize.Height - (int)(state.TextRenderingMatrix[2, 1]);
-
-        #region width calculation
-
-        // Does this work for all charcaters
-        int idx = (int)c - fd.FontInfo.FirstChar;
-        float width = 0;
-        if (idx < activeWidths.Length)
-          width = (float)activeWidths[idx] / 1000f;
-        else
-          width = fd.FontInfo.FontDescriptor.MissingWidth / 1000f;
-        #endregion
-
-        (float scaleX, float scaleY) s = activeParser.GetScale(glyphInfo.Index, state.TextRenderingMatrix, width);
-
-        #region asserts
-        Debug.Assert(X > 0, $"X is negative at index {i}. Lit: {textToWrite}");
-        Debug.Assert(Y > 0, $"Y is negative at index {i}. Lit: {textToWrite}");
-        Debug.Assert(X < _targetSize.Width, $"X must be within bounds.X: {X} - Width: {_targetSize.Width}. Lit: {textToWrite}");
-        Debug.Assert(Y < _targetSize.Height, $"Y must be within bounds.Y: {Y} - Height: {_targetSize.Height}. Lit: {textToWrite}");
-        Debug.Assert(s.scaleX > 0, $"Scale factor X must be higher than 0! sfX: {s.scaleX}. Lit: {textToWrite}. Ind : {i}");
-        Debug.Assert(s.scaleY > 0, $"Scale factor Y must be higher than 0! sfY: {s.scaleY}. Lit: {textToWrite}.Ind : {i}");
-        #endregion asserts
-
-        int ascent = (int)Math.Round(fd.FontInfo.FontDescriptor.Ascent * s.scaleY);
-        int descent = (int)Math.Round(fd.FontInfo.FontDescriptor.Descent * s.scaleY);
-
-        #region glyph metrics
-
-        int c_x0 = 0;
-        int c_y0 = 0;
-        int c_x1 = 0;
-        int c_y1 = 0;
-        activeParser.GetGlyphBoundingBox(ref glyphInfo, s.scaleX, s.scaleY, ref c_x0, ref c_y0, ref c_x1, ref c_y1);
-
-        Debug.Assert(c_x0 != int.MaxValue && c_x0 != int.MinValue);
-        Debug.Assert(c_y0 != int.MaxValue && c_y0 != int.MinValue);
-        Debug.Assert(c_x1 != int.MaxValue && c_x1 != int.MinValue);
-        Debug.Assert(c_y1 != int.MaxValue && c_y1 != int.MinValue);
-
-        // char height - different than bounding box height
-        int y = Y + c_y0;
-        // I think that this should be replaced from value in Widths array
-        // NOTE: widths array wont work since this width is not in units but in pixels after its been scaled down
-        int glyphWidth = c_x1 - c_x0;
-        int glyphHeight = c_y1 - c_y0;
-
-        //// Added when type1 interpreter had height 0 and caused issues, I didnt see impact on TTF files 
-        //if (glyphHeight == 0)
-        //  glyphHeight = 2;
-
-        //if (glyphWidth == 0)
-        //  glyphWidth = 2;
-        //Debug.Assert(glyphWidth > 0);
-        //Debug.Assert(glyphHeight > 0);
-
-        #endregion
-
-        int byteOffset = X + (y * _targetSize.Width);
-        int shiftX = 0;
-        int shiftY = 0;
-
-        activeParser.RasterizeGlyph(_outputBuffer, byteOffset, glyphWidth, glyphHeight, _targetSize.Width, s.scaleX, s.scaleY, shiftX, shiftY, ref glyphInfo);
-
-        #region Advance
-        // double advanceX = width * state.TextObject.FontScaleFactor + state.TextObject.Tc;
-        // double advanceY = 0 + state.TextObject.FontScaleFactor; // This wont work for vertical fonts
-        double advanceX = width + state.TextObject.Tc;
-        double advanceY = 0; // This wont work for vertical fonts
-
-        if (c == ' ')
-          advanceX += state.TextObject.Tw;
-        advanceX *= state.TextObject.Th;
-
-        // TODO: this really depends on what type of CTM it is. i.e is there shear, transaltion, rotation etc
-        // I should detect this and save state somewhere
-        // for now just support translate and scale
-        // NOTE: actually I think I can just multiply matrix, and this is done to avoid matrix multiplciation
-        state.TextObject.TextMatrix[2, 0] = advanceX * state.TextRenderingMatrix[0, 0] + state.TextObject.TextMatrix[2, 0];
-        state.TextObject.TextMatrix[2, 1] = 0 * state.TextObject.TextMatrix[1, 1] + state.TextObject.TextMatrix[2, 1];
-        #endregion
+        PDF_DrawGlyph(textToWrite[i], ref glyphInfo, rasterizer, state, fd, widths, textToWrite, i);
       }
+    }
+
+    public void PDF_DrawGlyph(char c, ref GlyphInfo glyphInfo, IRasterizer rasterizer, PDFGI_DrawState state, PDF_FontData fd, double[] widths, string literal, int index)
+    {
+      rasterizer.SetDefaultGlyphInfoValues(ref glyphInfo);
+      // TODO: use this instead of c, FIX 
+      rasterizer.GetGlyphInfo(c, ref glyphInfo);
+
+      ComputeTextRenderingMatrix(state.TextObject, state.CTM, ref state.TextRenderingMatrix);
+
+      // rounding makes it look a bit better?
+      int X = (int)MathF.Round((float)state.TextRenderingMatrix[2, 0]);
+      // because origin is bottom-left we have do bitmapHeight - , to get position on the top
+      int Y = _targetSize.Height - (int)(state.TextRenderingMatrix[2, 1]);
+
+      #region width calculation
+
+      // Does this work for all charcaters
+      int idx = (int)c - fd.FontInfo.FirstChar;
+      float width = 0;
+      if (idx < widths.Length)
+        width = (float)widths[idx] / 1000f;
+      else
+        width = fd.FontInfo.FontDescriptor.MissingWidth / 1000f;
+      #endregion
+
+      (float scaleX, float scaleY) s = rasterizer.GetScale(glyphInfo.Index, state.TextRenderingMatrix, width);
+
+      #region asserts
+      Debug.Assert(X > 0, $"X is negative at index {index}. Lit: {literal}");
+      Debug.Assert(Y > 0, $"Y is negative at index {index}. Lit: {literal}");
+      Debug.Assert(X < _targetSize.Width, $"X must be within bounds.X: {X} - Width: {_targetSize.Width}. Lit: {literal}");
+      Debug.Assert(Y < _targetSize.Height, $"Y must be within bounds.Y: {Y} - Height: {_targetSize.Height}. Lit: {literal}");
+      Debug.Assert(s.scaleX > 0, $"Scale factor X must be higher than 0! sfX: {s.scaleX}. Lit: {literal}. Ind : {index}");
+      Debug.Assert(s.scaleY > 0, $"Scale factor Y must be higher than 0! sfY: {s.scaleY}. Lit: {literal}.Ind : {index}");
+      #endregion asserts
+
+      int ascent = (int)Math.Round(fd.FontInfo.FontDescriptor.Ascent * s.scaleY);
+      int descent = (int)Math.Round(fd.FontInfo.FontDescriptor.Descent * s.scaleY);
+
+      #region glyph metrics
+
+      int c_x0 = 0;
+      int c_y0 = 0;
+      int c_x1 = 0;
+      int c_y1 = 0;
+      rasterizer.GetGlyphBoundingBox(ref glyphInfo, s.scaleX, s.scaleY, ref c_x0, ref c_y0, ref c_x1, ref c_y1);
+
+      Debug.Assert(c_x0 != int.MaxValue && c_x0 != int.MinValue);
+      Debug.Assert(c_y0 != int.MaxValue && c_y0 != int.MinValue);
+      Debug.Assert(c_x1 != int.MaxValue && c_x1 != int.MinValue);
+      Debug.Assert(c_y1 != int.MaxValue && c_y1 != int.MinValue);
+
+      // char height - different than bounding box height
+      int y = Y + c_y0;
+      // I think that this should be replaced from value in Widths array
+      // NOTE: widths array wont work since this width is not in units but in pixels after its been scaled down
+      int glyphWidth = c_x1 - c_x0;
+      int glyphHeight = c_y1 - c_y0;
+
+      //// Added when type1 interpreter had height 0 and caused issues, I didnt see impact on TTF files 
+      //if (glyphHeight == 0)
+      //  glyphHeight = 2;
+
+      //if (glyphWidth == 0)
+      //  glyphWidth = 2;
+      //Debug.Assert(glyphWidth > 0);
+      //Debug.Assert(glyphHeight > 0);
+
+      #endregion
+
+      int byteOffset = X + (y * _targetSize.Width);
+      int shiftX = 0;
+      int shiftY = 0;
+
+      rasterizer.RasterizeGlyph(_outputBuffer, byteOffset, glyphWidth, glyphHeight, _targetSize.Width, s.scaleX, s.scaleY, shiftX, shiftY, ref glyphInfo);
+
+      #region Advance
+      // double advanceX = width * state.TextObject.FontScaleFactor + state.TextObject.Tc;
+      // double advanceY = 0 + state.TextObject.FontScaleFactor; // This wont work for vertical fonts
+      double advanceX = width + state.TextObject.Tc;
+      double advanceY = 0; // This wont work for vertical fonts
+
+      if (c == ' ')
+        advanceX += state.TextObject.Tw;
+      advanceX *= state.TextObject.Th;
+
+      // TODO: this really depends on what type of CTM it is. i.e is there shear, transaltion, rotation etc
+      // I should detect this and save state somewhere
+      // for now just support translate and scale
+      // NOTE: actually I think I can just multiply matrix, and this is done to avoid matrix multiplciation
+      state.TextObject.TextMatrix[2, 0] = advanceX * state.TextRenderingMatrix[0, 0] + state.TextObject.TextMatrix[2, 0];
+      state.TextObject.TextMatrix[2, 1] = 0 * state.TextObject.TextMatrix[1, 1] + state.TextObject.TextMatrix[2, 1];
+      #endregion
     }
 
     private void UpdateCTM(double a, double b, double c, double d, double e, double f)
@@ -1003,7 +1040,7 @@ namespace Converter.Parsers.PDF
       MyMath.MultiplyMatrixes3x3(mid, CTM, textRenderingMatrix);
     }
 
-    private PDF_FontData GetFontDataFromKey(string searchKey)
+    public PDF_FontData GetFontDataFromKey(string searchKey)
     {
       foreach (PDF_FontData fd in _resourceDict.Font)
         if (fd.Key == searchKey)
