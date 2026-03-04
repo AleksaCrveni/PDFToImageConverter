@@ -34,9 +34,7 @@ namespace RasterizeDebugger
     readonly float _scrollValue = 0.1f;
     TextureBrush _imageBrush;
     ZOOM _zoomMode = ZOOM.IN;
-    bool center = false;
-
-
+    bool _zoomChanged = false;
     readonly float MAX_ZOOM = 5f;
     readonly float MIN_ZOOM = 1f;
     enum ZOOM { IN, OUT }
@@ -74,6 +72,7 @@ namespace RasterizeDebugger
         // Map the Form-centric mouse location to the PictureBox client coordinate system
         Point pictureBoxPoint = pb_mainImage.PointToClient(this.PointToScreen(e.Location));
         ZoomScroll(pictureBoxPoint, e.Delta > 0);
+        _zoomChanged = true;
       }
     }
 
@@ -336,25 +335,18 @@ namespace RasterizeDebugger
       x = (int)Math.Round(c.X / _zoomScale - _transform.OffsetX / _zoomScale);
       y = (int)Math.Round(c.Y / _zoomScale - _transform.OffsetY / _zoomScale);
       // This is garbage workaorund to deal with non centered unzoom........
-      if (center && _zoomScale == MIN_ZOOM)
+      if (_zoomChanged && _zoomScale == MIN_ZOOM)
       {
         x = 0;
         y = 0;
         _imageBrush = new TextureBrush(pb_mainImage.Image);
         pb_mainImage.Image = Image.FromStream(new MemoryStream(_imageData));
-        center = false;
         _transform = new Matrix();
         pb_mainImage.Invalidate();
+        _zoomChanged = false;
         return;
       }
       e.Graphics.FillRectangle(_imageBrush, x, y, w - 1, h - 1);
-    }
-
-    private void btn_centerImage_Click(object sender, EventArgs e)
-    {
-      center = true;
-      pb_mainImage.Invalidate();
-
     }
   }
 }

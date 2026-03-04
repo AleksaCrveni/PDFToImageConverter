@@ -54,7 +54,6 @@
       label6 = new Label();
       lbl_glyphName = new Label();
       panel2 = new Panel();
-      btn_centerImage = new Button();
       ((System.ComponentModel.ISupportInitialize)pb_mainImage).BeginInit();
       panel1.SuspendLayout();
       panel2.SuspendLayout();
@@ -326,23 +325,11 @@
       panel2.Size = new Size(678, 580);
       panel2.TabIndex = 22;
       // 
-      // btn_centerImage
-      // 
-      btn_centerImage.Anchor = AnchorStyles.Top | AnchorStyles.Right;
-      btn_centerImage.Location = new Point(12, 54);
-      btn_centerImage.Name = "btn_centerImage";
-      btn_centerImage.Size = new Size(101, 23);
-      btn_centerImage.TabIndex = 23;
-      btn_centerImage.Text = "Center Image";
-      btn_centerImage.UseVisualStyleBackColor = true;
-      btn_centerImage.Click += btn_centerImage_Click;
-      // 
       // form_main
       // 
       AutoScaleDimensions = new SizeF(7F, 15F);
       AutoScaleMode = AutoScaleMode.Font;
       ClientSize = new Size(1012, 675);
-      Controls.Add(btn_centerImage);
       Controls.Add(panel2);
       Controls.Add(panel1);
       Controls.Add(lbl_readPos);
@@ -398,6 +385,5 @@
     private Label lbl_glyphName;
     private TreeView treeView1;
     private Panel panel2;
-    private Button btn_centerImage;
   }
 }
