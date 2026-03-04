@@ -7,15 +7,16 @@ using Converter.FileStructures.PDF.GraphicsInterpreter;
 using Converter.Parsers.PDF;
 using Converter.Rasterizers;
 using Converter.Writers.TIFF;
+using System.ComponentModel.DataAnnotations;
 using System.Diagnostics;
-using static System.Windows.Forms.AxHost;
+using System.Drawing.Drawing2D;
 
 namespace RasterizeDebugger
 {
   /// <summary>
   /// THIS ONLY WORKS FOR 1 BYTE PER PIXEL WRITERS 
   /// </summary>
-  public partial class lbl_charVal : Form
+  public partial class form_main : Form
   {
     OpenFileDialog _dialog;
     PDFGOInterpreter _interpreter;
@@ -28,6 +29,23 @@ namespace RasterizeDebugger
     PDF_FontData _currFontData;
     IRasterizer _currRasterizer;
     bool _end;
+    Matrix _transform = new Matrix();
+    float _zoomScale = 1.0f;
+    readonly float _scrollValue = 0.1f;
+    TextureBrush _imageBrush;
+    ZOOM _zoomMode = ZOOM.IN;
+    bool center = false;
+
+
+    readonly float MAX_ZOOM = 5f;
+    readonly float MIN_ZOOM = 1f;
+    enum ZOOM { IN, OUT }
+
+    class ZoomStatePosition
+    {
+      public PointF p;
+      public float zoomScale;
+    }
     class LocalState
     {
       public string currentText;
@@ -35,7 +53,7 @@ namespace RasterizeDebugger
       public int charIndex;
     }
 
-    public lbl_charVal()
+    public form_main()
     {
       InitializeComponent();
       _dialog = new OpenFileDialog();
@@ -45,13 +63,18 @@ namespace RasterizeDebugger
 
     private void Form1_Load(object sender, EventArgs e)
     {
-      //PdfParser parser = new();
-      //PDFFile file = new PDFFile();
-      //MemoryStream memoryStream = new MemoryStream();
-      //PDF_Options options = new PDF_Options();
-      //parser.Parse(file, File.OpenRead(Files.BaseDocFilePath), memoryStream, ref options);
-      //Image image = Image.FromStream(memoryStream);
-      //pb_mainImage.Image = image;
+
+    }
+
+    protected override void OnMouseWheel(MouseEventArgs e)
+    {
+      pb_mainImage.Focus();
+      if (pb_mainImage.Focused == true && e.Delta != 0)
+      {
+        // Map the Form-centric mouse location to the PictureBox client coordinate system
+        Point pictureBoxPoint = pb_mainImage.PointToClient(this.PointToScreen(e.Location));
+        ZoomScroll(pictureBoxPoint, e.Delta > 0);
+      }
     }
 
     private void btn_load_Click(object sender, EventArgs e)
@@ -105,7 +128,12 @@ namespace RasterizeDebugger
         _imageDataStartPos = writer.data.InitialImageDataOffset;
 
         pb_mainImage.Image = Image.FromStream(new MemoryStream(_imageData));
+        pb_mainImage.Size = new Size(options.Width, options.Height);
         _end = false;
+
+        _imageBrush = new TextureBrush(pb_mainImage.Image);
+        _transform = new Matrix();
+        _zoomScale = 1.0f;
       }
     }
 
@@ -177,6 +205,7 @@ namespace RasterizeDebugger
     {
       Array.ConstrainedCopy(_interpreter._outputBuffer, 0, _imageData, _imageDataStartPos, _interpreter._outputBuffer.Length);
       pb_mainImage.Image = Image.FromStream(new MemoryStream(_imageData));
+      _imageBrush = new TextureBrush(pb_mainImage.Image);
     }
 
     private void btn_processAll_Click(object sender, EventArgs e)
@@ -264,6 +293,67 @@ namespace RasterizeDebugger
 
     private void panel1_Paint(object sender, PaintEventArgs e)
     {
+
+    }
+
+    private void ZoomScroll(Point location, bool zoomIn)
+    {
+      // Figure out what the new scale will be. Ensure the scale factor remains between
+      // 1% and 200%
+      float newScale = Math.Min(Math.Max(_zoomScale + (zoomIn ? _scrollValue : -_scrollValue), MIN_ZOOM), MAX_ZOOM);
+
+      if (newScale != _zoomScale)
+      {
+        float adjust = newScale / _zoomScale;
+        _zoomMode = newScale < _zoomScale ? ZOOM.OUT : ZOOM.IN;
+
+        _zoomScale = newScale;
+        _transform.Translate(-location.X, -location.Y, MatrixOrder.Append);
+
+        // Scale view
+        _transform.Scale(adjust, adjust, MatrixOrder.Append);
+
+        // Translate origin back to original mouse point.
+        _transform.Translate(location.X, location.Y, MatrixOrder.Append);
+
+        Debug.WriteLine($"{_zoomMode.ToString()} scale: {_zoomScale}");
+
+        pb_mainImage.Invalidate();
+      }
+    }
+
+    private void pb_mainImage_Paint(object sender, PaintEventArgs e)
+    {
+      if (pb_mainImage.Image == null)
+        return;
+      Graphics g = e.Graphics;
+      g.Transform = _transform;
+      Rectangle c = e.ClipRectangle;
+      int x = 0;
+      int y = 0;
+      var w = (int)Math.Round(c.Width / _zoomScale);
+      var h = (int)Math.Round(c.Height / _zoomScale);
+      x = (int)Math.Round(c.X / _zoomScale - _transform.OffsetX / _zoomScale);
+      y = (int)Math.Round(c.Y / _zoomScale - _transform.OffsetY / _zoomScale);
+      // This is garbage workaorund to deal with non centered unzoom........
+      if (center && _zoomScale == MIN_ZOOM)
+      {
+        x = 0;
+        y = 0;
+        _imageBrush = new TextureBrush(pb_mainImage.Image);
+        pb_mainImage.Image = Image.FromStream(new MemoryStream(_imageData));
+        center = false;
+        _transform = new Matrix();
+        pb_mainImage.Invalidate();
+        return;
+      }
+      e.Graphics.FillRectangle(_imageBrush, x, y, w - 1, h - 1);
+    }
+
+    private void btn_centerImage_Click(object sender, EventArgs e)
+    {
+      center = true;
+      pb_mainImage.Invalidate();
 
     }
   }

@@ -1,6 +1,6 @@
 ﻿namespace RasterizeDebugger
 {
-  partial class lbl_charVal
+  partial class form_main
   {
     /// <summary>
     ///  Required designer variable.
@@ -54,6 +54,7 @@
       label6 = new Label();
       lbl_glyphName = new Label();
       panel2 = new Panel();
+      btn_centerImage = new Button();
       ((System.ComponentModel.ISupportInitialize)pb_mainImage).BeginInit();
       panel1.SuspendLayout();
       panel2.SuspendLayout();
@@ -61,13 +62,13 @@
       // 
       // pb_mainImage
       // 
-      pb_mainImage.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
       pb_mainImage.Location = new Point(3, 3);
       pb_mainImage.Name = "pb_mainImage";
       pb_mainImage.Size = new Size(672, 574);
       pb_mainImage.TabIndex = 0;
       pb_mainImage.TabStop = false;
       pb_mainImage.Click += pb_mainImage_Click;
+      pb_mainImage.Paint += pb_mainImage_Paint;
       // 
       // label1
       // 
@@ -318,19 +319,30 @@
       // 
       // panel2
       // 
-      panel2.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
-      panel2.AutoSizeMode = AutoSizeMode.GrowAndShrink;
+      panel2.Anchor = AnchorStyles.None;
       panel2.Controls.Add(pb_mainImage);
       panel2.Location = new Point(12, 83);
       panel2.Name = "panel2";
       panel2.Size = new Size(678, 580);
       panel2.TabIndex = 22;
       // 
-      // lbl_charVal
+      // btn_centerImage
+      // 
+      btn_centerImage.Anchor = AnchorStyles.Top | AnchorStyles.Right;
+      btn_centerImage.Location = new Point(12, 54);
+      btn_centerImage.Name = "btn_centerImage";
+      btn_centerImage.Size = new Size(101, 23);
+      btn_centerImage.TabIndex = 23;
+      btn_centerImage.Text = "Center Image";
+      btn_centerImage.UseVisualStyleBackColor = true;
+      btn_centerImage.Click += btn_centerImage_Click;
+      // 
+      // form_main
       // 
       AutoScaleDimensions = new SizeF(7F, 15F);
       AutoScaleMode = AutoScaleMode.Font;
       ClientSize = new Size(1012, 675);
+      Controls.Add(btn_centerImage);
       Controls.Add(panel2);
       Controls.Add(panel1);
       Controls.Add(lbl_readPos);
@@ -347,7 +359,7 @@
       Controls.Add(btn_fontInfo);
       Controls.Add(lbl_currentText);
       Controls.Add(label1);
-      Name = "lbl_charVal";
+      Name = "form_main";
       Text = "PDF Rasterizer Debugger";
       Load += Form1_Load;
       ((System.ComponentModel.ISupportInitialize)pb_mainImage).EndInit();
@@ -386,5 +398,6 @@
     private Label lbl_glyphName;
     private TreeView treeView1;
     private Panel panel2;
+    private Button btn_centerImage;
   }
 }
