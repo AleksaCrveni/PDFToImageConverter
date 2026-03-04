@@ -1,6 +1,6 @@
 ﻿namespace RasterizeDebugger
 {
-  partial class Form1
+  partial class lbl_charVal
   {
     /// <summary>
     ///  Required designer variable.
@@ -45,17 +45,29 @@
       label_5 = new Label();
       lbl_readPos = new Label();
       label_7 = new Label();
+      label4 = new Label();
+      lbl_charValue = new Label();
+      label7 = new Label();
+      panel1 = new Panel();
+      treeView1 = new TreeView();
+      lbl_glyphIndex = new Label();
+      label6 = new Label();
+      lbl_glyphName = new Label();
+      panel2 = new Panel();
       ((System.ComponentModel.ISupportInitialize)pb_mainImage).BeginInit();
+      panel1.SuspendLayout();
+      panel2.SuspendLayout();
       SuspendLayout();
       // 
       // pb_mainImage
       // 
       pb_mainImage.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
-      pb_mainImage.Location = new Point(12, 83);
+      pb_mainImage.Location = new Point(3, 3);
       pb_mainImage.Name = "pb_mainImage";
-      pb_mainImage.Size = new Size(892, 483);
+      pb_mainImage.Size = new Size(672, 574);
       pb_mainImage.TabIndex = 0;
       pb_mainImage.TabStop = false;
+      pb_mainImage.Click += pb_mainImage_Click;
       // 
       // label1
       // 
@@ -79,7 +91,7 @@
       // btn_fontInfo
       // 
       btn_fontInfo.Anchor = AnchorStyles.Top | AnchorStyles.Right;
-      btn_fontInfo.Location = new Point(759, 9);
+      btn_fontInfo.Location = new Point(855, 9);
       btn_fontInfo.Name = "btn_fontInfo";
       btn_fontInfo.Size = new Size(75, 23);
       btn_fontInfo.TabIndex = 3;
@@ -89,7 +101,7 @@
       // btn_nextChar
       // 
       btn_nextChar.Anchor = AnchorStyles.Top | AnchorStyles.Right;
-      btn_nextChar.Location = new Point(600, 9);
+      btn_nextChar.Location = new Point(696, 9);
       btn_nextChar.Name = "btn_nextChar";
       btn_nextChar.Size = new Size(75, 23);
       btn_nextChar.TabIndex = 4;
@@ -100,7 +112,7 @@
       // btn_nextText
       // 
       btn_nextText.Anchor = AnchorStyles.Top | AnchorStyles.Right;
-      btn_nextText.Location = new Point(681, 9);
+      btn_nextText.Location = new Point(777, 9);
       btn_nextText.Name = "btn_nextText";
       btn_nextText.Size = new Size(72, 23);
       btn_nextText.TabIndex = 5;
@@ -111,26 +123,27 @@
       // label2
       // 
       label2.AutoSize = true;
-      label2.Font = new Font("Segoe UI", 11F);
-      label2.Location = new Point(12, 38);
+      label2.Font = new Font("Segoe UI Semibold", 11.25F, FontStyle.Bold, GraphicsUnit.Point, 0);
+      label2.Location = new Point(0, 13);
       label2.Name = "label2";
-      label2.Size = new Size(98, 20);
+      label2.Size = new Size(113, 20);
       label2.TabIndex = 6;
-      label2.Text = "Current Char :";
+      label2.Text = "Current Glyph :";
       // 
       // lbl_currentChar
       // 
       lbl_currentChar.AutoSize = true;
-      lbl_currentChar.Location = new Point(113, 42);
+      lbl_currentChar.Font = new Font("Segoe UI", 11F);
+      lbl_currentChar.Location = new Point(119, 13);
       lbl_currentChar.Name = "lbl_currentChar";
-      lbl_currentChar.Size = new Size(36, 15);
+      lbl_currentChar.Size = new Size(44, 20);
       lbl_currentChar.TabIndex = 7;
       lbl_currentChar.Text = "NULL";
       // 
       // btn_load
       // 
       btn_load.Anchor = AnchorStyles.Top | AnchorStyles.Right;
-      btn_load.Location = new Point(759, 38);
+      btn_load.Location = new Point(855, 38);
       btn_load.Name = "btn_load";
       btn_load.Size = new Size(75, 23);
       btn_load.TabIndex = 8;
@@ -141,7 +154,7 @@
       // btn_processAll
       // 
       btn_processAll.Anchor = AnchorStyles.Top | AnchorStyles.Right;
-      btn_processAll.Location = new Point(841, 10);
+      btn_processAll.Location = new Point(937, 10);
       btn_processAll.Name = "btn_processAll";
       btn_processAll.Size = new Size(63, 51);
       btn_processAll.TabIndex = 9;
@@ -152,7 +165,7 @@
       // lbl_currFilename
       // 
       lbl_currFilename.Anchor = AnchorStyles.Top | AnchorStyles.Right;
-      lbl_currFilename.Location = new Point(600, 42);
+      lbl_currFilename.Location = new Point(696, 42);
       lbl_currFilename.Name = "lbl_currFilename";
       lbl_currFilename.Size = new Size(156, 19);
       lbl_currFilename.TabIndex = 10;
@@ -162,7 +175,7 @@
       // 
       label3.Anchor = AnchorStyles.Top | AnchorStyles.Right;
       label3.AutoSize = true;
-      label3.Location = new Point(600, 65);
+      label3.Location = new Point(696, 65);
       label3.Name = "label3";
       label3.Size = new Size(50, 15);
       label3.TabIndex = 11;
@@ -172,7 +185,7 @@
       // 
       lbl_contentLength.Anchor = AnchorStyles.Top | AnchorStyles.Right;
       lbl_contentLength.AutoSize = true;
-      lbl_contentLength.Location = new Point(647, 65);
+      lbl_contentLength.Location = new Point(743, 65);
       lbl_contentLength.Name = "lbl_contentLength";
       lbl_contentLength.Size = new Size(13, 15);
       lbl_contentLength.TabIndex = 12;
@@ -182,7 +195,7 @@
       // 
       lbl_currPosition.Anchor = AnchorStyles.Top | AnchorStyles.Right;
       lbl_currPosition.AutoSize = true;
-      lbl_currPosition.Location = new Point(710, 65);
+      lbl_currPosition.Location = new Point(806, 65);
       lbl_currPosition.Name = "lbl_currPosition";
       lbl_currPosition.Size = new Size(13, 15);
       lbl_currPosition.TabIndex = 14;
@@ -192,7 +205,7 @@
       // 
       label_5.Anchor = AnchorStyles.Top | AnchorStyles.Right;
       label_5.AutoSize = true;
-      label_5.Location = new Point(681, 65);
+      label_5.Location = new Point(777, 65);
       label_5.Name = "label_5";
       label_5.Size = new Size(32, 15);
       label_5.TabIndex = 13;
@@ -202,7 +215,7 @@
       // 
       lbl_readPos.Anchor = AnchorStyles.Top | AnchorStyles.Right;
       lbl_readPos.AutoSize = true;
-      lbl_readPos.Location = new Point(821, 65);
+      lbl_readPos.Location = new Point(917, 65);
       lbl_readPos.Name = "lbl_readPos";
       lbl_readPos.Size = new Size(13, 15);
       lbl_readPos.TabIndex = 16;
@@ -212,17 +225,114 @@
       // 
       label_7.Anchor = AnchorStyles.Top | AnchorStyles.Right;
       label_7.AutoSize = true;
-      label_7.Location = new Point(759, 65);
+      label_7.Location = new Point(855, 65);
       label_7.Name = "label_7";
       label_7.Size = new Size(61, 15);
       label_7.TabIndex = 15;
       label_7.Text = "Read Pos :";
       // 
-      // Form1
+      // label4
+      // 
+      label4.AutoSize = true;
+      label4.Font = new Font("Segoe UI Semibold", 11.25F, FontStyle.Bold, GraphicsUnit.Point, 0);
+      label4.Location = new Point(0, 33);
+      label4.Name = "label4";
+      label4.Size = new Size(76, 20);
+      label4.TabIndex = 17;
+      label4.Text = "Num Val: ";
+      // 
+      // lbl_charValue
+      // 
+      lbl_charValue.AutoSize = true;
+      lbl_charValue.Font = new Font("Segoe UI", 11F);
+      lbl_charValue.Location = new Point(74, 33);
+      lbl_charValue.Name = "lbl_charValue";
+      lbl_charValue.Size = new Size(17, 20);
+      lbl_charValue.TabIndex = 18;
+      lbl_charValue.Text = "0";
+      // 
+      // label7
+      // 
+      label7.AutoSize = true;
+      label7.Font = new Font("Segoe UI Semibold", 11.25F, FontStyle.Bold, GraphicsUnit.Point, 0);
+      label7.Location = new Point(0, 53);
+      label7.Name = "label7";
+      label7.Size = new Size(98, 20);
+      label7.TabIndex = 19;
+      label7.Text = "Glyph Name:";
+      // 
+      // panel1
+      // 
+      panel1.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Right;
+      panel1.Controls.Add(treeView1);
+      panel1.Controls.Add(lbl_glyphIndex);
+      panel1.Controls.Add(label6);
+      panel1.Controls.Add(label2);
+      panel1.Controls.Add(lbl_glyphName);
+      panel1.Controls.Add(lbl_currentChar);
+      panel1.Controls.Add(label7);
+      panel1.Controls.Add(label4);
+      panel1.Controls.Add(lbl_charValue);
+      panel1.Location = new Point(696, 83);
+      panel1.Name = "panel1";
+      panel1.Size = new Size(304, 580);
+      panel1.TabIndex = 21;
+      panel1.Paint += panel1_Paint;
+      // 
+      // treeView1
+      // 
+      treeView1.Location = new Point(3, 96);
+      treeView1.Name = "treeView1";
+      treeView1.Size = new Size(294, 481);
+      treeView1.TabIndex = 23;
+      // 
+      // lbl_glyphIndex
+      // 
+      lbl_glyphIndex.AutoSize = true;
+      lbl_glyphIndex.Font = new Font("Segoe UI", 11F);
+      lbl_glyphIndex.Location = new Point(96, 73);
+      lbl_glyphIndex.Name = "lbl_glyphIndex";
+      lbl_glyphIndex.Size = new Size(44, 20);
+      lbl_glyphIndex.TabIndex = 22;
+      lbl_glyphIndex.Text = "NULL";
+      // 
+      // label6
+      // 
+      label6.AutoSize = true;
+      label6.Font = new Font("Segoe UI Semibold", 11.25F, FontStyle.Bold, GraphicsUnit.Point, 0);
+      label6.Location = new Point(0, 73);
+      label6.Name = "label6";
+      label6.Size = new Size(95, 20);
+      label6.TabIndex = 21;
+      label6.Text = "Glyph Index:";
+      // 
+      // lbl_glyphName
+      // 
+      lbl_glyphName.AutoSize = true;
+      lbl_glyphName.Font = new Font("Segoe UI", 11F);
+      lbl_glyphName.Location = new Point(96, 53);
+      lbl_glyphName.Name = "lbl_glyphName";
+      lbl_glyphName.Size = new Size(44, 20);
+      lbl_glyphName.TabIndex = 20;
+      lbl_glyphName.Text = "NULL";
+      // 
+      // panel2
+      // 
+      panel2.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
+      panel2.AutoSizeMode = AutoSizeMode.GrowAndShrink;
+      panel2.Controls.Add(pb_mainImage);
+      panel2.Location = new Point(12, 83);
+      panel2.Name = "panel2";
+      panel2.Size = new Size(678, 580);
+      panel2.TabIndex = 22;
+      // 
+      // lbl_charVal
       // 
       AutoScaleDimensions = new SizeF(7F, 15F);
       AutoScaleMode = AutoScaleMode.Font;
-      ClientSize = new Size(916, 578);
+      ClientSize = new Size(1012, 675);
+      Controls.Add(panel2);
+      Controls.Add(panel1);
       Controls.Add(lbl_readPos);
       Controls.Add(label_7);
       Controls.Add(lbl_currPosition);
@@ -232,18 +342,18 @@
       Controls.Add(lbl_currFilename);
       Controls.Add(btn_processAll);
       Controls.Add(btn_load);
-      Controls.Add(lbl_currentChar);
-      Controls.Add(label2);
       Controls.Add(btn_nextText);
       Controls.Add(btn_nextChar);
       Controls.Add(btn_fontInfo);
       Controls.Add(lbl_currentText);
       Controls.Add(label1);
-      Controls.Add(pb_mainImage);
-      Name = "Form1";
+      Name = "lbl_charVal";
       Text = "PDF Rasterizer Debugger";
       Load += Form1_Load;
       ((System.ComponentModel.ISupportInitialize)pb_mainImage).EndInit();
+      panel1.ResumeLayout(false);
+      panel1.PerformLayout();
+      panel2.ResumeLayout(false);
       ResumeLayout(false);
       PerformLayout();
     }
@@ -267,5 +377,14 @@
     private Label label_5;
     private Label lbl_readPos;
     private Label label_7;
+    private Label label4;
+    private Label lbl_charValue;
+    private Label label7;
+    private Panel panel1;
+    private Label lbl_glyphIndex;
+    private Label label6;
+    private Label lbl_glyphName;
+    private TreeView treeView1;
+    private Panel panel2;
   }
 }

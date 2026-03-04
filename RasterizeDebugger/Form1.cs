@@ -7,6 +7,7 @@ using Converter.FileStructures.PDF.GraphicsInterpreter;
 using Converter.Parsers.PDF;
 using Converter.Rasterizers;
 using Converter.Writers.TIFF;
+using System.Diagnostics;
 using static System.Windows.Forms.AxHost;
 
 namespace RasterizeDebugger
@@ -14,7 +15,7 @@ namespace RasterizeDebugger
   /// <summary>
   /// THIS ONLY WORKS FOR 1 BYTE PER PIXEL WRITERS 
   /// </summary>
-  public partial class Form1 : Form
+  public partial class lbl_charVal : Form
   {
     OpenFileDialog _dialog;
     PDFGOInterpreter _interpreter;
@@ -34,7 +35,7 @@ namespace RasterizeDebugger
       public int charIndex;
     }
 
-    public Form1()
+    public lbl_charVal()
     {
       InitializeComponent();
       _dialog = new OpenFileDialog();
@@ -104,6 +105,7 @@ namespace RasterizeDebugger
         _imageDataStartPos = writer.data.InitialImageDataOffset;
 
         pb_mainImage.Image = Image.FromStream(new MemoryStream(_imageData));
+        _end = false;
       }
     }
 
@@ -130,7 +132,7 @@ namespace RasterizeDebugger
       _currFontData = _interpreter.GetFontDataFromKey(_interpreter._debugState.FontRef);
       _currRasterizer = _currFontData.Rasterizer;
       double[] widths = _currFontData.FontInfo.Widths;
-      _interpreter.PDF_DrawGlyph(c, ref gInfo, _currRasterizer, _interpreter._debugState.State, _currFontData, widths, _localState.currentText, _localState.charIndex);
+      DrawGlyphAndUpdateGlyphInfo(c, ref gInfo, _currRasterizer, _interpreter._debugState.State, _currFontData, widths, _localState.currentText, _localState.charIndex);
 
       UpdateImageDataAndPictureBox();
       UpdateLabels();
@@ -146,13 +148,7 @@ namespace RasterizeDebugger
         }
         else
         {
-          // update local state
-          _localState.charIndex = 0;
-          _localState.currentText = _interpreter._debugState.Literals[_localState.textIndex].Literal;
-          _interpreter._debugState.State.TextObject.TextMatrix[2, 0] -=
-            (_interpreter._debugState.Literals[_localState.textIndex].PositionAdjustment / 1000f) *
-            _interpreter._debugState.State.TextObject.TextMatrix[0, 0]
-            * _interpreter._debugState.State.TextObject.FontScaleFactor;
+          SetNextTextAndUpdateState();
         }
       }
 
@@ -167,14 +163,8 @@ namespace RasterizeDebugger
         _end = true;
         return;
       }
-
-      _localState.charIndex = 0;
       _localState.textIndex = 0;
-      _localState.currentText = _interpreter._debugState.Literals[0].Literal;
-      _interpreter._debugState.State.TextObject.TextMatrix[2, 0] -=
-         (_interpreter._debugState.Literals[_localState.textIndex].PositionAdjustment / 1000f) *
-         _interpreter._debugState.State.TextObject.TextMatrix[0, 0]
-         * _interpreter._debugState.State.TextObject.FontScaleFactor;
+      SetNextTextAndUpdateState();
     }
     public void UpdateLabels()
     {
@@ -197,16 +187,24 @@ namespace RasterizeDebugger
         MessageBox.Show("End of content!");
         return;
       }
-      
+      Stopwatch sw = new Stopwatch();
+      sw.Start();
       while (!_end)
       {
-        ProcessText();
+        ProcessText(false);
       }
+      long processTime = sw.ElapsedMilliseconds;
+      UpdateImageDataAndPictureBox();
+      UpdateLabels();
+      lbl_charValue.Text = "END";
+      lbl_glyphIndex.Text = "END";
+      lbl_glyphName.Text = "END";
+      sw.Stop();
+      MessageBox.Show($"Process time: {processTime}ms. Total: {sw.ElapsedMilliseconds}ms!");
 
-      
     }
 
-    private void ProcessText()
+    private void ProcessText(bool updateUI = true)
     {
       GlyphInfo gInfo = new GlyphInfo();
       _currFontData = _interpreter.GetFontDataFromKey(_interpreter._debugState.FontRef);
@@ -216,11 +214,14 @@ namespace RasterizeDebugger
       for (int i = _localState.charIndex; i < _localState.currentText.Length; i++)
       {
         c = _localState.currentText[i];
-        _interpreter.PDF_DrawGlyph(c, ref gInfo, _currRasterizer, _interpreter._debugState.State, _currFontData, widths, _localState.currentText, _localState.charIndex);
+        DrawGlyphAndUpdateGlyphInfo(c, ref gInfo, _currRasterizer, _interpreter._debugState.State, _currFontData, widths, _localState.currentText, _localState.charIndex, updateUI);
       }
       _localState.charIndex = _localState.currentText.Length - 1;
-      UpdateImageDataAndPictureBox();
-      UpdateLabels();
+      if (updateUI)
+      {
+        UpdateImageDataAndPictureBox();
+        UpdateLabels();
+      }
       _localState.textIndex++;
       if (_localState.textIndex >= _interpreter._debugState.Literals.Count)
       {
@@ -229,14 +230,41 @@ namespace RasterizeDebugger
       }
       else
       {
-        // update local state
-        _localState.charIndex = 0;
-        _localState.currentText = _interpreter._debugState.Literals[_localState.textIndex].Literal;
-        _interpreter._debugState.State.TextObject.TextMatrix[2, 0] -=
-          (_interpreter._debugState.Literals[_localState.textIndex].PositionAdjustment / 1000f) *
-          _interpreter._debugState.State.TextObject.TextMatrix[0, 0]
-          * _interpreter._debugState.State.TextObject.FontScaleFactor;
+        SetNextTextAndUpdateState();
       }
+    }
+
+
+    public void SetNextTextAndUpdateState()
+    {
+      // update local state
+      _localState.charIndex = 0;
+      _localState.currentText = _interpreter._debugState.Literals[_localState.textIndex].Literal;
+      _interpreter._debugState.State.TextObject.TextMatrix[2, 0] -=
+        (_interpreter._debugState.Literals[_localState.textIndex].PositionAdjustment / 1000f) *
+        _interpreter._debugState.State.TextObject.TextMatrix[0, 0]
+        * _interpreter._debugState.State.TextObject.FontScaleFactor;
+    }
+
+    public void DrawGlyphAndUpdateGlyphInfo(char c, ref GlyphInfo glyphInfo, IRasterizer rasterizer, PDFGI_DrawState state, PDF_FontData fd, double[] widths, string literal, int index, bool updateUI = true)
+    {
+      _interpreter.PDF_DrawGlyph(c, ref glyphInfo, _currRasterizer, _interpreter._debugState.State, _currFontData, widths, _localState.currentText, _localState.charIndex);
+      if (!updateUI)
+        return;
+      lbl_charValue.Text = ((int)c).ToString();
+      lbl_glyphIndex.Text = glyphInfo.Index.ToString();
+      lbl_glyphName.Text = glyphInfo.Name;
+
+    }
+
+    private void pb_mainImage_Click(object sender, EventArgs e)
+    {
+
+    }
+
+    private void panel1_Paint(object sender, PaintEventArgs e)
+    {
+
     }
   }
 }
