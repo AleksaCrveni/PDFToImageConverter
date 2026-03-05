@@ -598,7 +598,9 @@ namespace Converter.Parsers.PDF
         fd.FontInfo = fontInfo;
         // TODO: assume that data is filled ? 
         // TODO: create right rasterized based on subtype and fontfile // Do I still eneed to do this?
+#if DEBUG
         File.WriteAllBytes(Files.RootFolder + @$"\{fontInfo.FontDescriptor.FontName}" + @"-fontFile.txt", fontInfo.FontDescriptor.FontFile.CommonStreamInfo.RawStreamData);
+#endif
         IRasterizer rasterizer = fontInfo.SubType switch
         {
           PDF_FontType.Null => throw new NotImplementedException(),
