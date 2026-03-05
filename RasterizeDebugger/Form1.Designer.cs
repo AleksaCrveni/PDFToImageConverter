@@ -49,11 +49,15 @@
       lbl_charValue = new Label();
       label7 = new Label();
       panel1 = new Panel();
+      btn_upTo = new Button();
+      txb_literalNumber = new TextBox();
       tview_fontInfo = new TreeView();
       lbl_glyphIndex = new Label();
       label6 = new Label();
       lbl_glyphName = new Label();
       panel2 = new Panel();
+      label5 = new Label();
+      lbl_literalNumber = new Label();
       ((System.ComponentModel.ISupportInitialize)pb_mainImage).BeginInit();
       panel1.SuspendLayout();
       panel2.SuspendLayout();
@@ -61,7 +65,7 @@
       // 
       // pb_mainImage
       // 
-      pb_mainImage.Location = new Point(3, 3);
+      pb_mainImage.Location = new Point(0, 6);
       pb_mainImage.Name = "pb_mainImage";
       pb_mainImage.Size = new Size(672, 574);
       pb_mainImage.TabIndex = 0;
@@ -264,6 +268,8 @@
       // panel1
       // 
       panel1.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Right;
+      panel1.Controls.Add(btn_upTo);
+      panel1.Controls.Add(txb_literalNumber);
       panel1.Controls.Add(tview_fontInfo);
       panel1.Controls.Add(lbl_glyphIndex);
       panel1.Controls.Add(label6);
@@ -279,8 +285,28 @@
       panel1.TabIndex = 21;
       panel1.Paint += panel1_Paint;
       // 
+      // btn_upTo
+      // 
+      btn_upTo.Anchor = AnchorStyles.Top | AnchorStyles.Right;
+      btn_upTo.Location = new Point(204, 63);
+      btn_upTo.Name = "btn_upTo";
+      btn_upTo.Size = new Size(93, 23);
+      btn_upTo.TabIndex = 23;
+      btn_upTo.Text = "Process Up To";
+      btn_upTo.UseVisualStyleBackColor = true;
+      btn_upTo.Click += btn_upTo_Click;
+      // 
+      // txb_literalNumber
+      // 
+      txb_literalNumber.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
+      txb_literalNumber.Location = new Point(204, 34);
+      txb_literalNumber.Name = "txb_literalNumber";
+      txb_literalNumber.Size = new Size(93, 23);
+      txb_literalNumber.TabIndex = 23;
+      // 
       // tview_fontInfo
       // 
+      tview_fontInfo.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left;
       tview_fontInfo.Location = new Point(3, 96);
       tview_fontInfo.Name = "tview_fontInfo";
       tview_fontInfo.Size = new Size(294, 481);
@@ -318,18 +344,39 @@
       // 
       // panel2
       // 
-      panel2.Anchor = AnchorStyles.None;
       panel2.Controls.Add(pb_mainImage);
       panel2.Location = new Point(12, 83);
       panel2.Name = "panel2";
       panel2.Size = new Size(678, 580);
       panel2.TabIndex = 22;
       // 
+      // label5
+      // 
+      label5.Anchor = AnchorStyles.Top | AnchorStyles.Right;
+      label5.AutoSize = true;
+      label5.Location = new Point(582, 65);
+      label5.Name = "label5";
+      label5.Size = new Size(55, 15);
+      label5.TabIndex = 23;
+      label5.Text = "Literal # :";
+      // 
+      // lbl_literalNumber
+      // 
+      lbl_literalNumber.Anchor = AnchorStyles.Top | AnchorStyles.Right;
+      lbl_literalNumber.AutoSize = true;
+      lbl_literalNumber.Location = new Point(633, 65);
+      lbl_literalNumber.Name = "lbl_literalNumber";
+      lbl_literalNumber.Size = new Size(13, 15);
+      lbl_literalNumber.TabIndex = 24;
+      lbl_literalNumber.Text = "0";
+      // 
       // form_main
       // 
       AutoScaleDimensions = new SizeF(7F, 15F);
       AutoScaleMode = AutoScaleMode.Font;
       ClientSize = new Size(1012, 675);
+      Controls.Add(lbl_literalNumber);
+      Controls.Add(label5);
       Controls.Add(panel2);
       Controls.Add(panel1);
       Controls.Add(lbl_readPos);
@@ -385,5 +432,9 @@
     private Label lbl_glyphName;
     private TreeView tview_fontInfo;
     private Panel panel2;
+    private TextBox txb_literalNumber;
+    private Button btn_upTo;
+    private Label label5;
+    private Label lbl_literalNumber;
   }
 }

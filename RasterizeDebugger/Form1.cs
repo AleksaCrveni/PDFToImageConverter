@@ -4,13 +4,12 @@ using Converter.Converters.Image.TIFF;
 using Converter.FileStructures.General;
 using Converter.FileStructures.PDF;
 using Converter.FileStructures.PDF.GraphicsInterpreter;
+using Converter.FileStructures.TIFF;
 using Converter.Parsers.PDF;
 using Converter.Rasterizers;
 using Converter.Writers.TIFF;
-using System.ComponentModel.DataAnnotations;
 using System.Diagnostics;
 using System.Drawing.Drawing2D;
-using System.Runtime.CompilerServices;
 
 namespace RasterizeDebugger
 {
@@ -39,6 +38,7 @@ namespace RasterizeDebugger
     readonly float MAX_ZOOM = 5f;
     readonly float MIN_ZOOM = 1f;
     string _lastFontRef;
+    uint _totalStringLiteralCount;
     enum ZOOM { IN, OUT }
 
     class ZoomStatePosition
@@ -115,7 +115,7 @@ namespace RasterizeDebugger
         _interpreter = new PDFGOInterpreter(rawContent, rDict, converter, true);
         lbl_contentLength.Text = rawContent.Length.ToString();
         _localState = new LocalState();
-        ReadNextData();
+        ReadNextData(true);
         UpdateLabels();
         MemoryStream memoryStream = new MemoryStream();
         TIFFGrayscaleWriter writer = new TIFFGrayscaleWriter(memoryStream);
@@ -127,9 +127,11 @@ namespace RasterizeDebugger
         writer.WriteEmptyImage(ref options);
         _imageData = memoryStream.ToArray();
         _imageDataStartPos = writer.data.InitialImageDataOffset;
-
-        pb_mainImage.Image = Image.FromStream(new MemoryStream(_imageData));
+        panel2.Size = new Size(options.Width, options.Height);
         pb_mainImage.Size = new Size(options.Width, options.Height);
+        pb_mainImage.Image = Image.FromStream(new MemoryStream(_imageData));
+
+
         _end = false;
 
         _imageBrush = new TextureBrush(pb_mainImage.Image);
@@ -138,6 +140,8 @@ namespace RasterizeDebugger
         _lastFontRef = _interpreter._debugState.FontRef;
         _currFontData = _interpreter.GetFontDataFromKey(_interpreter._debugState.FontRef);
         UpdateFontInfoTreeView();
+        _totalStringLiteralCount = 0;
+        lbl_literalNumber.Text = _totalStringLiteralCount.ToString();
       }
     }
 
@@ -181,17 +185,17 @@ namespace RasterizeDebugger
         if (_localState.textIndex >= _interpreter._debugState.Literals.Count)
         {
           // Load next from interpreer
-          ReadNextData();
+          ReadNextData(true);
         }
         else
         {
-          SetNextTextAndUpdateState();
+          SetNextTextAndUpdateState(true);
         }
       }
 
     }
 
-    public void ReadNextData()
+    public void ReadNextData(bool updateUI)
     {
       _interpreter.ConvertToPixelData();
       if (_interpreter._debugState.Literals.Count == 0)
@@ -201,7 +205,7 @@ namespace RasterizeDebugger
         return;
       }
       _localState.textIndex = 0;
-      SetNextTextAndUpdateState();
+      SetNextTextAndUpdateState(updateUI);
     }
     public void UpdateLabels()
     {
@@ -247,7 +251,7 @@ namespace RasterizeDebugger
       GlyphInfo gInfo = new GlyphInfo();
 
       _currFontData = _interpreter.GetFontDataFromKey(_interpreter._debugState.FontRef);
-      
+
       _currRasterizer = _currFontData.Rasterizer;
       double[] widths = _currFontData.FontInfo.Widths;
       char c;
@@ -271,20 +275,23 @@ namespace RasterizeDebugger
       if (_localState.textIndex >= _interpreter._debugState.Literals.Count)
       {
         // Load next from interpreer
-        ReadNextData();
+        ReadNextData(updateUI);
       }
       else
       {
-        SetNextTextAndUpdateState();
+        SetNextTextAndUpdateState(updateUI);
       }
     }
 
 
-    public void SetNextTextAndUpdateState()
+    public void SetNextTextAndUpdateState(bool updateUI)
     {
       // update local state
       _localState.charIndex = 0;
       _localState.currentText = _interpreter._debugState.Literals[_localState.textIndex].Literal;
+      _totalStringLiteralCount++;
+      if (updateUI)
+        lbl_literalNumber.Text = _totalStringLiteralCount.ToString();
       _interpreter._debugState.State.TextObject.TextMatrix[2, 0] -=
         (_interpreter._debugState.Literals[_localState.textIndex].PositionAdjustment / 1000f) *
         _interpreter._debugState.State.TextObject.TextMatrix[0, 0]
@@ -421,6 +428,45 @@ namespace RasterizeDebugger
 
       tview_fontInfo.Nodes[0].Expand();
       tview_fontInfo.EndUpdate();
+    }
+
+    private void btn_upTo_Click(object sender, EventArgs e)
+    {
+      // shorcut here just so we can create glyphinfo once if needed 
+      if (_end)
+      {
+        MessageBox.Show("End of content!");
+        return;
+      }
+
+      bool valid = UInt32.TryParse(txb_literalNumber.Text, out uint target);
+      string err = string.Empty;
+
+      if (txb_literalNumber.Text.Trim().Length == 0)
+        err = "Value must be set!";
+
+      if (txb_literalNumber.Text.Contains('-'))
+        err = "Number can't be negative!";
+
+      if (!valid)
+        err = "Invalid value. Target must be positive integer!";
+
+      if (target <= _totalStringLiteralCount && valid)
+        err = "Target must be bigger than current position (count)!";
+
+      if (err != string.Empty)
+      {
+        MessageBox.Show(err);
+        return;
+      }
+      while (!_end && target > _totalStringLiteralCount)
+      {
+        ProcessText(false);
+      }
+
+      UpdateImageDataAndPictureBox();
+      UpdateLabels();
+      lbl_literalNumber.Text = _totalStringLiteralCount.ToString();
     }
   }
 }
