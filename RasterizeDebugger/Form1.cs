@@ -142,6 +142,10 @@ namespace RasterizeDebugger
         UpdateFontInfoTreeView();
         _totalStringLiteralCount = 0;
         lbl_literalNumber.Text = _totalStringLiteralCount.ToString();
+        lbl_charValue.Text = "NULL";
+        lbl_glyphIndex.Text = "NULL";
+        lbl_glyphName.Text = "NULL";
+        lbl_currentChar.Text = "NULL";
       }
     }
 
