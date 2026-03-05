@@ -50,7 +50,9 @@ namespace Converter.Parsers.Fonts
       // TODO: Apparently this can be ascii string as well, look into this
       byte[] privateDictRaw = DecryptPrivateDictionary();
       Debug.Assert(privateDictRaw.Length > 0);
+#if DEBUG
       File.WriteAllBytes(Files.RootFolder + @$"\{_ffInfo.FontDescriptor.FontName}-decryptedEEXEC.txt", privateDictRaw);
+#endif
       ParsePrivateDictionary(font, privateDictRaw);
     }
 
@@ -701,8 +703,9 @@ namespace Converter.Parsers.Fonts
         decrypted.Add($"dup {ind} {charStringLength} {Encoding.Default.GetString(decr)}");
         font.FontDict.Private.Subrs[ind] = decr;
       }
-
+#if DEBUG
       File.WriteAllLines(Files.RootFolder + @$"\{_ffInfo.FontDescriptor.FontName}" + @"-decryptedSubrs.txt", decrypted);
+#endif
     }
     
     private void ParseCharStrings()
@@ -737,8 +740,10 @@ namespace Converter.Parsers.Fonts
         decrypted.Add($"dup {key} {charStringLength} {Encoding.Default.GetString(decr)}");
         font.FontDict.Private.CharStrings[key] = decr;
       }
-
+#if DEBUG
       File.WriteAllLines(Files.RootFolder + @$"\{_ffInfo.FontDescriptor.FontName}" + @"-decryptedCharStrings.txt", decrypted);
+#endif
+
     } 
 
     private string ProcessNextToken()
