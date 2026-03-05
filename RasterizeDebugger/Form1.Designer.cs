@@ -49,7 +49,7 @@
       lbl_charValue = new Label();
       label7 = new Label();
       panel1 = new Panel();
-      treeView1 = new TreeView();
+      tview_fontInfo = new TreeView();
       lbl_glyphIndex = new Label();
       label6 = new Label();
       lbl_glyphName = new Label();
@@ -264,7 +264,7 @@
       // panel1
       // 
       panel1.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Right;
-      panel1.Controls.Add(treeView1);
+      panel1.Controls.Add(tview_fontInfo);
       panel1.Controls.Add(lbl_glyphIndex);
       panel1.Controls.Add(label6);
       panel1.Controls.Add(label2);
@@ -279,12 +279,12 @@
       panel1.TabIndex = 21;
       panel1.Paint += panel1_Paint;
       // 
-      // treeView1
+      // tview_fontInfo
       // 
-      treeView1.Location = new Point(3, 96);
-      treeView1.Name = "treeView1";
-      treeView1.Size = new Size(294, 481);
-      treeView1.TabIndex = 23;
+      tview_fontInfo.Location = new Point(3, 96);
+      tview_fontInfo.Name = "tview_fontInfo";
+      tview_fontInfo.Size = new Size(294, 481);
+      tview_fontInfo.TabIndex = 23;
       // 
       // lbl_glyphIndex
       // 
@@ -383,7 +383,7 @@
     private Label lbl_glyphIndex;
     private Label label6;
     private Label lbl_glyphName;
-    private TreeView treeView1;
+    private TreeView tview_fontInfo;
     private Panel panel2;
   }
 }
