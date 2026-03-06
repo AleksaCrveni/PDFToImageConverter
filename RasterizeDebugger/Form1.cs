@@ -40,7 +40,8 @@ namespace RasterizeDebugger
     string _lastFontRef;
     uint _totalStringLiteralCount;
     enum ZOOM { IN, OUT }
-
+    Playground _playground;
+    bool _playgroundOpen = false;
     class ZoomStatePosition
     {
       public PointF p;
@@ -146,6 +147,8 @@ namespace RasterizeDebugger
         lbl_glyphIndex.Text = "NULL";
         lbl_glyphName.Text = "NULL";
         lbl_currentChar.Text = "NULL";
+        _playground?.Close();
+        _playground = new Playground(_file);
       }
     }
 
@@ -471,6 +474,21 @@ namespace RasterizeDebugger
       UpdateImageDataAndPictureBox();
       UpdateLabels();
       lbl_literalNumber.Text = _totalStringLiteralCount.ToString();
+    }
+
+    private void btn_fontPlayground_Click(object sender, EventArgs e)
+    {
+      // avoid du plication of events
+      if (!_playgroundOpen)
+        _playground.FormClosed += PlaygroundClosedEvent;
+      _playground.Show();
+      _playgroundOpen = true;
+    }
+
+    private void PlaygroundClosedEvent(object sender, FormClosedEventArgs e)
+    {
+      _playground = new Playground(_file);
+      _playgroundOpen = false;
     }
   }
 }

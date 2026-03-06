@@ -31,7 +31,7 @@
       pb_mainImage = new PictureBox();
       label1 = new Label();
       lbl_currentText = new Label();
-      btn_fontInfo = new Button();
+      btn_fontPlayground = new Button();
       btn_nextChar = new Button();
       btn_nextText = new Button();
       label2 = new Label();
@@ -92,20 +92,21 @@
       lbl_currentText.TabIndex = 2;
       lbl_currentText.Text = "NULL";
       // 
-      // btn_fontInfo
+      // btn_fontPlayground
       // 
-      btn_fontInfo.Anchor = AnchorStyles.Top | AnchorStyles.Right;
-      btn_fontInfo.Location = new Point(855, 9);
-      btn_fontInfo.Name = "btn_fontInfo";
-      btn_fontInfo.Size = new Size(75, 23);
-      btn_fontInfo.TabIndex = 3;
-      btn_fontInfo.Text = "Font Info";
-      btn_fontInfo.UseVisualStyleBackColor = true;
+      btn_fontPlayground.Anchor = AnchorStyles.Top | AnchorStyles.Right;
+      btn_fontPlayground.Location = new Point(842, 9);
+      btn_fontPlayground.Name = "btn_fontPlayground";
+      btn_fontPlayground.Size = new Size(88, 23);
+      btn_fontPlayground.TabIndex = 3;
+      btn_fontPlayground.Text = "Playground";
+      btn_fontPlayground.UseVisualStyleBackColor = true;
+      btn_fontPlayground.Click += btn_fontPlayground_Click;
       // 
       // btn_nextChar
       // 
       btn_nextChar.Anchor = AnchorStyles.Top | AnchorStyles.Right;
-      btn_nextChar.Location = new Point(696, 9);
+      btn_nextChar.Location = new Point(683, 9);
       btn_nextChar.Name = "btn_nextChar";
       btn_nextChar.Size = new Size(75, 23);
       btn_nextChar.TabIndex = 4;
@@ -116,7 +117,7 @@
       // btn_nextText
       // 
       btn_nextText.Anchor = AnchorStyles.Top | AnchorStyles.Right;
-      btn_nextText.Location = new Point(777, 9);
+      btn_nextText.Location = new Point(764, 9);
       btn_nextText.Name = "btn_nextText";
       btn_nextText.Size = new Size(72, 23);
       btn_nextText.TabIndex = 5;
@@ -147,9 +148,9 @@
       // btn_load
       // 
       btn_load.Anchor = AnchorStyles.Top | AnchorStyles.Right;
-      btn_load.Location = new Point(855, 38);
+      btn_load.Location = new Point(842, 38);
       btn_load.Name = "btn_load";
-      btn_load.Size = new Size(75, 23);
+      btn_load.Size = new Size(88, 23);
       btn_load.TabIndex = 8;
       btn_load.Text = "Load PDF";
       btn_load.UseVisualStyleBackColor = true;
@@ -169,7 +170,7 @@
       // lbl_currFilename
       // 
       lbl_currFilename.Anchor = AnchorStyles.Top | AnchorStyles.Right;
-      lbl_currFilename.Location = new Point(696, 42);
+      lbl_currFilename.Location = new Point(683, 38);
       lbl_currFilename.Name = "lbl_currFilename";
       lbl_currFilename.Size = new Size(156, 19);
       lbl_currFilename.TabIndex = 10;
@@ -390,7 +391,7 @@
       Controls.Add(btn_load);
       Controls.Add(btn_nextText);
       Controls.Add(btn_nextChar);
-      Controls.Add(btn_fontInfo);
+      Controls.Add(btn_fontPlayground);
       Controls.Add(lbl_currentText);
       Controls.Add(label1);
       Name = "form_main";
@@ -409,7 +410,7 @@
     private PictureBox pb_mainImage;
     private Label label1;
     private Label lbl_currentText;
-    private Button btn_fontInfo;
+    private Button btn_fontPlayground;
     private Button btn_nextChar;
     private Button btn_nextText;
     private Label label2;
