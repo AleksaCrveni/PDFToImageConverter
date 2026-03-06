@@ -91,7 +91,8 @@ namespace RasterizeDebugger
       else
       {
         // this can happen also to be 0 len since font can use other tag , its specified in PDF docs
-        string[] chars = _currFont.FontInfo.FontDescriptor.CharSet.Split('/');
+        // we ignore first char becuase string starts with /
+        string[] chars = _currFont.FontInfo.FontDescriptor.CharSet.AsSpan().Slice(1).ToString().Split('/');
         Debug.Assert(chars.Length > 0);
         cb_glyph.Items.Clear();
         cb_glyph.BeginUpdate();

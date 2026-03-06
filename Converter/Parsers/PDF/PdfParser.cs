@@ -1228,7 +1228,7 @@ namespace Converter.Parsers.PDF
               fontDescriptor.CharSet = helper.GetNextByteString();
             else
             {
-              fontDescriptor.CharSet = helper.GetNextRawString();
+              fontDescriptor.CharSet = helper.GetNextStringLiteral();
             }
             break;
           case "Style": // CID Only
