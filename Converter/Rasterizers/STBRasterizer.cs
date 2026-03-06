@@ -805,7 +805,9 @@ namespace Converter.Rasterizers
             m = (int)k;
             if (m > 255)
               m = 255;
-            result.Pixels[result.Offset + j * result.Stride + i] = (byte)m;
+            // NOTE: this was added so we dont rewrite any other pixels from other glyphs that maybe in the bounding box of current glyph that is being printed
+            if (m > 0)
+              result.Pixels[result.Offset + j * result.Stride + i] = (byte)m;
           }
         }
 
