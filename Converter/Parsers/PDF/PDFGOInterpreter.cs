@@ -2,12 +2,16 @@
 using Converter.FileStructures;
 using Converter.FileStructures.PDF;
 using Converter.FileStructures.PDF.GraphicsInterpreter;
+using Converter.FileStructures.PostScript;
+using Converter.FileStructures.TTF;
 using Converter.Rasterizers;
 using Converter.StaticData;
+using Converter.Utils;
 using System.Buffers;
 using System.Diagnostics;
 using System.Globalization;
 using System.Text;
+using static System.Formats.Asn1.AsnWriter;
 
 namespace Converter.Parsers.PDF
 {
@@ -48,6 +52,7 @@ namespace Converter.Parsers.PDF
     public byte[] _outputBuffer;
     public bool _debug;
     public PDFGO_DEBUG_STATE _debugState;
+    private ShapeRasterizer _shapeRasterizer;
 
     // TODO: maybe NULL check is redundant if we let it throw to end?
     public PDFGOInterpreter(byte[] contentBuffer, PDF_ResourceDict resourceDict,  IConverter converter, bool debug = false)
@@ -70,6 +75,7 @@ namespace Converter.Parsers.PDF
       _targetSize = (_converter.GetHeight(), _converter.GetWidth());
       _outputBuffer = new byte[_targetSize.Height * _targetSize.Width];
       _debug = debug;
+      _shapeRasterizer = new ShapeRasterizer(Array.Empty<byte>(), "");
       if (debug)
         _debugState = new PDFGO_DEBUG_STATE();
       InitGS();
@@ -120,7 +126,7 @@ namespace Converter.Parsers.PDF
             {
               dashArr[dpIndex] = GetNextStackValAsInt();
             }
-
+            Debug.Assert(arrayLengths.Count == 0, "currently only support solid line");
             currentGS.DashPattern = dashPattern;
             break;
           case 0x6972: // ri
@@ -164,17 +170,15 @@ namespace Converter.Parsers.PDF
           #endregion gss&sgs
           #region pathConstruction
           case 0x6d: // m
-            currentPC.PathConstructs.Clear();
-            mp = new PDFGI_Point();
-            mp.Y1 = GetNextStackValAsInt();
-            mp.X1 = GetNextStackValAsInt();
-            currentPC.PathConstructs.Add((PDFGI_PathConstructOperator.m, mp));
+            // this is relavive to current point
+            double y = GetNextStackValAsDouble();
+            double x = GetNextStackValAsDouble();
+            currentPC.Shape.MoveTo(textRenderingMatrix[2, 0] + x, textRenderingMatrix[2, 1] + y);
             break;
           case 0x6c: // l
-            mp = new PDFGI_Point();
-            mp.Y1 = GetNextStackValAsInt();
-            mp.X1 = GetNextStackValAsInt();
-            currentPC.PathConstructs.Add((PDFGI_PathConstructOperator.l, mp));
+            y = GetNextStackValAsDouble();
+            x = GetNextStackValAsDouble();
+            currentPC.Shape.LineTo(textRenderingMatrix[2, 0] + x, textRenderingMatrix[2, 1] + y);
             break;
           case 0x63: // c
             mp = new PDFGI_Point();
@@ -184,7 +188,7 @@ namespace Converter.Parsers.PDF
             mp.X2 = GetNextStackValAsInt();
             mp.Y1 = GetNextStackValAsInt();
             mp.X1 = GetNextStackValAsInt();
-            currentPC.PathConstructs.Add((PDFGI_PathConstructOperator.c, mp));
+            throw new NotImplementedException();
             break;
           case 0x76: // v
             mp = new PDFGI_Point();
@@ -192,7 +196,7 @@ namespace Converter.Parsers.PDF
             mp.X3 = GetNextStackValAsInt();
             mp.Y2 = GetNextStackValAsInt();
             mp.X2 = GetNextStackValAsInt();
-            currentPC.PathConstructs.Add((PDFGI_PathConstructOperator.v, mp));
+            throw new NotImplementedException();
             break;
           case 0x79: // y
             mp = new PDFGI_Point();
@@ -200,11 +204,11 @@ namespace Converter.Parsers.PDF
             mp.X3 = GetNextStackValAsInt();
             mp.Y1 = GetNextStackValAsInt();
             mp.X1 = GetNextStackValAsInt();
-            currentPC.PathConstructs.Add((PDFGI_PathConstructOperator.y, mp));
+            throw new NotImplementedException();
             break;
           case 0x68: // h
             mp = new PDFGI_Point();
-            currentPC.PathConstructs.Add((PDFGI_PathConstructOperator.h, mp));
+            throw new NotImplementedException();
             break;
           case 0x6572: // re
             mp = new PDFGI_Point();
@@ -215,18 +219,18 @@ namespace Converter.Parsers.PDF
             mp.Y3 = GetNextStackValAsInt();
             mp.Y1 = GetNextStackValAsInt();
             mp.X1 = GetNextStackValAsInt();
-            currentPC.PathConstructs.Add((PDFGI_PathConstructOperator.re, mp));
+            throw new NotImplementedException();
             break;
           #endregion pathConstruction
           #region pathPainting
           case 0x53: // S
-            // TODO: implement this
+            PDF_RasterShape();
             break;
           case 0x73: // s
             throw new NotImplementedException("Operator not i implemented");
           case 0x66: // f
 
-            currentPC.PathConstructs.Clear();
+            currentPC.Shape = new PSShape();
             currentPC.EvenOddClippingPath = false;
             currentPC.NonZeroClippingPath = false;
             break;
@@ -244,8 +248,8 @@ namespace Converter.Parsers.PDF
             throw new NotImplementedException("Operator not i implemented");
           case 0x6e: // n
             mp = new PDFGI_Point();
-            currentPC.PathConstructs.Add((PDFGI_PathConstructOperator.n, mp));       // CHECK CLIPPING PATH SECTION
-                     // path painting
+            throw new NotImplementedException();// CHECK CLIPPING PATH SECTION
+                                                // path painting
             break;
           #endregion pathPainting
           #region clippingPath
@@ -876,6 +880,84 @@ namespace Converter.Parsers.PDF
 
     }
 
+    /// <summary>
+    /// Make ShapeRasterizer and use it for this, we need accesds to STBRasterizer
+    /// </summary>
+    public void PDF_RasterShape()
+    {
+      // rounding makes it look a bit better?
+      int X = (int)MathF.Round((float)textRenderingMatrix[2, 0]);
+      // because origin is bottom-left we have do bitmapHeight - , to get position on the top
+      int Y = _targetSize.Height - (int)(textRenderingMatrix[2, 1]);
+
+      List<TTFVertex> vertices = RasterHelper.ConvertToTTFVertexFormat(currentPC.Shape);
+      List<int> windingLengths = new List<int>();
+      int windingCount = 0;
+      float scaleX = (float)textRenderingMatrix[0, 0] * 0.001f;
+      float scaleY = (float)textRenderingMatrix[1, 1] * 0.001f;
+      float scale = scaleX > scaleY ? scaleX : scaleY;
+      List<PointF> windings = _shapeRasterizer.STB_FlattenCurves(ref vertices, vertices.Count, 0.35f / scale, ref windingLengths, ref windingCount);
+      int c_x0 = 0;
+      int c_y0 = 0;
+      int c_x1 = 0;
+      int c_y1 = 0;
+
+      #region Assert
+      Debug.Assert(c_x0 != int.MaxValue && c_x0 != int.MinValue);
+      Debug.Assert(c_y0 != int.MaxValue && c_y0 != int.MinValue);
+      Debug.Assert(c_x1 != int.MaxValue && c_x1 != int.MinValue);
+      Debug.Assert(c_y1 != int.MaxValue && c_y1 != int.MinValue);
+      #endregion Assert
+
+      RasterHelper.GetFakeBoundingBoxFromPoints(windings, ref c_x0, ref c_y0, ref c_x1, ref c_y1, scale);
+
+      int y = Y + (int)(c_y0 * scale);
+      // I think that this should be replaced from value in Widths array
+      // NOTE: widths array wont work since this width is not in units but in pixels after its been scaled down
+      int glyphWidth = c_x1 - c_x0;
+      int glyphHeight = c_y1 - c_y0;
+      // currently we only support like a straight line and bellow should be like
+      // line thinkness so we will just scale it into height
+      Debug.Assert(currentPC.Shape._moves.Last() == PS_COMMAND.LINE_TO);
+      //glyphHeight = (int)(currentGS.LineWidth);
+      if (glyphHeight == 0)
+        glyphHeight = 1;
+      if (glyphWidth == 0)
+        glyphWidth = 1;
+      Debug.Assert(glyphHeight > 0);
+      Debug.Assert(glyphWidth > 0);
+      // scale shape down???
+      int byteOffset = X + (y * _targetSize.Width);
+      int shiftX = 0;
+      int shiftY = 0;
+
+      BmpS result = new BmpS();
+      result.H = glyphHeight;
+      result.W = glyphWidth;
+      result.Offset = byteOffset;
+      result.Pixels = _outputBuffer;
+      result.Stride = _targetSize.Width;
+      _shapeRasterizer.STB_InternalRasterize(ref result, ref windings, ref windingLengths, windingCount, scaleX, scaleY, 0, 0, (int)MathF.Floor(c_x0 * scale), (int)MathF.Floor(c_y0 * scale), true);
+
+      #region Advance
+      
+      // not sure what is width here
+      double advanceX = currentTextObject.Tc;
+      double advanceY = 0; // This wont work for vertical fonts
+      
+      //if (c == ' ')
+      //  advanceX += currentTextObject.Tw;
+      advanceX *= currentTextObject.Th;
+
+      // TODO: this really depends on what type of CTM it is. i.e is there shear, transaltion, rotation etc
+      // I should detect this and save state somewhere
+      // for now just support translate and scale
+      // NOTE: actually I think I can just multiply matrix, and this is done to avoid matrix multiplciation
+      currentTextObject.TextMatrix[2, 0] = advanceX * textRenderingMatrix[0, 0] + currentTextObject.TextMatrix[2, 0];
+      currentTextObject.TextMatrix[2, 1] = 0 * currentTextObject.TextMatrix[1, 1] + currentTextObject.TextMatrix[2, 1];
+      #endregion
+    }
+
     public void PDF_DrawText(string font, string textToWrite, PDFGI_DrawState state, int positionAdjustment = 0)
     {
       // TODO: just do this once at opettor and assign ref to glolbal obj
@@ -1048,6 +1130,9 @@ namespace Converter.Parsers.PDF
 
       return new PDF_FontData();
     }
+
+    
+
   }
 
   public enum OperandType
@@ -1058,4 +1143,6 @@ namespace Converter.Parsers.PDF
     ARRAY,
     INSTRUCTION
   }
+
+ 
 }

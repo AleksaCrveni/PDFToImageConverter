@@ -94,11 +94,10 @@ namespace Converter.FileStructures.PDF.GraphicsInterpreter
   // not sure if any othe rparamters will be needed wrap it in now
   public struct PDFGI_PathConstruction
   {
-    // instead of list this could be queue type FIFO
-    public List<(PDFGI_PathConstructOperator, PDFGI_Point)> PathConstructs;
+    public PSShape Shape;
     public PDFGI_PathConstruction()
     {
-      PathConstructs = new List<(PDFGI_PathConstructOperator, PDFGI_Point)>();
+      Shape = new PSShape();
     }
     public bool NonZeroClippingPath = false;
     public bool EvenOddClippingPath = false;

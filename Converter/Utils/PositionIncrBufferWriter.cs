@@ -75,5 +75,19 @@ namespace Converter.Utils
         pos += 4;
       }
     }
+
+    public void WriteDouble(ref int pos, double value)
+    {
+      if (_isLittleEndian)
+      {
+        BinaryPrimitives.WriteDoubleLittleEndian(_buffer.Slice(pos, 8), value);
+        pos += 8;
+      }
+      else
+      {
+        BinaryPrimitives.WriteDoubleBigEndian(_buffer.Slice(pos, 8), value);
+        pos += 8;
+      }
+    }
   }
 }

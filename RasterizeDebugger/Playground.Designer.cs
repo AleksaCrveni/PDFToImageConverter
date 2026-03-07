@@ -36,6 +36,7 @@
       label3 = new Label();
       txb_Scale = new TextBox();
       pb_main = new PictureBox();
+      btn_loadShape = new Button();
       ((System.ComponentModel.ISupportInitialize)pb_main).BeginInit();
       SuspendLayout();
       // 
@@ -106,15 +107,26 @@
       // 
       pb_main.Location = new Point(12, 41);
       pb_main.Name = "pb_main";
-      pb_main.Size = new Size(870, 618);
+      pb_main.Size = new Size(927, 618);
       pb_main.TabIndex = 8;
       pb_main.TabStop = false;
+      // 
+      // btn_loadShape
+      // 
+      btn_loadShape.Location = new Point(819, 12);
+      btn_loadShape.Name = "btn_loadShape";
+      btn_loadShape.Size = new Size(120, 23);
+      btn_loadShape.TabIndex = 9;
+      btn_loadShape.Text = "Load Shape";
+      btn_loadShape.UseVisualStyleBackColor = true;
+      btn_loadShape.Click += btn_loadShape_Click;
       // 
       // Playground
       // 
       AutoScaleDimensions = new SizeF(7F, 15F);
       AutoScaleMode = AutoScaleMode.Font;
-      ClientSize = new Size(894, 671);
+      ClientSize = new Size(951, 671);
+      Controls.Add(btn_loadShape);
       Controls.Add(pb_main);
       Controls.Add(txb_Scale);
       Controls.Add(label3);
@@ -141,5 +153,6 @@
     private Label label3;
     private TextBox txb_Scale;
     private PictureBox pb_main;
+    private Button btn_loadShape;
   }
 }

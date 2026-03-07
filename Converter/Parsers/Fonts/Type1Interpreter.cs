@@ -25,14 +25,14 @@ namespace Converter.Parsers.Fonts
     // State
     private int _subroutineCallCount = 0;
     private bool _flex = false;
-    private float[] _flexArr;
+    private double[] _flexArr;
     private int _flexIndex = 0;
 
     public Type1Interpreter(byte[] buffer, PDF_FontInfo ffInfo) : base(buffer)
     {
       _ffInfo = ffInfo;
       font = new TYPE1_Font();
-      _flexArr = new float[14]; // 14 is max size of flex arguments
+      _flexArr = new double[14]; // 14 is max size of flex arguments
     }
 
     public void LoadFont()
@@ -180,8 +180,8 @@ namespace Converter.Parsers.Fonts
                 break;
 
               int pos = outShape._shapePoints.Count - 1;
-              float targetX = 0;
-              float targetY = 0;
+              double targetX = 0;
+              double targetY = 0;
               // get last move to
               for (int j = outShape._moves.Count - 1; j >= 0; j--)
               {

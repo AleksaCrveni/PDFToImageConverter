@@ -1,6 +1,8 @@
 ﻿using Converter.FileStructures.PostScript;
 using Converter.FileStructures.TTF;
 using Converter.FileStructures.Type1;
+using Converter.Utils;
+using System.Buffers.Binary;
 
 namespace Converter.Rasterizers
 {
@@ -10,7 +12,7 @@ namespace Converter.Rasterizers
   public class PSShape
   {
     public List<PS_COMMAND> _moves;
-    public List<float> _shapePoints;
+    public List<double> _shapePoints;
     public TYPE1_Point2D _width;
     
     // Temp
@@ -26,11 +28,11 @@ namespace Converter.Rasterizers
     public PSShape()
     {
       _moves = new List<PS_COMMAND>();
-      _shapePoints = new List<float>();
+      _shapePoints = new List<double>();
       _width = new TYPE1_Point2D();
     }
 
-    public void LineTo(float dx, float dy)
+    public void LineTo(double dx, double dy)
     {
       _shapePoints.Add(dx);
       _shapePoints.Add(dy);
@@ -38,7 +40,7 @@ namespace Converter.Rasterizers
       _actualLast = PS_COMMAND.LINE_TO;
     }
 
-    public void MoveTo(float dx, float dy)
+    public void MoveTo(double dx, double dy)
     {
       if (_moves.Count > 0 && _moves.Last() == PS_COMMAND.MOVE_TO)
       {
@@ -55,7 +57,7 @@ namespace Converter.Rasterizers
       }
     }
 
-    public void CurveTo(float dx1, float dy1, float dx2, float dy2, float dx3, float dy3)
+    public void CurveTo(double dx1, double dy1, double dx2, double dy2, double dx3, double dy3)
     {
       _shapePoints.Add(dx1);
       _shapePoints.Add(dy1);
@@ -71,10 +73,79 @@ namespace Converter.Rasterizers
     /// Do this for compute it, or maybe we scale down each point when we add them and not all affter
     /// </summary>
     /// <param name="scale"></param>
-    public void ScaleAll(float scale)
+    public void ScaleAll(double scale)
     {
       for (int i = 0; i < _shapePoints.Count; i++)
         _shapePoints[i] = _shapePoints[i] * scale;
+    }
+
+    // Positions are absolute so reader should anticipate that
+    public void SaveAbsolute(string name)
+    {
+      FileStream fs = File.Create($"PS_SHAPE_{name}.shape");
+      byte[] mem = new byte[8096]; // limit for now for 8k shapes
+      Span<byte> buffer = new Span<byte>();
+      int pos = 0;
+      PositionIncrBufferWriter writer = new PositionIncrBufferWriter(ref buffer, true);
+      bool absolute = true;
+      buffer[pos++] = (byte)(absolute ? 1 : 0);
+      // width data
+      writer.WriteDouble(ref pos, _width.X);
+      writer.WriteDouble(ref pos, _width.Y);
+      buffer[pos++] = (byte)(_width.PartOfPath ? 1 : 0);
+      writer.WriteSigned32ToBuffer(ref pos, _moves.Count); // move count
+      for (int i = 0; i < _moves.Count; i++)
+      {
+        buffer[pos++] = (byte)_moves[i];
+      }
+      writer.WriteSigned32ToBuffer(ref pos, _shapePoints.Count);
+      fs.Write(buffer.Slice(0, pos));
+      pos = 0;
+
+      for (int i = 0; i < _shapePoints.Count; i++)
+      {
+        writer.WriteDouble(ref pos, _shapePoints[i]);
+        if (pos > buffer.Length - 24) // 24 is arbitary
+        {
+          fs.Write(buffer.Slice(0, pos));
+          pos = 0;
+        }
+      }
+      // leftover
+      if (pos != 0)
+      {
+        fs.Write(buffer.Slice(0, pos));
+      }
+
+      fs.Flush();
+      fs.Close();
+      fs.Dispose();
+    }
+
+    /// <summary>
+    ///  not efficient and we trusdt input too much but its ok for now just get it to work
+    /// </summary>
+    /// <param name="buffer"></param>
+    public void LoadData(byte[] data)
+    {
+      int pos = 0;
+      bool absolute = data[pos++] == 1 ? true : false;
+      Span<byte> buffer = data.AsSpan();
+      _width = new TYPE1_Point2D();
+      _width.X = BufferReader.ReadDoubleLE(ref buffer, ref pos);
+      _width.Y = BufferReader.ReadDoubleLE(ref buffer, ref pos);
+      _width.PartOfPath = buffer[pos++] == 1 ? true : false;
+
+      int moveCount = BufferReader.ReadInt32LE(ref buffer, ref pos);
+      for (int i = 0; i < moveCount; i++)
+      {
+        _moves.Add((PS_COMMAND)buffer[pos++]);
+      }
+      int shapePointsCount = BufferReader.ReadInt32LE(ref buffer, ref pos);
+      for (int i = 0; i < shapePointsCount; i++)
+      {
+        _shapePoints.Add(BufferReader.ReadDoubleLE(ref buffer, ref pos));
+      };
     }
   }
 }

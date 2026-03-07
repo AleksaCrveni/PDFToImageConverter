@@ -1,22 +1,13 @@
-﻿using Accessibility;
-using Converter.FileStructures.PDF;
+﻿using Converter.FileStructures.PDF;
 using Converter.FileStructures.PostScript;
 using Converter.FileStructures.TTF;
 using Converter.FileStructures.Type1;
-using Converter.Parsers.PostScript;
 using Converter.Rasterizers;
+using Converter.Utils;
 using Converter.Writers.TIFF;
-using System;
-using System.Collections.Generic;
-using System.ComponentModel;
-using System.Data;
 using System.Diagnostics;
-using System.Drawing;
-using System.Linq;
 using System.Text;
-using System.Threading.Tasks;
-using System.Windows.Forms;
-using static System.Resources.ResXFileRef;
+
 
 namespace RasterizeDebugger
 {
@@ -30,10 +21,16 @@ namespace RasterizeDebugger
     byte[] _data;
     int _imageDataStartPos = 0;
     byte[] _imageData;
+    OpenFileDialog _dialog;
+    PSShape _shape;
+
     public Playground(PDFFile file)
     {
       InitializeComponent();
       _pdfFile = file;
+      _dialog = new OpenFileDialog();
+      _dialog.Filter = "Shape (*.shape)|*.shape";
+      _dialog.RestoreDirectory = true;
     }
     private void Playground_Load(object sender, EventArgs e)
     {
@@ -131,7 +128,7 @@ namespace RasterizeDebugger
       Debug.Assert(shape != null);
 
       // already scaled
-      List<TTFVertex> vertices = r.ConvertToTTFVertexFormat(shape);
+      List<TTFVertex> vertices = RasterHelper.ConvertToTTFVertexFormat(shape);
       StringBuilder sb = new StringBuilder();
       #region log
       int j = 0;
@@ -172,7 +169,7 @@ namespace RasterizeDebugger
       int ix1 = 0;
       int iy1 = 0;
       int height = 0;
-      r.GetFakeBoundingBoxFromPoints(windings, ref ix0, ref iy0, ref ix1, ref iy1, _scale);
+      RasterHelper.GetFakeBoundingBoxFromPoints(windings, ref ix0, ref iy0, ref ix1, ref iy1, _scale);
 
       height = iy1 - iy0;
       if (width.Y > 0)
@@ -185,6 +182,23 @@ namespace RasterizeDebugger
       result.Stride = _width;
       r.STB_InternalRasterize(ref result, ref windings, ref windingLengths, windingCount, _scale, _scale, 0, 0, ix0, iy0, true);
 
+      UpdateImage();
+    }
+
+    private void btn_loadShape_Click(object sender, EventArgs e)
+    {
+      DialogResult result = _dialog.ShowDialog();
+      if (result == DialogResult.OK)
+      {
+        _shape = new PSShape();
+        _shape.LoadData(File.ReadAllBytes(_dialog.FileName));
+        ShapeRasterizer shapeRasterizer = new ShapeRasterizer(Array.Empty<byte>(), "");
+        // TODO:
+
+      }
+    }
+    private void UpdateImage()
+    {
       Array.ConstrainedCopy(_data, 0, _imageData, _imageDataStartPos, _data.Length);
       pb_main.Image = Image.FromStream(new MemoryStream(_imageData));
     }

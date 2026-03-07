@@ -50,6 +50,13 @@ namespace Converter.Utils
       return num;
     }
 
+    public static double ReadDoubleLE(ref Span<byte> buffer, ref int pos)
+    {
+      double num = BinaryPrimitives.ReadDoubleLittleEndian(buffer.Slice(pos, 8));
+      pos += 8;
+      return num;
+    }
+
     public static int ReadInt32LE(ref ReadOnlySpan<byte> buffer, ref int pos)
     {
       int num = BinaryPrimitives.ReadInt32LittleEndian(buffer.Slice(pos, 4));
@@ -77,6 +84,14 @@ namespace Converter.Utils
       pos += 2;
       return num;
     }
+
+    public static double ReadDoubleLE(ref ReadOnlySpan<byte> buffer, ref int pos)
+    {
+      double num = BinaryPrimitives.ReadDoubleLittleEndian(buffer.Slice(pos, 8));
+      pos += 8;
+      return num;
+    }
+
     #endregion LittleEndian
 
     #region BigEndian
@@ -108,6 +123,13 @@ namespace Converter.Utils
       return num;
     }
 
+    public static double ReadDoubleBE(ref Span<byte> buffer, ref int pos)
+    {
+      double num = BinaryPrimitives.ReadDoubleBigEndian(buffer.Slice(pos, 8));
+      pos += 8;
+      return num;
+    }
+
     public static int ReadInt32BE(ref ReadOnlySpan<byte> buffer, ref int pos)
     {
       int num = BinaryPrimitives.ReadInt32BigEndian(buffer.Slice(pos, 4));
@@ -136,6 +158,12 @@ namespace Converter.Utils
       return num;
     }
 
+    public static double ReadDoubleBE(ref ReadOnlySpan<byte> buffer, ref int pos)
+    {
+      double num = BinaryPrimitives.ReadDoubleBigEndian(buffer.Slice(pos, 8));
+      pos += 8;
+      return num;
+    }
     #endregion BigEndian
   }
 }

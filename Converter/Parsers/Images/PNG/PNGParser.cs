@@ -5,6 +5,7 @@ using System.Buffers;
 using System.Buffers.Binary;
 using System.Diagnostics;
 using System.IO.Compression;
+using System.Numerics;
 
 namespace Converter.Parsers.Images.PNG
 {
@@ -115,10 +116,10 @@ namespace Converter.Parsers.Images.PNG
             currCrc = BinaryPrimitives.ReadUInt32BigEndian(buffer.Slice(0, 4));
             break;
           case PNG_CHUNK_TYPE.PLTE:
-            throw new NotImplementedException();
+           //throw new NotImplementedException();
             break;
           case PNG_CHUNK_TYPE.tRNS:
-            throw new NotImplementedException();
+           // throw new NotImplementedException();
             break;
           case PNG_CHUNK_TYPE.NULL:
             throw new InvalidDataException("Unknown chunk!");
@@ -213,23 +214,7 @@ namespace Converter.Parsers.Images.PNG
           Span<byte> prevData = prevRow.AsSpan().Slice(1);
 
           byte filter = currRow[0];
-          Debug.Assert(filter == 0);
-          switch (filter)
-          {
-            case (byte)PNG_FILTER.NONE:
-              break;
-
-            case (byte)PNG_FILTER.SUB:
-              break;
-            case (byte)PNG_FILTER.UP:
-              break;
-            case (byte)PNG_FILTER.AVERAGE:
-              break;
-            case (byte)PNG_FILTER.PAETH:
-              break;
-            default:
-              throw new InvalidDataException("Unknown Filter Type!");
-          }
+          UndoFilter(filter, currData, prevData, bytesPerPixel);
 
           Array.ConstrainedCopy(currRow, 1, output, i * currData.Length, currData.Length);
           Array.Copy(currRow, prevRow, currRow.Length); // Set currentRow to be prev
@@ -238,8 +223,28 @@ namespace Converter.Parsers.Images.PNG
       }
       else if (file.Interlance == PNG_INTERLANCE.ADAM7)
       {
-        throw new NotSupportedException("ADAM7 not supported");
+
       }
     } 
+
+    public static void UndoFilter(byte filter, Span<byte> currentRow, Span<byte> previousRow, int bytesPerPixel)
+    {
+      Debug.Assert(filter == 0);
+      switch (filter)
+      {
+        case (byte)PNG_FILTER.NONE:
+          break;
+        case (byte)PNG_FILTER.SUB:
+          break;
+        case (byte)PNG_FILTER.UP:
+          break;
+        case (byte)PNG_FILTER.AVERAGE:
+          break;
+        case (byte)PNG_FILTER.PAETH:
+          break;
+        default:
+          throw new InvalidDataException("Unknown Filter Type!");
+      }
+    }
   }
 }

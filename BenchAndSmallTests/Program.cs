@@ -14,6 +14,7 @@ using Converter.Writers.PNG;
 using Converter.Writers.TIFF;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.Diagnostics.Tracing.Parsers.MicrosoftWindowsWPF;
+using System.Buffers.Binary;
 using System.IO.Compression;
 using System.Security.Cryptography.X509Certificates;
 using System.Text;
@@ -224,12 +225,18 @@ using System.Text;
 
 //byte[] b = File.ReadAllBytes("bytes.txt");
 //string s = Encoding.Unicode.GetString(b);
+
+byte[] arr = new byte[] { 1, 2, 0, 12 };
+
+uint val = BinaryPrimitives.ReadUInt32LittleEndian(arr.AsSpan());
+
+
 string s = "020";
 int codePoint = Char.ConvertToUtf32(s, 0);
 
-//PdfParser parser = new PdfParser();
-//PDF_Options options = new PDF_Options();
-//parser.Parse(Files.RootFolder + "\\Prijemni-1.pdf", ref options);
+PdfParser parser = new PdfParser();
+PDF_Options options = new PDF_Options();
+parser.Parse(Files.RootFolder + "\\Prijemni-1.pdf", ref options);
 
 //BMPParser p = new BMPParser();
 //p.Parse(@$"W:\PDFToImageConverter\Files\testBmpMono.bmp");
@@ -241,5 +248,5 @@ int codePoint = Char.ConvertToUtf32(s, 0);
 //options.Type = BMP_TYPE.MONO;
 //BMPWriter.WriteRandomBMP("myRandomBMP.bmp", ref options);
 
-PNGFile file = PNGParser.Parse(Files.PNGSample);
-PNGWriter.Write("test.png", file);
+//PNGFile file = PNGParser.Parse(Files.PNGInternlancedSample);
+////PNGWriter.Write("test.png", file);
