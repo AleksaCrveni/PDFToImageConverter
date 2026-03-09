@@ -187,7 +187,7 @@ namespace Converter.Parsers.PDF
             mp.X2 = GetNextStackValAsInt();
             mp.Y1 = GetNextStackValAsInt();
             mp.X1 = GetNextStackValAsInt();
-            throw new NotImplementedException();
+            //throw new NotImplementedException();
             break;
           case 0x76: // v
             mp = new PDFGI_Point();
@@ -195,7 +195,7 @@ namespace Converter.Parsers.PDF
             mp.X3 = GetNextStackValAsInt();
             mp.Y2 = GetNextStackValAsInt();
             mp.X2 = GetNextStackValAsInt();
-            throw new NotImplementedException();
+           // throw new NotImplementedException();
             break;
           case 0x79: // y
             mp = new PDFGI_Point();
@@ -203,7 +203,7 @@ namespace Converter.Parsers.PDF
             mp.X3 = GetNextStackValAsInt();
             mp.Y1 = GetNextStackValAsInt();
             mp.X1 = GetNextStackValAsInt();
-            throw new NotImplementedException();
+          //  throw new NotImplementedException();
             break;
           case 0x68: // h
             mp = new PDFGI_Point();
@@ -218,7 +218,7 @@ namespace Converter.Parsers.PDF
             mp.Y3 = GetNextStackValAsInt();
             mp.Y1 = GetNextStackValAsInt();
             mp.X1 = GetNextStackValAsInt();
-            throw new NotImplementedException();
+         //   throw new NotImplementedException();
             break;
           #endregion pathConstruction
           #region pathPainting
@@ -248,7 +248,7 @@ namespace Converter.Parsers.PDF
             throw new NotImplementedException("Operator not i implemented");
           case 0x6e: // n
             mp = new PDFGI_Point();
-            throw new NotImplementedException();// CHECK CLIPPING PATH SECTION
+           // throw new NotImplementedException();// CHECK CLIPPING PATH SECTION
                                                 // path painting
             break;
           #endregion pathPainting
