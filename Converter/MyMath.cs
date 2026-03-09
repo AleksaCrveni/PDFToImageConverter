@@ -58,7 +58,7 @@
       mA[2, 1] = mB[2, 1];
       mA[2, 2] = mB[2, 2];
     }
-    public static float FPart(float x) => x - MathF.Floor(x);
-    public static float RFPart(float x) => 1 - FPart(x);
+    public static double FPart(double x) => x - Math.Floor(x);
+    public static double RFPart(double x) => 1 - FPart(x);
   }
 }

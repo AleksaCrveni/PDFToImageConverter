@@ -1688,7 +1688,7 @@ namespace Converter.Rasterizers
     #region MyRasterizerFunctions
 
     // placeholder
-    void Plot(byte[] bitmapArr, int byteOffset, int bitmapWidth, int x, int y, float brightness)
+    void Plot(byte[] bitmapArr, int byteOffset, int bitmapWidth, int x, int y, double brightness)
     {
       bitmapArr[byteOffset + y * bitmapWidth + x] = (byte)(brightness * 255);
     }
@@ -1701,12 +1701,12 @@ namespace Converter.Rasterizers
     /// <param name="y0"></param>
     /// <param name="x1"></param>
     /// <param name="y1"></param>
-    public virtual void MY_DrawLine(byte[] bitmapArr, int byteOffset, int bitmapWidth, float x0, float y0, float x1, float y1)
+    public virtual void MY_DrawLine(byte[] bitmapArr, int byteOffset, int bitmapWidth, double x0, double y0, double x1, double y1)
     {
-      bool steep = MathF.Abs(y1 - y0) > MathF.Abs(x1 - x0);
+      bool steep = Math.Abs(y1 - y0) > Math.Abs(x1 - x0);
       if (steep)
       {
-        float temp;
+        double temp;
         temp = x0;
         x0 = y0;
         y0 = temp;
@@ -1719,7 +1719,7 @@ namespace Converter.Rasterizers
       // make sure x0 is left of x1
       if (x0 > x1)
       {
-        float temp;
+        double temp;
         temp = x1;
         x1 = x0;
         x0 = temp;
@@ -1729,22 +1729,22 @@ namespace Converter.Rasterizers
         y0 = temp;
       }
 
-      float dx = x1 - x0;
-      float dy = y1 - y0;
+      double dx = x1 - x0;
+      double dy = y1 - y0;
      
-      float gradient;
+      double gradient;
       if (dx == 0)
         gradient = 1;
       else
         gradient = dy / dx;
 
         // first endpoint
-        int xEnd = (int)MathF.Floor(x0);
-      float yEnd = y0 + gradient * ((float)xEnd - x0);
-      float xGap = 1 - (x0 - (float)xEnd);
+        int xEnd = (int)Math.Floor(x0);
+      double yEnd = y0 + gradient * ((double)xEnd - x0);
+      double xGap = 1 - (x0 - (double)xEnd);
 
       int xPxl1 = xEnd;
-      int yPxl1 = (int)MathF.Floor(yEnd);
+      int yPxl1 = (int)Math.Floor(yEnd);
 
       if (steep)
       {
@@ -1757,15 +1757,15 @@ namespace Converter.Rasterizers
         Plot(bitmapArr, byteOffset, bitmapWidth, xPxl1, yPxl1 + 1, MyMath.FPart(yEnd) * xGap);
       }
 
-      float interY = yEnd + gradient; // first y-intersection for the main loop
+      double interY = yEnd + gradient; // first y-intersection for the main loop
 
       // second end point
-      xEnd = (int)MathF.Ceiling(x1);
-      yEnd = y1 + gradient * ((float)xEnd - x1);
-      xGap = 1 - ((float)xEnd - x1);
+      xEnd = (int)Math.Ceiling(x1);
+      yEnd = y1 + gradient * ((double)xEnd - x1);
+      xGap = 1 - ((double)xEnd - x1);
 
       int xPxl2 = xEnd;
-      int yPxl2 = (int)MathF.Floor(yEnd);
+      int yPxl2 = (int)Math.Floor(yEnd);
       if (steep)
       {
         Plot(bitmapArr, byteOffset, bitmapWidth, yPxl2, xPxl2, MyMath.RFPart(yEnd) * xGap);
@@ -1782,8 +1782,8 @@ namespace Converter.Rasterizers
       {
         for (int x = xPxl1 + 1; x < xPxl2; x++)
         {
-          Plot(bitmapArr, byteOffset, bitmapWidth, (int)MathF.Floor(interY), x, MyMath.RFPart(interY));
-          Plot(bitmapArr, byteOffset, bitmapWidth, (int)MathF.Floor(interY) + 1, x, MyMath.FPart(interY));
+          Plot(bitmapArr, byteOffset, bitmapWidth, (int)Math.Floor(interY), x, MyMath.RFPart(interY));
+          Plot(bitmapArr, byteOffset, bitmapWidth, (int)Math.Floor(interY) + 1, x, MyMath.FPart(interY));
           interY += gradient;
         }
       }
@@ -1791,8 +1791,8 @@ namespace Converter.Rasterizers
       {
         for (int x = xPxl1 + 1; x < xPxl2; x++)
         {
-          Plot(bitmapArr, byteOffset, bitmapWidth, x, (int)MathF.Floor(interY), MyMath.RFPart(interY));
-          Plot(bitmapArr, byteOffset, bitmapWidth, x, (int)MathF.Floor(interY) + 1, MyMath.FPart(interY));
+          Plot(bitmapArr, byteOffset, bitmapWidth, x, (int)Math.Floor(interY), MyMath.RFPart(interY));
+          Plot(bitmapArr, byteOffset, bitmapWidth, x, (int)Math.Floor(interY) + 1, MyMath.FPart(interY));
           interY += gradient;
         }
       }

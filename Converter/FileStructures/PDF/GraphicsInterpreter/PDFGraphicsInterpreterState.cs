@@ -81,6 +81,11 @@ namespace Converter.FileStructures.PDF.GraphicsInterpreter
     public int Phase;
   }
 
+  public class PointD
+  {
+    public double X;
+    public double Y;
+  }
   public struct PDFGI_Point()
   {
     public int X1;

@@ -23,18 +23,18 @@ namespace RasterPlayground
       return buff;
     }
 
-    private static void Plot(byte[] bitmap, int width, int x, int y, float brightness)
+    private static void Plot(byte[] bitmap, int width, int x, int y, double brightness)
     {
       Debug.Assert(brightness <= 1);
       bitmap[y * width + x] = (byte)(brightness * 255);
     }
-    public static byte[] DrawLine(int width, int height, float x0, float y0, float x1, float y1)
+    public static byte[] DrawLine(int width, int height, double x0, double y0, double x1, double y1)
     {
       byte[] bitmap = new byte[width * height];
-      bool steep = MathF.Abs(y1 - y0) > MathF.Abs(x1 - x0);
+      bool steep = Math.Abs(y1 - y0) > Math.Abs(x1 - x0);
       if (steep)
       {
-        float temp;
+        double temp;
         temp = x0;
         x0 = y0;
         y0 = temp;
@@ -47,7 +47,7 @@ namespace RasterPlayground
       // make sure x0 is left of x1
       if (x0 > x1)
       {
-        float temp;
+        double temp;
         temp = x1;
         x1 = x0;
         x0 = temp;
@@ -57,22 +57,22 @@ namespace RasterPlayground
         y0 = temp;
       }
 
-      float dx = x1 - x0;
-      float dy = y1 - y0;
+      double dx = x1 - x0;
+      double dy = y1 - y0;
 
-      float gradient;
+      double gradient;
       if (dx == 0)
         gradient = 1;
       else
         gradient = dy / dx;
 
       // first endpoint
-      int xEnd = (int)MathF.Floor(x0);
-      float yEnd = y0 + gradient * ((float)xEnd - x0);
-      float xGap = 1 - (x0 - (float)xEnd);
+      int xEnd = (int)Math.Floor(x0);
+      double yEnd = y0 + gradient * ((double)xEnd - x0);
+      double xGap = 1 - (x0 - (double)xEnd);
 
       int xPxl1 = xEnd;
-      int yPxl1 = (int)MathF.Floor(yEnd);
+      int yPxl1 = (int)Math.Floor(yEnd);
 
       if (steep)
       {
@@ -85,15 +85,15 @@ namespace RasterPlayground
         Plot(bitmap, width, xPxl1, yPxl1 + 1, MyMath.FPart(yEnd) * xGap);
       }
 
-      float interY = yEnd + gradient; // first y-intersection for the main loop
+      double interY = yEnd + gradient; // first y-intersection for the main loop
 
       // second end point
-      xEnd = (int)MathF.Ceiling(x1);
-      yEnd = y1 + gradient * ((float)xEnd - x1);
-      xGap = 1 - ((float)xEnd - x1);
+      xEnd = (int)Math.Ceiling(x1);
+      yEnd = y1 + gradient * ((double)xEnd - x1);
+      xGap = 1 - ((double)xEnd - x1);
 
       int xPxl2 = xEnd;
-      int yPxl2 = (int)MathF.Floor(yEnd);
+      int yPxl2 = (int)Math.Floor(yEnd);
       if (steep)
       {
         Plot(bitmap, width, yPxl2, xPxl2, MyMath.RFPart(yEnd) * xGap);
@@ -110,8 +110,8 @@ namespace RasterPlayground
       {
         for (int x = xPxl1 + 1; x < xPxl2; x++)
         {
-          Plot(bitmap, width, (int)MathF.Floor(interY), x, MyMath.RFPart(interY));
-          Plot(bitmap, width, (int)MathF.Floor(interY) + 1, x, MyMath.FPart(interY));
+          Plot(bitmap, width, (int)Math.Floor(interY), x, MyMath.RFPart(interY));
+          Plot(bitmap, width, (int)Math.Floor(interY) + 1, x, MyMath.FPart(interY));
           interY += gradient;
         }
       }
@@ -119,8 +119,8 @@ namespace RasterPlayground
       {
         for (int x = xPxl1 + 1; x < xPxl2; x++)
         {
-          Plot(bitmap, width, x, (int)MathF.Floor(interY), MyMath.RFPart(interY));
-          Plot(bitmap, width, x, (int)MathF.Floor(interY) + 1, MyMath.FPart(interY));
+          Plot(bitmap, width, x, (int)Math.Floor(interY), MyMath.RFPart(interY));
+          Plot(bitmap, width, x, (int)Math.Floor(interY) + 1, MyMath.FPart(interY));
           interY += gradient;
         }
       }

@@ -82,9 +82,12 @@ namespace Converter.Rasterizers
     // Positions are absolute so reader should anticipate that
     public void SaveAbsolute(string name)
     {
-      FileStream fs = File.Create($"PS_SHAPE_{name}.shape");
+#if RELEASE
+          return;
+#endif
+      FileStream fs = File.Create(Path.Join(Files.RootFolder, $"PS_SHAPE_{name}.shape"));
       byte[] mem = new byte[8096]; // limit for now for 8k shapes
-      Span<byte> buffer = new Span<byte>();
+      Span<byte> buffer = mem.AsSpan();
       int pos = 0;
       PositionIncrBufferWriter writer = new PositionIncrBufferWriter(ref buffer, true);
       bool absolute = true;

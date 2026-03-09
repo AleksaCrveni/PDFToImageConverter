@@ -2,16 +2,11 @@
 using Converter.FileStructures;
 using Converter.FileStructures.PDF;
 using Converter.FileStructures.PDF.GraphicsInterpreter;
-using Converter.FileStructures.PostScript;
-using Converter.FileStructures.TTF;
 using Converter.Rasterizers;
 using Converter.StaticData;
-using Converter.Utils;
-using System.Buffers;
 using System.Diagnostics;
 using System.Globalization;
 using System.Text;
-using static System.Formats.Asn1.AsnWriter;
 
 namespace Converter.Parsers.PDF
 {
@@ -98,6 +93,9 @@ namespace Converter.Parsers.PDF
       PDFGI_Point mp;
       string literal;
       tokensParsed++;
+      // used for tracking points of currently drawn path
+      PointD currPoint = new PointD();
+
       // val != because last token value might not be 0 so it won't account it
       while (_char != PDFConstants.NULL || (_char == PDFConstants.NULL && val != 0))
       {
@@ -173,12 +171,13 @@ namespace Converter.Parsers.PDF
             // this is relavive to current point
             double y = GetNextStackValAsDouble();
             double x = GetNextStackValAsDouble();
-            currentPC.Shape.MoveTo(textRenderingMatrix[2, 0] + x, textRenderingMatrix[2, 1] + y);
+            
+            currentPC.Shape.MoveTo(x, y);
             break;
           case 0x6c: // l
             y = GetNextStackValAsDouble();
             x = GetNextStackValAsDouble();
-            currentPC.Shape.LineTo(textRenderingMatrix[2, 0] + x, textRenderingMatrix[2, 1] + y);
+            currentPC.Shape.LineTo(x, y);
             break;
           case 0x63: // c
             mp = new PDFGI_Point();
@@ -208,7 +207,7 @@ namespace Converter.Parsers.PDF
             break;
           case 0x68: // h
             mp = new PDFGI_Point();
-            throw new NotImplementedException();
+//            throw new NotImplementedException();
             break;
           case 0x6572: // re
             mp = new PDFGI_Point();
@@ -225,6 +224,7 @@ namespace Converter.Parsers.PDF
           #region pathPainting
           case 0x53: // S
             PDF_RasterShape();
+            currentPC.Shape = new PSShape();
             break;
           case 0x73: // s
             throw new NotImplementedException("Operator not i implemented");
@@ -885,77 +885,23 @@ namespace Converter.Parsers.PDF
     /// </summary>
     public void PDF_RasterShape()
     {
+      //currentPC.Shape.SaveAbsolute("shapeExport");
+      //throw new Exception("crash it!");
       // rounding makes it look a bit better?
       int X = (int)MathF.Round((float)textRenderingMatrix[2, 0]);
       // because origin is bottom-left we have do bitmapHeight - , to get position on the top
       int Y = _targetSize.Height - (int)(textRenderingMatrix[2, 1]);
 
-      List<TTFVertex> vertices = RasterHelper.ConvertToTTFVertexFormat(currentPC.Shape);
-      List<int> windingLengths = new List<int>();
-      int windingCount = 0;
       float scaleX = (float)textRenderingMatrix[0, 0] * 0.001f;
       float scaleY = (float)textRenderingMatrix[1, 1] * 0.001f;
-      float scale = scaleX > scaleY ? scaleX : scaleY;
-      List<PointF> windings = _shapeRasterizer.STB_FlattenCurves(ref vertices, vertices.Count, 0.35f / scale, ref windingLengths, ref windingCount);
-      int c_x0 = 0;
-      int c_y0 = 0;
-      int c_x1 = 0;
-      int c_y1 = 0;
 
-      #region Assert
-      Debug.Assert(c_x0 != int.MaxValue && c_x0 != int.MinValue);
-      Debug.Assert(c_y0 != int.MaxValue && c_y0 != int.MinValue);
-      Debug.Assert(c_x1 != int.MaxValue && c_x1 != int.MinValue);
-      Debug.Assert(c_y1 != int.MaxValue && c_y1 != int.MinValue);
-      #endregion Assert
+      float scale = 1;
 
-      RasterHelper.GetFakeBoundingBoxFromPoints(windings, ref c_x0, ref c_y0, ref c_x1, ref c_y1, scale);
-
-      int y = Y + (int)(c_y0 * scale);
-      // I think that this should be replaced from value in Widths array
-      // NOTE: widths array wont work since this width is not in units but in pixels after its been scaled down
-      int glyphWidth = c_x1 - c_x0;
-      int glyphHeight = c_y1 - c_y0;
-      // currently we only support like a straight line and bellow should be like
-      // line thinkness so we will just scale it into height
-      Debug.Assert(currentPC.Shape._moves.Last() == PS_COMMAND.LINE_TO);
-      //glyphHeight = (int)(currentGS.LineWidth);
-      if (glyphHeight == 0)
-        glyphHeight = 1;
-      if (glyphWidth == 0)
-        glyphWidth = 1;
-      Debug.Assert(glyphHeight > 0);
-      Debug.Assert(glyphWidth > 0);
-      // scale shape down???
+      int y = Y;
       int byteOffset = X + (y * _targetSize.Width);
-      int shiftX = 0;
-      int shiftY = 0;
+      _shapeRasterizer.RasterizeShape(_outputBuffer, byteOffset, _targetSize.Width, currentPC.Shape, 1);
 
-      BmpS result = new BmpS();
-      result.H = glyphHeight;
-      result.W = glyphWidth;
-      result.Offset = byteOffset;
-      result.Pixels = _outputBuffer;
-      result.Stride = _targetSize.Width;
-      _shapeRasterizer.STB_InternalRasterize(ref result, ref windings, ref windingLengths, windingCount, scaleX, scaleY, 0, 0, (int)MathF.Floor(c_x0 * scale), (int)MathF.Floor(c_y0 * scale), true);
-
-      #region Advance
-      
-      // not sure what is width here
-      double advanceX = currentTextObject.Tc;
-      double advanceY = 0; // This wont work for vertical fonts
-      
-      //if (c == ' ')
-      //  advanceX += currentTextObject.Tw;
-      advanceX *= currentTextObject.Th;
-
-      // TODO: this really depends on what type of CTM it is. i.e is there shear, transaltion, rotation etc
-      // I should detect this and save state somewhere
-      // for now just support translate and scale
-      // NOTE: actually I think I can just multiply matrix, and this is done to avoid matrix multiplciation
-      currentTextObject.TextMatrix[2, 0] = advanceX * textRenderingMatrix[0, 0] + currentTextObject.TextMatrix[2, 0];
-      currentTextObject.TextMatrix[2, 1] = 0 * currentTextObject.TextMatrix[1, 1] + currentTextObject.TextMatrix[2, 1];
-      #endregion
+      //AdvanceDrawPos((char)0);
     }
 
     public void PDF_DrawText(string font, string textToWrite, PDFGI_DrawState state, int positionAdjustment = 0)
@@ -1054,23 +1000,7 @@ namespace Converter.Parsers.PDF
 
       rasterizer.RasterizeGlyph(_outputBuffer, byteOffset, glyphWidth, glyphHeight, _targetSize.Width, s.scaleX, s.scaleY, shiftX, shiftY, ref glyphInfo);
 
-      #region Advance
-      // double advanceX = width * state.TextObject.FontScaleFactor + state.TextObject.Tc;
-      // double advanceY = 0 + state.TextObject.FontScaleFactor; // This wont work for vertical fonts
-      double advanceX = width + state.TextObject.Tc;
-      double advanceY = 0; // This wont work for vertical fonts
-
-      if (c == ' ')
-        advanceX += state.TextObject.Tw;
-      advanceX *= state.TextObject.Th;
-
-      // TODO: this really depends on what type of CTM it is. i.e is there shear, transaltion, rotation etc
-      // I should detect this and save state somewhere
-      // for now just support translate and scale
-      // NOTE: actually I think I can just multiply matrix, and this is done to avoid matrix multiplciation
-      state.TextObject.TextMatrix[2, 0] = advanceX * state.TextRenderingMatrix[0, 0] + state.TextObject.TextMatrix[2, 0];
-      state.TextObject.TextMatrix[2, 1] = 0 * state.TextObject.TextMatrix[1, 1] + state.TextObject.TextMatrix[2, 1];
-      #endregion
+      AdvanceDrawPos(c, width, state);
     }
 
     private void UpdateCTM(double a, double b, double c, double d, double e, double f)
@@ -1120,6 +1050,27 @@ namespace Converter.Parsers.PDF
       double[,] mid = new double[3, 3];
       MyMath.MultiplyMatrixes3x3(identity, currentTextObject.TextMatrix, mid);
       MyMath.MultiplyMatrixes3x3(mid, CTM, textRenderingMatrix);
+    }
+
+    public void AdvanceDrawPos(char c, double width, PDFGI_DrawState state)
+    {
+      #region Advance
+      // double advanceX = width * state.TextObject.FontScaleFactor + state.TextObject.Tc;
+      // double advanceY = 0 + state.TextObject.FontScaleFactor; // This wont work for vertical fonts
+      double advanceX = width + state.TextObject.Tc;
+      double advanceY = 0; // This wont work for vertical fonts
+
+      if (c == ' ')
+        advanceX += state.TextObject.Tw;
+      advanceX *= state.TextObject.Th;
+
+      // TODO: this really depends on what type of CTM it is. i.e is there shear, transaltion, rotation etc
+      // I should detect this and save state somewhere
+      // for now just support translate and scale
+      // NOTE: actually I think I can just multiply matrix, and this is done to avoid matrix multiplciation
+      state.TextObject.TextMatrix[2, 0] = advanceX * state.TextRenderingMatrix[0, 0] + state.TextObject.TextMatrix[2, 0];
+      state.TextObject.TextMatrix[2, 1] = 0 * state.TextObject.TextMatrix[1, 1] + state.TextObject.TextMatrix[2, 1];
+      #endregion
     }
 
     public PDF_FontData GetFontDataFromKey(string searchKey)

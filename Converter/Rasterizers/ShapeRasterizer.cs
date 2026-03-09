@@ -1,10 +1,8 @@
 ﻿
 using Converter.FileStructures.PDF.GraphicsInterpreter;
-using Converter.FileStructures.TTF;
-using Converter.FileStructures.Type1;
-using Converter.Utils;
-using System.Diagnostics;
-
+using Converter.FileStructures.PostScript;
+using System.Reflection.Metadata.Ecma335;
+using System.Runtime.CompilerServices;
 namespace Converter.Rasterizers
 {
   /// <summary>
@@ -36,6 +34,37 @@ namespace Converter.Rasterizers
      
     }
 
+    public void RasterizeShape(byte[] bitmapArr, int byteOffset, int stride, PSShape shape, double scale)
+    {
+      if (scale != 1)
+        shape.ScaleAll(scale);
+
+      double currX = 0;
+      double currY = 0;
+      double x = 0;
+      double y = 0;
+      int i = 0;
+      // For path drawing points are absolute we dont have to incr
+      foreach(PS_COMMAND cmd in shape._moves)
+      {
+        switch (cmd)
+        {
+          case PS_COMMAND.MOVE_TO:
+            currX = shape._shapePoints[i++];
+            currY = shape._shapePoints[i++];
+            break;
+          case PS_COMMAND.LINE_TO:
+            x = shape._shapePoints[i++];
+            y = shape._shapePoints[i++];
+            MY_DrawLine(bitmapArr, byteOffset, stride, currX, currY, x, y);
+            currX = x;
+            currY = y;
+            break;
+          default:
+            throw new NotImplementedException($"Not implemented {cmd.ToString()}");
+        }
+      }
+    }
     protected override void InitFont()
     {
       throw new NotImplementedException();
