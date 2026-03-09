@@ -888,18 +888,19 @@ namespace Converter.Parsers.PDF
       //currentPC.Shape.SaveAbsolute("shapeExport");
       //throw new Exception("crash it!");
       // rounding makes it look a bit better?
-      int X = (int)MathF.Round((float)textRenderingMatrix[2, 0]);
+      int X = (int)MathF.Round((float)currentGS.CTM[2, 0]);
       // because origin is bottom-left we have do bitmapHeight - , to get position on the top
-      int Y = _targetSize.Height - (int)(textRenderingMatrix[2, 1]);
+      int Y = _targetSize.Height - (int)(currentGS.CTM[2, 1]);
 
-      float scaleX = (float)textRenderingMatrix[0, 0] * 0.001f;
-      float scaleY = (float)textRenderingMatrix[1, 1] * 0.001f;
+      float scaleX = (float)currentGS.CTM[0, 0];
+      float scaleY = (float)currentGS.CTM[1, 1];
 
-      float scale = 1;
+      // do one scale for now
+      float scale = scaleX > scaleY ? scaleX : scaleY;
 
       int y = Y;
       int byteOffset = X + (y * _targetSize.Width);
-      _shapeRasterizer.RasterizeShape(_outputBuffer, byteOffset, _targetSize.Width, currentPC.Shape, 1);
+      _shapeRasterizer.RasterizeShape(_outputBuffer, byteOffset, _targetSize.Width, currentPC.Shape, scale);
 
       //AdvanceDrawPos((char)0);
     }
