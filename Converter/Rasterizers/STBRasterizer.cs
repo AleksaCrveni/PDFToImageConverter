@@ -1688,7 +1688,11 @@ namespace Converter.Rasterizers
     #region MyRasterizerFunctions
 
     // placeholder
-    void Plot(int a, int b, float c) { }
+    void Plot(byte[] bitmapArr, int byteOffset, int bitmapWidth, int x, int y, float brightness)
+    {
+      bitmapArr[byteOffset + y * bitmapWidth + x] = (byte)(brightness * 255);
+    }
+
     /// <summary>
     /// https://en.wikipedia.org/wiki/Xiaolin_Wu%27s_line_algorithm
     /// Xiaolin Wu's line algorithm
@@ -1727,15 +1731,15 @@ namespace Converter.Rasterizers
 
       float dx = x1 - x0;
       float dy = y1 - y0;
-
+     
       float gradient;
       if (dx == 0)
         gradient = 1;
       else
         gradient = dy / dx;
 
-      // first endpoint
-      int xEnd = (int)MathF.Floor(x0);
+        // first endpoint
+        int xEnd = (int)MathF.Floor(x0);
       float yEnd = y0 + gradient * ((float)xEnd - x0);
       float xGap = 1 - (x0 - (float)xEnd);
 
@@ -1744,13 +1748,13 @@ namespace Converter.Rasterizers
 
       if (steep)
       {
-        Plot(yPxl1, xPxl1, MyMath.RFPart(yEnd) * xGap);
-        Plot(yPxl1 + 1, xPxl1, MyMath.FPart(yEnd) * xGap);
+        Plot(bitmapArr, byteOffset, bitmapWidth, yPxl1, xPxl1, MyMath.RFPart(yEnd) * xGap);
+        Plot(bitmapArr, byteOffset, bitmapWidth, yPxl1 + 1, xPxl1, MyMath.FPart(yEnd) * xGap);
       }
       else
       {
-        Plot(xPxl1, yPxl1, MyMath.RFPart(yEnd) * xGap);
-        Plot(xPxl1, yPxl1 + 1, MyMath.FPart(yEnd) * xGap);
+        Plot(bitmapArr, byteOffset, bitmapWidth, xPxl1, yPxl1, MyMath.RFPart(yEnd) * xGap);
+        Plot(bitmapArr, byteOffset, bitmapWidth, xPxl1, yPxl1 + 1, MyMath.FPart(yEnd) * xGap);
       }
 
       float interY = yEnd + gradient; // first y-intersection for the main loop
@@ -1764,13 +1768,13 @@ namespace Converter.Rasterizers
       int yPxl2 = (int)MathF.Floor(yEnd);
       if (steep)
       {
-        Plot(yPxl2, xPxl2, MyMath.RFPart(yEnd) * xGap);
-        Plot(yPxl2 + 1, xPxl2, MyMath.FPart(yEnd) * xGap);
+        Plot(bitmapArr, byteOffset, bitmapWidth, yPxl2, xPxl2, MyMath.RFPart(yEnd) * xGap);
+        Plot(bitmapArr, byteOffset, bitmapWidth, yPxl2 + 1, xPxl2, MyMath.FPart(yEnd) * xGap);
       }
       else
       {
-        Plot(xPxl2, yPxl2, MyMath.RFPart(yEnd) * xGap);
-        Plot(xPxl2, yPxl2 + 1, MyMath.FPart(yEnd) * xGap);
+        Plot(bitmapArr, byteOffset, bitmapWidth, xPxl2, yPxl2, MyMath.RFPart(yEnd) * xGap);
+        Plot(bitmapArr, byteOffset, bitmapWidth, xPxl2, yPxl2 + 1, MyMath.FPart(yEnd) * xGap);
       }
 
       // main loop
@@ -1778,8 +1782,8 @@ namespace Converter.Rasterizers
       {
         for (int x = xPxl1 + 1; x < xPxl2; x++)
         {
-          Plot((int)MathF.Floor(interY), x, MyMath.RFPart(interY));
-          Plot((int)MathF.Floor(interY) + 1, x, MyMath.FPart(interY));
+          Plot(bitmapArr, byteOffset, bitmapWidth, (int)MathF.Floor(interY), x, MyMath.RFPart(interY));
+          Plot(bitmapArr, byteOffset, bitmapWidth, (int)MathF.Floor(interY) + 1, x, MyMath.FPart(interY));
           interY += gradient;
         }
       }
@@ -1787,8 +1791,8 @@ namespace Converter.Rasterizers
       {
         for (int x = xPxl1 + 1; x < xPxl2; x++)
         {
-          Plot(x, (int)MathF.Floor(interY), MyMath.RFPart(interY));
-          Plot(x, (int)MathF.Floor(interY) + 1, MyMath.FPart(interY));
+          Plot(bitmapArr, byteOffset, bitmapWidth, x, (int)MathF.Floor(interY), MyMath.RFPart(interY));
+          Plot(bitmapArr, byteOffset, bitmapWidth, x, (int)MathF.Floor(interY) + 1, MyMath.FPart(interY));
           interY += gradient;
         }
       }
