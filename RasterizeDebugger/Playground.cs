@@ -24,6 +24,14 @@ namespace RasterizeDebugger
     OpenFileDialog _dialog;
     PSShape _shape;
 
+    public Playground()
+    {
+      InitializeComponent();
+      _dialog = new OpenFileDialog();
+      _dialog.Filter = "Shape (*.shape)|*.shape";
+      _dialog.RestoreDirectory = true;
+    }
+
     public Playground(PDFFile file)
     {
       InitializeComponent();
@@ -34,15 +42,20 @@ namespace RasterizeDebugger
     }
     private void Playground_Load(object sender, EventArgs e)
     {
-      foreach (PDF_PageInfo pInfo in _pdfFile.PageInformation)
+      if (_pdfFile != null) 
       {
-        foreach (PDF_FontData font in pInfo.ResourceDict.Font)
+        foreach (PDF_PageInfo pInfo in _pdfFile.PageInformation)
         {
-          cb_font.Items.Add(font.FontInfo.BaseFont);
+          foreach (PDF_FontData font in pInfo.ResourceDict.Font)
+          {
+            cb_font.Items.Add(font.FontInfo.BaseFont);
+          }
         }
+        cb_font.SelectedIndex = 0;
       }
+      
 
-      cb_font.SelectedIndex = 0;
+      
       txb_Scale.Text = _scale.ToString();
       _scale = 1f;
       _data = new byte[_height * _width];
@@ -112,6 +125,9 @@ namespace RasterizeDebugger
     /// <exception cref="InvalidDataException"></exception>
     private void btn_raster_Click(object sender, EventArgs e)
     {
+      if (_pdfFile == null)
+        return;
+
       Array.Clear(_data);
       bool valid = float.TryParse(txb_Scale.Text, out float res);
       if (!valid || res <= 0 || res > 100)

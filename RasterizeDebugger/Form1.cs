@@ -40,8 +40,7 @@ namespace RasterizeDebugger
     string _lastFontRef;
     uint _totalStringLiteralCount;
     enum ZOOM { IN, OUT }
-    Playground _playground;
-    bool _playgroundOpen = false;
+    string _fileFullPath;
     class ZoomStatePosition
     {
       public PointF p;
@@ -98,7 +97,7 @@ namespace RasterizeDebugger
         _outStream = new MemoryStream();
         PDF_Options pdfOptions = new PDF_Options();
         _parser.Parse(_file, _dialog.OpenFile(), _outStream, ref pdfOptions, true);
-
+        _fileFullPath = _dialog.FileName;
         byte[] rawContent = _file.PageInformation[0].ContentDict.RawStreamData;
         PDF_ResourceDict rDict = _file.PageInformation[0].ResourceDict;
 
@@ -147,8 +146,6 @@ namespace RasterizeDebugger
         lbl_glyphIndex.Text = "NULL";
         lbl_glyphName.Text = "NULL";
         lbl_currentChar.Text = "NULL";
-        _playground?.Close();
-        _playground = new Playground(_file);
       }
     }
 
@@ -478,17 +475,20 @@ namespace RasterizeDebugger
 
     private void btn_fontPlayground_Click(object sender, EventArgs e)
     {
-      // avoid du plication of events
-      if (!_playgroundOpen)
-        _playground.FormClosed += PlaygroundClosedEvent;
-      _playground.Show();
-      _playgroundOpen = true;
-    }
+      Playground p;
+      if (_file == null)
+      {
+        p = new Playground();
+      } else
+      {
+        PdfParser parser = new PdfParser();
+        PDF_Options options = new PDF_Options();
 
-    private void PlaygroundClosedEvent(object sender, FormClosedEventArgs e)
-    {
-      _playground = new Playground(_file);
-      _playgroundOpen = false;
+        PDFFile file = parser.Parse(_fileFullPath, ref options);
+        p = new Playground(file);
+        
+      }
+      p.Show();
     }
   }
 }
