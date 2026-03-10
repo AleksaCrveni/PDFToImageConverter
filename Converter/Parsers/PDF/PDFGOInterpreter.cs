@@ -47,7 +47,7 @@ namespace Converter.Parsers.PDF
     public byte[] _outputBuffer;
     public bool _debug;
     public PDFGO_DEBUG_STATE _debugState;
-    private ShapeRasterizer _shapeRasterizer;
+    private PathRasterizer _shapeRasterizer;
 
     // TODO: maybe NULL check is redundant if we let it throw to end?
     public PDFGOInterpreter(byte[] contentBuffer, PDF_ResourceDict resourceDict,  IConverter converter, bool debug = false)
@@ -70,7 +70,7 @@ namespace Converter.Parsers.PDF
       _targetSize = (_converter.GetHeight(), _converter.GetWidth());
       _outputBuffer = new byte[_targetSize.Height * _targetSize.Width];
       _debug = debug;
-      _shapeRasterizer = new ShapeRasterizer(Array.Empty<byte>(), "");
+      _shapeRasterizer = new PathRasterizer(Array.Empty<byte>(), "");
       if (debug)
         _debugState = new PDFGO_DEBUG_STATE();
       InitGS();

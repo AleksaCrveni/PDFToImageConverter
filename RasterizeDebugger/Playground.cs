@@ -6,7 +6,6 @@ using Converter.Rasterizers;
 using Converter.Utils;
 using Converter.Writers.TIFF;
 using System.Diagnostics;
-using System.Drawing.Imaging;
 using System.Text;
 
 
@@ -193,7 +192,7 @@ namespace RasterizeDebugger
       {
         _shape = new PSShape();
         _shape.LoadData(File.ReadAllBytes(_dialog.FileName));
-        ShapeRasterizer shapeRasterizer = new ShapeRasterizer(Array.Empty<byte>(), "");
+        PathRasterizer shapeRasterizer = new PathRasterizer(Array.Empty<byte>(), "");
         
           
         Array.Clear(_data);

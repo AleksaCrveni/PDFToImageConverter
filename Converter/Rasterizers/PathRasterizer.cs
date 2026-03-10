@@ -9,9 +9,9 @@ namespace Converter.Rasterizers
   /// Primarily used for rasterazing PDF paths
   /// Its kind of stateless workaround
   /// </summary>
-  public class ShapeRasterizer : STBRasterizer, IRasterizer
+  public class PathRasterizer : STBRasterizer, IRasterizer
   {
-    public ShapeRasterizer(byte[] rawFontBuffer, string? encodingType) : base(rawFontBuffer, encodingType)
+    public PathRasterizer(byte[] rawFontBuffer, string? encodingType) : base(rawFontBuffer, encodingType)
     {
     }
 
