@@ -24,8 +24,8 @@ typedef double real64;
 
 #define global_var static
 
-global_var int RENDER_WIDTH = 1200;
-global_var int RENDER_HEIGHT = 1200;
+global_var int RENDER_WIDTH = 1500;
+global_var int RENDER_HEIGHT = 1500;
 global_var int WINDOW_WIDTH = 800;
 global_var int WINDOW_HEIGHT = 800;
 
@@ -361,7 +361,6 @@ void HotLoadBuffer(win32_offscreen_buffer *Buffer)
 		return;
 	}
 	ShouldRender = false;
-	file.read((char*)Buffer->SizeInfo, 4);
 	/*
 	uint8* b = (uint8*)Buffer->SizeInfo;
 	int a = (*b++ << 8);

@@ -886,7 +886,6 @@ namespace Converter.Parsers.PDF
     public void PDF_RasterShape()
     {
       //currentPC.Shape.SaveAbsolute("shapeExport");
-      //throw new Exception("crash it!");
       // rounding makes it look a bit better?
       int X = (int)MathF.Round((float)currentGS.CTM[2, 0]);
       // because origin is bottom-left we have do bitmapHeight - , to get position on the top
@@ -901,8 +900,6 @@ namespace Converter.Parsers.PDF
       int y = Y;
       int byteOffset = X + (y * _targetSize.Width);
       _shapeRasterizer.RasterizeShape(_outputBuffer, byteOffset, _targetSize.Width, currentPC.Shape, scale);
-
-      //AdvanceDrawPos((char)0);
     }
 
     public void PDF_DrawText(string font, string textToWrite, PDFGI_DrawState state, int positionAdjustment = 0)

@@ -29,6 +29,7 @@ namespace Tester
       PDF_Options options = new PDF_Options();
       pdfParser.Parse(Files.BaseDocFilePath, ref options);
       pdfParser.Parse(Files.Sample, ref options);
+      pdfParser.Parse(Files.Prijemni1, ref options);
     }
 
   }
