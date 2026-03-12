@@ -118,6 +118,8 @@ namespace Converter.Parsers.Images.BMP
       h.XRes = BufferReader.ReadInt32LE(ref buffer, ref file.Pos);
       h.YRes = BufferReader.ReadInt32LE(ref buffer, ref file.Pos);
       h.NumOfColors = BufferReader.ReadUInt32LE(ref buffer, ref file.Pos);
+      if (h.NumOfColors == 0 && h.BitsPerPixel <= 8)
+        h.NumOfColors = (uint)MyMath.IntPow(2, (uint)h.BitsPerPixel);
       h.NumOfImportantColors = BufferReader.ReadUInt32LE(ref buffer, ref file.Pos);
       // no support for extra masks
 
