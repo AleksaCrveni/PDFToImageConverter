@@ -157,7 +157,75 @@
     TEXT,
     IMAGEB,
     IMAGEC,
-    IMAGEL
+    IMAGEI
+  }
+
+  // Table 169
+  public enum PDF_AnnotSubtype
+  {
+    NULL = 0,
+    Text,
+    Link,
+    FreeText,
+    Line,
+    Square,
+    Circle,
+    Polygon,
+    PolyLine,
+    Highlight,
+    Underline,
+    Squiggly,
+    StrikeOut,
+    Stamp,
+    Caret,
+    Ink,
+    Popup,
+    FileAttachment,
+    Sound,
+    Movie, 
+    Widget,
+    Screen,
+    PrinterMark,
+    TrapNet,
+    Watermark,
+    _3D,
+    Redact
+  }
+  
+  public enum PDF_AnnotAppearanceState
+  {
+    NULL,
+    On,
+    Off
+  }
+  public enum PDF_AnnotHightlightMode
+  {
+    NULL = 0,
+    N,
+    I,
+    O,
+    P
+  }
+
+  // Table 194
+  public enum PDF_AnnotActionType
+  {
+    NULL,
+    Launch,
+    Thread,
+    URI,
+    Sound,
+    Movie,
+    Hide,
+    Named,
+    SubmitForm,
+    ResetForm,
+    ImportData,
+    JavaScript,
+    SetOCGState,
+    Rendition,
+    Trans,
+    GoTo3DView
   }
 
 }

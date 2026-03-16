@@ -2,6 +2,7 @@
 using Converter.FileStructures.General;
 using Converter.Rasterizers;
 using System.Numerics;
+using System.Security.Cryptography.X509Certificates;
 using System.Text;
 
 namespace Converter.FileStructures.PDF
@@ -139,6 +140,7 @@ namespace Converter.FileStructures.PDF
     public (int, int) ResourcesIR;
     public int Count;
     public PDF_Rect MediaBox;
+    public List<PDF_ProcedureSet> ProcSet;
   }
   // Table 30
   // Resources - 
@@ -161,7 +163,7 @@ namespace Converter.FileStructures.PDF
     public List<(int, int)> B; // use list for now, idk size
     public double Dur;
     public Dictionary<object, object> Trans;
-    public List<string> Annots;
+    public List<PDF_Annot> Annots;
     public Dictionary<object, object> AA;
     public byte[] Metadata;
     public Dictionary<object, object> PieceInfo;
@@ -296,7 +298,8 @@ namespace Converter.FileStructures.PDF
       {
         if (startCode == codepoint)
           return val;
-      };
+      }
+      ;
 
       return string.Empty;
     }
@@ -368,7 +371,7 @@ namespace Converter.FileStructures.PDF
 
   // 7.4.1 & Table 5
   // TODO: Expand this
-  public class PDF_CommonStreamDict 
+  public class PDF_CommonStreamDict
   {
     public PDF_CommonStreamDict()
     {
@@ -388,7 +391,7 @@ namespace Converter.FileStructures.PDF
   public class PDF_CID_CMAP
   {
     public Dictionary<ushort, Rune> Cmap = new Dictionary<ushort, Rune>();
-    public Dictionary<ushort, List<Rune>> LigatureCmap = new Dictionary<ushort, List<Rune>>(); 
+    public Dictionary<ushort, List<Rune>> LigatureCmap = new Dictionary<ushort, List<Rune>>();
   }
 
   // 7.9.5
@@ -443,4 +446,96 @@ namespace Converter.FileStructures.PDF
     public PDF_CommonStreamDict CommonStreamDict;
     public List<(int objId, int offset)> Offsets;
   }
+
+  public class PDF_Annot
+  {
+    public PDF_AnnotSubtype SubType;
+    public PDF_Rect Rect;
+    public string Contents;
+    public (int objIndex, int generation) P_IR;
+    public string NM;
+    public string M;
+    public int F;
+    public Dictionary<object, object> AP;
+    public object AS;
+    public double[] Border = [0, 0, 1];
+    public List<double> BorderDashLine = [];
+    public List<double> C;
+    public int StructParent;
+    public Dictionary<object, object> OC;
+    public IPDF_AnnotData AnnotData;
+  }
+
+  public interface IPDF_AnnotData { }
+  public class PFD_ScreenAnnot : IPDF_AnnotData
+  {
+    public string T;
+    public Dictionary<object, object> MK;
+    public Dictionary<object, object> A;
+    public Dictionary<object, object> AA;
+  }
+  public class PDF_TextAnnot : IPDF_AnnotData { }
+
+  // Table 173
+  public class PDF_LinkAnnot : IPDF_AnnotData
+  {
+    public PDF_AnnotAction Actions;
+    // i.e /Dest [3 0 R /FitR –4 399 199 533]
+    public object Dest;
+    public PDF_AnnotHightlightMode H;
+    public Dictionary<object, object> PA;
+    // len 8
+    public double[] QuadPoints;
+    public Dictionary<object, object> BS;
+
+  }
+  public class PDF_FreeTextAnnot : IPDF_AnnotData { }
+  public class PDF_LineAnnot : IPDF_AnnotData { }
+  public class PDF_Square_CircleAnnot : IPDF_AnnotData { }
+  public class PDF_Polygon_PolyLineAnnot : IPDF_AnnotData { }
+  public class PDF_TextMarkupAnnot : IPDF_AnnotData { }
+  public class PDF_StampAnnot : IPDF_AnnotData { }
+  public class PDF_CaretAnnot : IPDF_AnnotData { }
+  public class PDF_InkAnnot : IPDF_AnnotData { }
+  public class PDF_PopupAnnot : IPDF_AnnotData { }
+  public class PDF_FileAttachmentAnnot : IPDF_AnnotData { }
+  public class PDF_SoundAnnot : IPDF_AnnotData { }
+  public class PDF_MovieAnnot : IPDF_AnnotData { }
+  public class PDF_WidgetAnnot : IPDF_AnnotData { }
+  public class PDF_ScreenAnnot : IPDF_AnnotData { }
+  public class PDF_PrinterMarkAnnot : IPDF_AnnotData { }
+  public class PDF_TrapNetAnnot : IPDF_AnnotData { }
+  public class PDF_WatermarkAnnnot : IPDF_AnnotData { }
+  public class PDF_3DAnnot : IPDF_AnnotData { }
+  public class PDF_RedactAnnot : IPDF_AnnotData { }
+
+  public class PDF_AnnotAction
+  {
+    public PDF_AnnotActionType SubType;
+    public object Next;
+    public IPDF_AnnotActionData ActionData;
+  }
+
+  public interface IPDF_AnnotActionData { }
+  public class PDF_AnnotLaunchAction : IPDF_AnnotActionData { }
+  public class PDF_AnnotThreadAction : IPDF_AnnotActionData { }
+  // Table 206
+  public class PDF_AnnotURIAction : IPDF_AnnotActionData
+  {
+    public string URI;
+    public bool IsMap;
+  }
+  public class PDF_AnnotSoundAction : IPDF_AnnotActionData { }
+  public class PDF_AnnotMovieAction : IPDF_AnnotActionData { }
+  public class PDF_AnnotHideAction : IPDF_AnnotActionData { }
+  public class PDF_AnnotNamedAction : IPDF_AnnotActionData { }
+  public class PDF_AnnotSubmitFormAction : IPDF_AnnotActionData { }
+  public class PDF_AnnotResetFormAction : IPDF_AnnotActionData { }
+  public class PDF_AnnotImportDataAction : IPDF_AnnotActionData { }
+  public class PDF_AnnotJavaScriptAction : IPDF_AnnotActionData { }
+  public class PDF_AnnotSetOCGStateAction : IPDF_AnnotActionData { }
+  public class PDF_AnnotRenditionAction : IPDF_AnnotActionData { }
+  public class PDF_AnnotTransAction : IPDF_AnnotActionData { }
+  public class PDF_AnnotGoTo3DViewAction : IPDF_AnnotActionData { }
+  
 }

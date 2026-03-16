@@ -2,6 +2,7 @@
 using Converter.StaticData;
 using System.Globalization;
 using System.Reflection.Emit;
+using System.Runtime.CompilerServices;
 using System.Text;
 
 namespace Converter.Parsers.PDF
@@ -24,6 +25,16 @@ namespace Converter.Parsers.PDF
     public PDFSpanParseHelper(ref ReadOnlySpan<byte> buffer)
     {
       _buffer = buffer;
+    }
+
+    /// <summary>
+    /// If we are at star t of object 26 0 obj we will skip those 3
+    /// </summary>
+    public void SkipObjHeader()
+    {
+      SkipNextToken();
+      SkipNextToken();
+      SkipNextToken();
     }
     // it should stop at next special char, but it should exclude them!
     // if special char is first token its ok!
@@ -64,6 +75,15 @@ namespace Converter.Parsers.PDF
       ReadOnlySpan<byte> span = new ReadOnlySpan<byte>();
       GetNextStringAsReadOnlySpan(ref span);
       return Encoding.Default.GetString(span).Split(delimiter).ToList();
+    }
+
+    // TODO: Optimize not to create string
+    public bool GetNextBool()
+    { 
+      bool isBool = bool.TryParse(GetNextToken(), out bool res);
+      if (!isBool)
+        throw new InvalidDataException("Invalid data, expected bool!");
+      return res;
     }
 
     public string GetNextASCIIString()
@@ -343,6 +363,27 @@ namespace Converter.Parsers.PDF
       return res;
     }
 
+    public List<double> GetNextDoubleArray()
+    {
+      List<double> array = new List<double>();
+      ReadUntilNonWhiteSpaceDelimiter();
+      if (_char != '[')
+        throw new InvalidDataException("Invalid array data. Expected Array");
+      ReadChar();
+
+      SkipWhiteSpace();
+      while (_char != PDFConstants.NULL && _char != ']')
+      {
+        array.Add(GetNextDouble());
+        SkipWhiteSpace();
+      }
+
+      if (_char != ']')
+        throw new InvalidDataException("Invalid array data. Expected end of Array");
+      ReadChar();
+      return array;
+    }
+
     public List<string> GetNextArrayStrict()
     {
       List<string> array = new List<string>();
@@ -524,7 +565,12 @@ namespace Converter.Parsers.PDF
       }
       return true;
     }
-
+    
+    // This has special encoding and its BE;
+    public string GetNextTextString()
+    {
+      throw new NotImplementedException();
+    }
     public bool GoToNextStringMatch(string valToMatch)
     {
       // use span not to allocate another string when getting new string
@@ -730,6 +776,32 @@ namespace Converter.Parsers.PDF
 
       // set curr and go next
       _position = _readPosition++;
+    }
+
+    public void SetBuffer(byte[] buffer)
+    {
+      _buffer = buffer.AsSpan();
+      _readPosition = 0;
+      _position = 0;
+    }
+    public void SetBuffer(byte[] buffer, ref Range range)
+    {
+      _buffer = buffer.AsSpan(range);
+      _readPosition = 0;
+      _position = 0;
+    }
+    public void SetBuffer(ref ReadOnlySpan<byte> buffer)
+    {
+      _buffer = buffer;
+      _readPosition = 0;
+      _position = 0;
+    }
+
+    public void SetBuffer(ref Span<byte> buffer)
+    {
+      _buffer = buffer;
+      _readPosition = 0;
+      _position = 0;
     }
   }
 }

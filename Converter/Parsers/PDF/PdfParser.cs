@@ -10,11 +10,9 @@ using Converter.Writers.TIFF;
 using System.Buffers;
 using System.Diagnostics;
 using System.Globalization;
-using System.IO.Compression;
 using System.Numerics;
-using System.Runtime.CompilerServices;
-using System.Security.AccessControl;
 using System.Text;
+using static Converter.FileStructures.PDF.PDF_AnnotThreadAction;
 namespace Converter.Parsers.PDF
 {
   // Note to myself - when dealing with variables that are indirect references add 'IR' on the end of the name
@@ -24,6 +22,9 @@ namespace Converter.Parsers.PDF
   {
     private readonly byte _newLineByte = 10;
     private readonly int KB = 1024;
+
+    delegate void ParseAnnotSubTypeData(PDFFile file, IPDF_AnnotData annot, ref PDFSpanParseHelper helper, string key);
+    delegate void ParseAnnotActionSubTypeData(PDFFile file, IPDF_AnnotActionData action, ref PDFSpanParseHelper helper, string key);
 
     public void SaveStingRepresentationToDisk(string filepath)
     {
@@ -1105,6 +1106,362 @@ namespace Converter.Parsers.PDF
 
     }
 
+    private void ParseAnnots(PDFFile file, List<(int objIndex, int generation)> objPositions, List<PDF_Annot> list)
+    {
+      PDFSpanParseHelper helper = new PDFSpanParseHelper();
+      foreach ((int objIndex, int generation) objPosition in objPositions)
+      {
+        SharedAllocator allocator = GetObjBuffer(file, objPosition);
+        PDF_Annot annot = new PDF_Annot();
+        helper.SetBuffer(allocator.Buffer, ref allocator.Range);
+        helper.SkipObjHeader();
+        ParseAnnot(file, ref helper, annot);
+        FreeAllocator(allocator);
+      }
+    }
+
+    private void ParseAnnot(PDFFile file, ref PDFSpanParseHelper helper, PDF_Annot annot)
+    {
+      if (!helper.GoToStartOfDict())
+        throw new InvalidDataException("Expected Dict got EOF!");
+
+      int readPos = helper._readPosition;
+      int pos = helper._position;
+      helper.GoToNextStringMatch("/Subtype");
+      helper.SkipNextToken();
+      // have to do some manual stuff because we can't convert /3D because we cant start enum entry with number
+      helper.ReadUntilNonWhiteSpaceDelimiter();
+      helper.ReadChar();
+      if (helper._char == 3)
+      {
+        helper.ReadChar();
+        if (helper._char == 'D')
+          annot.SubType = PDF_AnnotSubtype._3D;
+        else
+          throw new InvalidDataException("Unknown Annot type!");
+      } else
+      {
+        annot.SubType = helper.GetNextName<PDF_AnnotSubtype>();
+      }
+
+      if (annot.SubType == PDF_AnnotSubtype.NULL)
+        throw new InvalidDataException("Unknown Annot type!");
+      helper._readPosition = readPos;
+      helper._position = pos;
+
+      ParseAnnotSubTypeData subTypeFunction = ParseLinkAnnotAsExtension;
+      switch (annot.SubType)
+      {
+        case PDF_AnnotSubtype.NULL:
+          break;
+        case PDF_AnnotSubtype.Text:
+          break;
+        case PDF_AnnotSubtype.Link:
+          annot.AnnotData = new PDF_LinkAnnot();
+          subTypeFunction = ParseLinkAnnotAsExtension;
+          break;
+        case PDF_AnnotSubtype.FreeText:
+          break;
+        case PDF_AnnotSubtype.Line:
+          break;
+        case PDF_AnnotSubtype.Square:
+          break;
+        case PDF_AnnotSubtype.Circle:
+          break;
+        case PDF_AnnotSubtype.Polygon:
+          break;
+        case PDF_AnnotSubtype.PolyLine:
+          break;
+        case PDF_AnnotSubtype.Highlight:
+          break;
+        case PDF_AnnotSubtype.Underline:
+          break;
+        case PDF_AnnotSubtype.Squiggly:
+          break;
+        case PDF_AnnotSubtype.StrikeOut:
+          break;
+        case PDF_AnnotSubtype.Stamp:
+          break;
+        case PDF_AnnotSubtype.Caret:
+          break;
+        case PDF_AnnotSubtype.Ink:
+          break;
+        case PDF_AnnotSubtype.Popup:
+          break;
+        case PDF_AnnotSubtype.FileAttachment:
+          break;
+        case PDF_AnnotSubtype.Sound:
+          break;
+        case PDF_AnnotSubtype.Movie:
+          break;
+        case PDF_AnnotSubtype.Widget:
+          break;
+        case PDF_AnnotSubtype.Screen:
+          break;
+        case PDF_AnnotSubtype.PrinterMark:
+          break;
+        case PDF_AnnotSubtype.TrapNet:
+          break;
+        case PDF_AnnotSubtype.Watermark:
+          break;
+        case PDF_AnnotSubtype._3D:
+          break;
+        case PDF_AnnotSubtype.Redact:
+          break;
+      }
+
+      string tokenString = helper.GetNextToken();
+      while (tokenString != "")
+      {
+        switch (tokenString)
+        {
+          case "Rect":
+            annot.Rect = helper.GetNextRectangle();
+            break;
+          case "Contents":
+            annot.Contents = helper.GetNextTextString();
+            break;
+          case "P":
+            annot.P_IR = helper.GetNextIndirectReference();
+            break;
+          case "NM":
+            annot.NM = helper.GetNextTextString();
+            break;
+          case "M":
+            // TODO: support Date
+            annot.M = helper.GetNextTextString();
+            break;
+          case "F":
+            annot.F = helper.GetNextInt32();
+            break;
+          case "AP":
+            annot.AP = helper.GetNextDict();
+            break;
+          case "AS":
+            annot.AS = helper.GetNextName<PDF_AnnotAppearanceState>();
+            if (annot.AS == null)
+              throw new InvalidDataException("Invalid Annotation Appearance stream!");
+            break;
+          case "Border":
+            if (helper.IsCurrentByteDigit())
+            {
+              #region memAllocAndHelper
+              (int objIndex, int generation) objPosition = helper.GetNextIndirectReference();
+              SharedAllocator allocator = GetObjBuffer(file, objPosition);
+              ReadOnlySpan<byte> irSpan = allocator.Buffer.AsSpan(allocator.Range);
+              PDFSpanParseHelper irHelper = new PDFSpanParseHelper(ref irSpan);
+              #endregion memAllocAndHelper
+              irHelper.SkipObjHeader();
+              ParseAnnotBorder(ref irHelper, annot);
+              #region freeMem
+              FreeAllocator(allocator);
+              #endregion freeMem
+            }
+            else
+            {
+              ParseAnnotBorder(ref helper, annot);
+            }
+            break;
+          case "C":
+            annot.C = helper.GetNextDoubleArray();
+            break;
+          case "StructParent":
+            annot.StructParent = helper.GetNextInt32();
+            break;
+          case "OC":
+            annot.OC = helper.GetNextDict();
+            break;
+          default:
+            subTypeFunction(file, annot.AnnotData, ref helper, tokenString);
+            break;
+        }
+
+        helper.ReadUntilNonWhiteSpaceDelimiter();
+        if (helper._char == '>' && helper.IsCurrentCharacterSameAsNext())
+          break;
+        tokenString = helper.GetNextToken();
+      }
+
+    }
+
+
+    private void ParseAnnotBorder(ref PDFSpanParseHelper helper, PDF_Annot annot)
+    {
+      helper.ReadUntilNonWhiteSpaceDelimiter();
+      if (helper._char != '[')
+        throw new InvalidDataException("Invalid Annot Border data, Array expected!");
+
+      for (int i = 0; i < 3; i++)
+      {
+        annot.Border[i] = helper.GetNextDouble();
+      }
+
+      helper.ReadUntilNonWhiteSpaceDelimiter();
+      if (helper._char == ']')
+      {
+        helper.ReadChar();
+        return;
+      }
+
+      if (helper._char != '[')
+        throw new InvalidDataException("Invalid Annot Border DashLine data, Array expected!");
+
+      int c = 0;
+      while (helper._char != ']' && c < 2)
+      {
+        annot.BorderDashLine.Add(helper.GetNextDouble());
+        helper.SkipWhiteSpace();
+        c++;
+      }
+      if (helper._char != ']')
+        throw new InvalidDataException("Invalid Annot Border DashLine data, Array expected!");
+      helper.ReadChar();
+    }
+
+    private void ParseLinkAnnotAsExtension(PDFFile file, IPDF_AnnotData iAnnot, ref PDFSpanParseHelper helper, string key)
+    {
+      PDF_LinkAnnot annot = (PDF_LinkAnnot)iAnnot;
+      switch (key)
+      {
+        case "A":
+          helper.SkipWhiteSpace();
+          PDF_AnnotAction action = new PDF_AnnotAction();
+          if (helper.IsCurrentByteDigit())
+          {
+            #region memAllocAndHelper
+				    (int objIndex, int generation) objPosition = helper.GetNextIndirectReference();
+            SharedAllocator allocator = GetObjBuffer(file, objPosition);
+            ReadOnlySpan<byte> irSpan = allocator.Buffer.AsSpan(allocator.Range);
+            PDFSpanParseHelper irHelper = new PDFSpanParseHelper(ref irSpan);
+            #endregion memAllocAndHelper
+            irHelper.SkipObjHeader();
+            
+            ParseAnnotAction(file, action, ref irHelper);
+            #region freeMem
+            FreeAllocator(allocator);
+            #endregion freeMem
+          }
+          else
+          {
+            ParseAnnotAction(file, action , ref helper);
+          }
+          annot.Actions = action;
+          break;
+        default:
+          break;
+      }
+    }
+
+    private void ParseAnnotAction(PDFFile file, PDF_AnnotAction action, ref PDFSpanParseHelper helper)
+    {
+      if (!helper.GoToStartOfDict())
+        throw new InvalidDataException("Expected Dict got EOF!");
+      int readPos = helper._readPosition;
+      int pos = helper._position;
+      helper.GoToNextStringMatch("/S");
+      helper.SkipNextToken();
+      // have to do some manual stuff because we can't convert /3D because we cant start enum entry with number
+      action.SubType = helper.GetNextName<PDF_AnnotActionType>();
+
+      if (action.SubType == PDF_AnnotActionType.NULL)
+        throw new InvalidDataException("Unknown Annot type!");
+      helper._readPosition = readPos;
+      helper._position = pos;
+
+      ParseAnnotActionSubTypeData subTypeFunction = ParseAnnotURIActionAsExtension;
+      switch (action.SubType)
+      {
+        case PDF_AnnotActionType.NULL:
+          throw new NotImplementedException();
+          break;
+        case PDF_AnnotActionType.Launch:
+          throw new NotImplementedException();
+          break;
+        case PDF_AnnotActionType.Thread:
+          throw new NotImplementedException();
+          break;
+        case PDF_AnnotActionType.URI:
+          action.ActionData = new PDF_AnnotURIAction();
+          subTypeFunction = ParseAnnotURIActionAsExtension;
+          break;
+        case PDF_AnnotActionType.Sound:
+          throw new NotImplementedException();
+          break;
+        case PDF_AnnotActionType.Movie:
+          throw new NotImplementedException();
+          break;
+        case PDF_AnnotActionType.Hide:
+          throw new NotImplementedException();
+          break;
+        case PDF_AnnotActionType.Named:
+          throw new NotImplementedException();
+          break;
+        case PDF_AnnotActionType.SubmitForm:
+          throw new NotImplementedException();
+          break;
+        case PDF_AnnotActionType.ResetForm:
+          throw new NotImplementedException();
+          break;
+        case PDF_AnnotActionType.ImportData:
+          throw new NotImplementedException();
+          break;
+        case PDF_AnnotActionType.JavaScript:
+          throw new NotImplementedException();
+          break;
+        case PDF_AnnotActionType.SetOCGState:
+          throw new NotImplementedException();
+          break;
+        case PDF_AnnotActionType.Rendition:
+          throw new NotImplementedException();
+          break;
+        case PDF_AnnotActionType.Trans:
+          throw new NotImplementedException();
+          break;
+        case PDF_AnnotActionType.GoTo3DView:
+          throw new NotImplementedException();
+          break;
+        default:
+          break;
+      }
+
+      string tokenString = helper.GetNextToken();
+      while (tokenString != "")
+      {
+        switch (tokenString)
+        {
+          case "S":
+            helper.SkipNextToken();
+            break;
+          case "Next":
+            throw new NotImplementedException();
+            break;
+          default:
+            subTypeFunction(file, action.ActionData, ref helper, tokenString);
+            break;
+        }
+        helper.ReadUntilNonWhiteSpaceDelimiter();
+        if (helper._char == '>' && helper.IsCurrentCharacterSameAsNext())
+          break;
+        tokenString = helper.GetNextToken();
+      }
+
+    }
+    private void ParseAnnotURIActionAsExtension(PDFFile file, IPDF_AnnotActionData iAction, ref PDFSpanParseHelper helper, string key)
+    {
+      PDF_AnnotURIAction action = (PDF_AnnotURIAction)iAction;
+      switch (key)
+      {
+        case "URI":
+          action.URI = helper.GetNextStringLiteral();
+          break;
+        case "isMap":
+          action.IsMap = helper.GetNextBool();
+          break;
+        default:
+          break;
+      }
+    }
+
     private void ParseFontDescriptor(PDFFile file, (int objIndex, int generation) objPosition, ref PDF_FontDescriptor fontDescriptor)
     {
       SharedAllocator allocator = GetObjBuffer(file, objPosition);
@@ -1318,6 +1675,9 @@ namespace Converter.Parsers.PDF
           case "Resources":
             pageTree.ResourcesIR = helper.GetNextIndirectReference();
             break;
+          case "ProcSet":
+            pageTree.ProcSet = helper.GetListOfNames<PDF_ProcedureSet>();
+            break;
           default:
             break;
         }
@@ -1459,7 +1819,10 @@ namespace Converter.Parsers.PDF
               pageInfo.Trans = helper.GetNextDict();
               break;
             case "Annots" :
-              pageInfo.Annots = helper.GetNextArrayStrict();
+              List<(int objIndex, int generation)> objPositions = ParsePDFListOfIndirectReferences(file, ref helper);
+              List<PDF_Annot> annots = new List<PDF_Annot>();
+              ParseAnnots(file, objPositions, annots);
+              pageInfo.Annots = annots;
               break;
             case "AA" :
               pageInfo.AA = helper.GetNextDict();
@@ -2533,6 +2896,63 @@ namespace Converter.Parsers.PDF
     {
       byte[] arr = ArrayPool<byte>.Shared.Rent(size);
       ArrayPool<byte>.Shared.Return(arr);
+    }
+
+    /// <summary>
+    /// This method is introduced and should be used in most cases because it support checks for IR
+    /// Decided to add this because in documentations it says that some field may be array but some writers might just use IR
+    /// and since we don't want to allocate new memory in helper we have always had to handle this case manually in the parser
+    /// TODO: replace old way of doing it with this method
+    /// </summary>
+    /// <returns>Result</returns>
+    public List<string> ParsePDFArray(PDFFile file, ref PDFSpanParseHelper helper)
+    {
+      helper.SkipWhiteSpace();
+      // its IR
+      if (helper.IsCurrentByteDigit())
+      {
+        (int objIndex, int generation) objPosition = helper.GetNextIndirectReference();
+        SharedAllocator allocator = GetObjBuffer(file, objPosition);
+        ReadOnlySpan<byte> buffer = allocator.Buffer.AsSpan(allocator.Range);
+        PDFSpanParseHelper irHelper = new PDFSpanParseHelper(ref buffer);
+        irHelper.SkipObjHeader();
+        List<string> res = irHelper.GetNextArrayStrict();
+        FreeAllocator(allocator);
+        return res;
+      }
+      else if (helper._char == '[')
+      {
+        return helper.GetNextArrayStrict();
+      }
+      else
+      {
+        throw new InvalidDataException("Invalid array data!");
+      }
+    }
+
+    public List<(int objIndex, int generation)> ParsePDFListOfIndirectReferences(PDFFile file, ref PDFSpanParseHelper helper)
+    {
+      helper.SkipWhiteSpace();
+      // its IR
+      if (helper.IsCurrentByteDigit())
+      {
+        (int objIndex, int generation) objPosition = helper.GetNextIndirectReference();
+        SharedAllocator allocator = GetObjBuffer(file, objPosition);
+        ReadOnlySpan<byte> buffer = allocator.Buffer.AsSpan(allocator.Range);
+        PDFSpanParseHelper irHelper = new PDFSpanParseHelper(ref buffer);
+        irHelper.SkipObjHeader();
+        List<(int objIndex, int generation)> res = irHelper.GetNextIndirectReferenceList();
+        FreeAllocator(allocator);
+        return res;
+      }
+      else if (helper._char == '[')
+      {
+        return helper.GetNextIndirectReferenceList();
+      }
+      else
+      {
+        throw new InvalidDataException("Invalid array data!");
+      }
     }
   }
 }
