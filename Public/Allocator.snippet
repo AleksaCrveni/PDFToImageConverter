@@ -10,15 +10,15 @@
 		<Snippet>
 			<Code Language="CSharp">
 				<![CDATA[#region memAllocAndHelper
-				  (int objIndex, int generation) objPosition = helper.GetNextIndirectReference();
-            SharedAllocator allocator = GetObjBuffer(file, objPosition);
-						ReadOnlySpan<byte> irSpan = allocator.Buffer.AsSpan();
-            PDFSpanParseHelper irHelper = new PDFSpanParseHelper(ref irSpan);
-						$Cursor$#endregion memAllocAndHelper
-						
-					#region freeMem
-					FreeAllocator(allocator);
-						#endregion freeMem]]>
+(int objIndex, int generation) objPosition = helper.GetNextIndirectReference();
+SharedAllocator allocator = GetObjBuffer(file, objPosition);
+ReadOnlySpan<byte> irSpan = allocator.Buffer.AsSpan(allocator.Range);
+PDFSpanParseHelper irHelper = new PDFSpanParseHelper(ref irSpan);
+$Cursor$#endregion memAllocAndHelper
+
+#region freeMem
+FreeAllocator(allocator);
+#endregion freeMem]]>
 			</Code>
 			<Declarations>
 				<Literal>

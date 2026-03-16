@@ -1,29 +1,23 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <CodeSnippets xmlns="http://schemas.microsoft.com/VisualStudio/2005/CodeSnippet">
 	<CodeSnippet Format="1.0.0">
 		<Header>
-			<Title>IR Checker</Title>
+			<Title>End of Dict</Title>
 			<Author>Aleksa Crveni</Author>
-			<Description>Sets up IF for IR check</Description>
-			<Shortcut>isIR</Shortcut>
+			<Description>Checks if its end of dict</Description>
+			<Shortcut>isEnd</Shortcut>
 		</Header>
 		<Snippet>
 			<Code Language="CSharp">
-				<![CDATA[helper.SkipWhiteSpace();
-if (helper.IsCurrentByteDigit())
-{
-  $Cursor$
-}
-else
-{
-
-}]]>
+				<![CDATA[helper.ReadUntilNonWhiteSpaceDelimiter();
+ if (helper._char == '>' && helper.IsCurrentCharacterSameAsNext())
+   break;]]>
 			</Code>
 			<Declarations>
 				<Literal>
 					<ID>Cursor</ID>
 					<ToolTip>Cursor pos</ToolTip>
-					<Default>code</Default>
+					<Default>c</Default>
 				</Literal>
 			</Declarations>
 
