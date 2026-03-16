@@ -1,0 +1,33 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<CodeSnippets xmlns="http://schemas.microsoft.com/VisualStudio/2005/CodeSnippet">
+	<CodeSnippet Format="1.0.0">
+		<Header>
+			<Title>Shared Allocator</Title>
+			<Author>Aleksa Crveni</Author>
+			<Description>Sets up IR check</Description>
+			<Shortcut>allocIR</Shortcut>
+		</Header>
+		<Snippet>
+			<Code Language="CSharp">
+				<![CDATA[#region memAllocAndHelper
+				  (int objIndex, int generation) objPosition = helper.GetNextIndirectReference();
+            SharedAllocator allocator = GetObjBuffer(file, objPosition);
+						ReadOnlySpan<byte> irSpan = allocator.Buffer.AsSpan();
+            PDFSpanParseHelper irHelper = new PDFSpanParseHelper(ref irSpan);
+						$Cursor$#endregion memAllocAndHelper
+						
+					#region freeMem
+					FreeAllocator(allocator);
+						#endregion freeMem]]>
+			</Code>
+			<Declarations>
+				<Literal>
+					<ID>Cursor</ID>
+					<ToolTip>Cursor pos</ToolTip>
+					<Default>c</Default>
+				</Literal>
+			</Declarations>
+
+		</Snippet>
+	</CodeSnippet>
+</CodeSnippets>
