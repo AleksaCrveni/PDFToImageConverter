@@ -199,7 +199,7 @@ namespace Converter.FileStructures.PDF
   {
     public PDF_CommonStreamDict CommonStreamDict;
     public int N;
-    public PDF_ColorSpace Alternate; // Alternate colour space in case one specified in color space is not supported
+    public PDF_ColorSpaceFamily Alternate; // Alternate colour space in case one specified in color space is not supported
     public object[] Range;
     public object Metadata;
   }
@@ -212,7 +212,7 @@ namespace Converter.FileStructures.PDF
 
   public class PDF_ColorSpaceInfo
   {
-    public PDF_ColorSpace ColorSpaceFamily;
+    public PDF_ColorSpaceFamily ColorSpaceFamily;
     public PDF_ColorSpaceDictionary Dict;
   }
 

@@ -123,7 +123,7 @@
     OpenType
   }
 
-  public enum PDF_ColorSpace
+  public enum PDF_ColorSpaceFamily
   {
     NULL = 0,
     // device based

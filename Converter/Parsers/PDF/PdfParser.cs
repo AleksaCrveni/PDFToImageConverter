@@ -337,20 +337,25 @@ namespace Converter.Parsers.PDF
             resourceDict.ExtGState = helper.GetNextDict();
             break;
           case "ColorSpace":
+            // NOTE: skip[ for now beacuase i have no idea how to parse
             List<PDF_ColorSpaceData> csData = new List<PDF_ColorSpaceData>();
-
-            (bool isDirect, SharedAllocator? allocator) info = ReadIntoDirectOrIndirectDict(file, ref helper);
-            if (info.isDirect)
-            {
-              ParseColorSpaceIRDictionary(file, ref helper, true, csData);
-            }
-            else
-            {
-              ReadOnlySpan<byte> irBuffer = info.allocator.Buffer.AsSpan(info.allocator.Range);
-              PDFSpanParseHelper irHelper = new PDFSpanParseHelper(ref irBuffer);
-              ParseColorSpaceIRDictionary(file, ref irHelper, false, csData);
-            }
-            FreeAllocator(info.allocator);
+            // temp
+            helper._position--;
+            helper._readPosition--;
+            helper.SkipNextDictOrIR(); 
+            //(bool isDirect, SharedAllocator? allocator) info = ReadIntoDirectOrIndirectDict(file, ref helper);
+            //if (info.isDirect)
+            //{
+            //  ParseColorSpaceIRDictionary(file, ref helper, true, csData);
+              
+            //}
+            //else
+            //{
+            //  ReadOnlySpan<byte> irBuffer = info.allocator.Buffer.AsSpan(info.allocator.Range);
+            //  PDFSpanParseHelper irHelper = new PDFSpanParseHelper(ref irBuffer);
+            //  ParseColorSpaceIRDictionary(file, ref irHelper, false, csData);
+            //}
+            //FreeAllocator(info.allocator);
             resourceDict.ColorSpace = csData;
             break;
           case "Pattern":
@@ -365,7 +370,7 @@ namespace Converter.Parsers.PDF
           case "Font":
             List<PDF_FontData> fontData = new List<PDF_FontData>();
 
-            info = ReadIntoDirectOrIndirectDict(file, ref helper);
+            (bool isDirect, SharedAllocator? allocator) info = ReadIntoDirectOrIndirectDict(file, ref helper);
             if (info.isDirect)
             {
               ParseFontIRDictionary(file, ref helper, true, fontData);
@@ -425,8 +430,8 @@ namespace Converter.Parsers.PDF
             dict.N = helper.GetNextInt32();
             break;
           case "Alternate":
-            PDF_ColorSpace cs = helper.GetNextName<PDF_ColorSpace>();
-            if (cs == PDF_ColorSpace.NULL)
+            PDF_ColorSpaceFamily cs = helper.GetNextName<PDF_ColorSpaceFamily>();
+            if (cs == PDF_ColorSpaceFamily.NULL)
               throw new InvalidDataException("Alternate color space invalid!");
 
             dict.Alternate = cs;
@@ -474,8 +479,8 @@ namespace Converter.Parsers.PDF
       while (helper._char != ']' && helper._char != PDFConstants.NULL)
       {
         csi = new PDF_ColorSpaceInfo();
-        PDF_ColorSpace csf = helper.GetNextName<PDF_ColorSpace>();
-        if (csf == PDF_ColorSpace.NULL)
+        PDF_ColorSpaceFamily csf = helper.GetNextName<PDF_ColorSpaceFamily>();
+        if (csf == PDF_ColorSpaceFamily.NULL)
           throw new InvalidDataException("Invalid Color Space Family!");
         
         (int objectIndex, int _) objPosition = helper.GetNextIndirectReference();
@@ -860,13 +865,13 @@ namespace Converter.Parsers.PDF
             (bool isDirect, SharedAllocator? allocator) info = ReadIntoDirectOrIndirectDict(file, ref helper);
             if (info.isDirect)
             {
-              ParseCIDSystemInfo(file, ref helper, CIDSystemInfo);
+              ParseCIDSystemInfo(file, ref helper, CIDSystemInfo, true);
             }
             else
             {
               ReadOnlySpan<byte> irBuffer = info.allocator.Buffer.AsSpan(info.allocator.Range);
               PDFSpanParseHelper irHelper = new PDFSpanParseHelper(ref irBuffer);
-              ParseCIDSystemInfo(file, ref irHelper, CIDSystemInfo);
+              ParseCIDSystemInfo(file, ref irHelper, CIDSystemInfo, false);
             }
             FreeAllocator(info.allocator);
             dict.CIDSystemInfo = CIDSystemInfo;
@@ -1024,9 +1029,12 @@ namespace Converter.Parsers.PDF
       helper.ReadChar(); // ']'
     }
 
-    public void ParseCIDSystemInfo(PDFFile file, ref PDFSpanParseHelper helper, CIDSystemInfo info)
+    public void ParseCIDSystemInfo(PDFFile file, ref PDFSpanParseHelper helper, CIDSystemInfo info, bool inDict)
     {
-      helper.GoToStartOfDict();
+      if (inDict)
+        helper.ReadChar();
+      else
+        helper.GoToStartOfDict();
       string tokenString = helper.GetNextToken();
       while (tokenString != string.Empty)
       {
@@ -2174,7 +2182,7 @@ namespace Converter.Parsers.PDF
       return (false, allocator);
     }
 
-
+    [Obsolete]
     /// <summary>
     /// Checks wether next object is indirect reference to dictionary or its direct dictionary in the current object
     /// We do it this way so we dont have to deal with delegeate issues where we can't always pass same arguments (i.e object that needs to be 
@@ -2184,6 +2192,8 @@ namespace Converter.Parsers.PDF
     /// <param name="file">PR</param>
     /// <param name="helper">Current helper </param>
     /// <returns>IsDirectObject is set to true if its direct object and allocator is null. Reversed if its indirect reference and allocator is used</returns>
+    /// <postnotes>I dont think this API is really good, because it might read into dict so we need to pass another param in the that we will call with allocator data</postnotes>
+    /// <postnotes>So either change code to not read into dict "helper.ReadChar()" and update usages or do not use it at all!</postnotes>
     public (bool isDirectObject, SharedAllocator? allocator) ReadIntoDirectOrIndirectDict(PDFFile file, ref PDFSpanParseHelper helper, bool returnIRBuffer = true)
     {
       helper.SkipWhiteSpace();

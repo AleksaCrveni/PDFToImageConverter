@@ -470,8 +470,10 @@ namespace Converter.Parsers.PDF
                 break;
               }
             }
-            if (!found)
-              throw new InvalidDataException("Missing color space information!");
+            // NOTE: dont care about this for now untill we know how to properlt parse ColorInfo
+            // Sample and Report have completely different structure and ican't figure it out yet
+            //if (!found)
+            //  throw new InvalidDataException("Missing color space information!");
             currentGS.ColorSpaceInfo = info;
             break;
           case 0x4353: // SC
@@ -479,7 +481,10 @@ namespace Converter.Parsers.PDF
           case 0x4e4353: // SCN
             throw new NotImplementedException("Operator not i implemented");
           case 0x6373: // sc
-            int N = currentGS.ColorSpaceInfo.Dict.N;
+            // NOTE: dont care about this for now untill we know how to properlt parse ColorInfo
+            // Sample and Report have completely different structure and ican't figure it out yet
+            //int N = currentGS.ColorSpaceInfo.Dict.N;
+            int N = realOperands.Count;
             for (int i =0; i < N; i++)
             {
               GetNextStackValAsInt();
