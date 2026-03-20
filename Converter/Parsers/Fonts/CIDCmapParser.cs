@@ -18,9 +18,8 @@ namespace Converter.Parsers.Fonts
     }
 
     // TODO: Optimize this
-    public PDF_CID_CMAP Parse()
+    public void Parse(PDF_CID_CMAP cmap)
     {
-      PDF_CID_CMAP cmap = new PDF_CID_CMAP();
       string token = GetNextToken();
       while (token != "endcmap" && token != string.Empty)
       {
@@ -43,7 +42,6 @@ namespace Converter.Parsers.Fonts
         token = GetNextToken();
         
       }
-      return cmap;
     }
 
     private void ParseBfCharsRange(PDF_CID_CMAP cmap)

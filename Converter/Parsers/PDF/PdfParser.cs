@@ -823,7 +823,7 @@ namespace Converter.Parsers.PDF
 
       ReadOnlySpan<byte> buffer = dict.RawStreamData.AsSpan();
       CIDCmapParserHelper helper = new CIDCmapParserHelper(ref buffer);
-      cmap = helper.Parse();
+      helper.Parse(cmap);
     }
 
     /// <summary>
