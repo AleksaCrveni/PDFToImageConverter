@@ -7,15 +7,11 @@ namespace Converter.Utils
   {
     public static byte[] DecodeFilter(ref ReadOnlySpan<byte> inputBuffer, ENCODING_FILTER filter)
     {
-      // first just do single filter
-      if (filter == ENCODING_FILTER.Null)
-        return new byte[1];
-
       byte[] decoded;
       switch (filter)
       {
         case ENCODING_FILTER.Null:
-          decoded = Array.Empty<byte>();
+          decoded = inputBuffer.ToArray();
           break;
         case ENCODING_FILTER.ASCIIHexDecode:
           decoded = Array.Empty<byte>();
