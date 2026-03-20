@@ -421,7 +421,7 @@ namespace RasterizeDebugger
       {
         tview_fontInfo.Nodes[0].LastNode.LastNode.Nodes.Add($"Codepoint: {_currFontData.FontInfo.EncodingData.Differences[i].code} Value: {_currFontData.FontInfo.EncodingData.Differences[i].val}");
       }
-      tview_fontInfo.Nodes[0].Nodes.Add($"DescendantFontsIR: {_currFontData.FontInfo.DescendantFontsIR.ojbIndex} {_currFontData.FontInfo.DescendantFontsIR.generation}");
+      tview_fontInfo.Nodes[0].Nodes.Add($"DescendantFontsIR: {_currFontData.FontInfo.DescendantFontsIR[0].ojbIndex} {_currFontData.FontInfo.DescendantFontsIR[0].generation}");
       tview_fontInfo.Nodes[0].Nodes.Add($"ToUnicodeIR: {_currFontData.FontInfo.ToUnicodeIR.objIndex} {_currFontData.FontInfo.ToUnicodeIR.generation}");
 
       tview_fontInfo.Nodes[0].Nodes.Add("ComposeFontInfo");
