@@ -23,6 +23,10 @@ namespace Converter.Rasterizers
     protected int __beginOfSfnt;
     protected STBRasterizer(byte[] rawFontBuffer, string? encodingType)
     {
+      // TODO: I think that we can soon remove all STB functions form IRasterizer since we established common interface that PDFGOInterpreter will use
+      // and then we can remove this shortcut as well
+      if (rawFontBuffer.Length == 0) // indicates that this class wont be used but we still need it for IRasterizer
+        return;
       __buffer = rawFontBuffer;
       __rasterVersion = TTF_RASTERIZER_VERSION.V2;
       __byteSize = 8;

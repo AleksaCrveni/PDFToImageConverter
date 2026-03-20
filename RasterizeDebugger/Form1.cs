@@ -425,7 +425,7 @@ namespace RasterizeDebugger
       tview_fontInfo.Nodes[0].Nodes.Add($"ToUnicodeIR: {_currFontData.FontInfo.ToUnicodeIR.objIndex} {_currFontData.FontInfo.ToUnicodeIR.generation}");
 
       tview_fontInfo.Nodes[0].Nodes.Add("ComposeFontInfo");
-      if (_currFontData.FontInfo.CompositeFontInfo != null)
+      if (_currFontData.FontInfo.DescendantFontsInfo != null)
       {
         throw new NotImplementedException("Implement CFONTINFO stuff!");
       }

@@ -505,7 +505,14 @@ namespace Converter.Parsers.PDF
     {
       // its ok since its list atm..
       List<(int, int)> list = new();
-      ReadUntilNonWhiteSpaceDelimiter();
+      SkipWhiteSpace();
+      // handles non array cases when some writers decide not to follow spec
+      if (IsCurrentByteDigit())
+      {
+        list.Add(GetNextIndirectReference());
+        return list;
+      }
+
       if (_char != '[')
         throw new InvalidDataException("Invalid Rectangle data. Expected [");
       ReadChar();

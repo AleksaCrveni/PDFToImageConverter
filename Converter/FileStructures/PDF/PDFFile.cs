@@ -273,9 +273,9 @@ namespace Converter.FileStructures.PDF
     public PDF_FontEncodingData EncodingData = new PDF_FontEncodingData();
 
     // Type 0 only
-    public (int ojbIndex, int generation) DescendantFontsIR = (-1, -1);
+    public List<(int ojbIndex, int generation)> DescendantFontsIR;
     public (int objIndex, int generation) ToUnicodeIR = (-1, -1);
-    public CompositeFontInfo? CompositeFontInfo;
+    public List<CompositeFontInfo>? DescendantFontsInfo;
   }
 
   // Table 114

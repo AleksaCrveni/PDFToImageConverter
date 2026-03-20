@@ -138,7 +138,6 @@ namespace Converter.Parsers.PDF
       };
     
       PDFGOInterpreter pdfGo = new PDFGOInterpreter(rawContent, rDict, converter);
-
       pdfGo.ConvertToPixelData();
     }
 
@@ -605,12 +604,21 @@ namespace Converter.Parsers.PDF
         // TODO: assume that data is filled ? 
         // TODO: create right rasterized based on subtype and fontfile // Do I still eneed to do this?
 #if DEBUG
-        File.WriteAllBytes(Files.RootFolder + @$"\{fontInfo.FontDescriptor.FontName}" + @"-fontFile.txt", fontInfo.FontDescriptor.FontFile.CommonStreamInfo.RawStreamData);
+        if (fontInfo.FontDescriptor != null)
+          File.WriteAllBytes(Files.RootFolder + @$"\{fontInfo.FontDescriptor.FontName}" + @"-fontFile.txt", fontInfo.FontDescriptor.FontFile.CommonStreamInfo.RawStreamData);
+        else
+        {
+          foreach(var entry in fontInfo.DescendantFontsInfo)
+          {
+            File.WriteAllBytes(Files.RootFolder + @$"\Composite_{entry.DescendantDict.BaseFont}" + @"-fontFile.txt", entry.DescendantDict.FontDescriptor.FontFile.CommonStreamInfo.RawStreamData);
+          }
+        }
 #endif
+
         IRasterizer rasterizer = fontInfo.SubType switch
         {
           PDF_FontType.Null => throw new NotImplementedException(),
-          PDF_FontType.Type0 => new CompositeFontRasterizer(fontInfo.CompositeFontInfo.DescendantDict.FontDescriptor.FontFile.CommonStreamInfo.RawStreamData, ref fontInfo),
+          PDF_FontType.Type0 => new CompositeFontRasterizer(fontInfo.DescendantFontsInfo[0].DescendantDict.FontDescriptor.FontFile.CommonStreamInfo.RawStreamData, fontInfo),
           PDF_FontType.Type1 => new Type1Rasterizer(fontInfo.FontDescriptor.FontFile.CommonStreamInfo.RawStreamData, ref fontInfo),
           PDF_FontType.MMType1 => throw new NotImplementedException(),
           PDF_FontType.Type3 => throw new NotImplementedException(),
@@ -724,14 +732,10 @@ namespace Converter.Parsers.PDF
               FreeAllocator(irAllocator);
             }
             break;
-          case "DescendantFonts": // Spec says its array, but i've seen examples where writers just slap IR without array
-            helper.SkipWhiteSpace();
-            if (helper._char == '[')
-              helper.ReadChar();
-            fontInfo.DescendantFontsIR = helper.GetNextIndirectReference();
-            helper.SkipWhiteSpace();
-            if (helper._char == ']')
-              helper.ReadChar();
+          case "DescendantFonts":
+            // Spec says its array, but i've seen examples where writers just slap IR without array
+            // but that will be handled helper method
+            fontInfo.DescendantFontsIR = helper.GetNextIndirectReferenceList();
             break;
           case "ToUnicode":
             fontInfo.ToUnicodeIR = helper.GetNextIndirectReference();
@@ -792,16 +796,20 @@ namespace Converter.Parsers.PDF
       // check if its composite Font
       if (fontInfo.SubType == PDF_FontType.Type0)
       {
-        CompositeFontInfo cInfo = new CompositeFontInfo();
-        CIDFontDictionary CIDFontDictionary = new CIDFontDictionary();
-        
-        ParseCIDFontDictionary(file, fontInfo.DescendantFontsIR, CIDFontDictionary);
-        cInfo.DescendantDict = CIDFontDictionary;
-        
-        PDF_CID_CMAP cmap = new PDF_CID_CMAP();
-        ParseToUnicodeCMAP(file, fontInfo.ToUnicodeIR, cmap);
-        cInfo.Cmap = cmap;
-        fontInfo.CompositeFontInfo = cInfo;
+        fontInfo.DescendantFontsInfo = new List<CompositeFontInfo>();
+        foreach ((int objIndex, int generation) objPosition in fontInfo.DescendantFontsIR)
+        {
+          CompositeFontInfo cInfo = new CompositeFontInfo();
+          CIDFontDictionary CIDFontDictionary = new CIDFontDictionary();
+
+          ParseCIDFontDictionary(file, objPosition, CIDFontDictionary);
+          cInfo.DescendantDict = CIDFontDictionary;
+
+          PDF_CID_CMAP cmap = new PDF_CID_CMAP();
+          ParseToUnicodeCMAP(file, fontInfo.ToUnicodeIR, cmap);
+          cInfo.Cmap = cmap;
+          fontInfo.DescendantFontsInfo.Add(cInfo);
+        }
       }
 
       if (tokenString == "")
@@ -810,12 +818,10 @@ namespace Converter.Parsers.PDF
 
     private void ParseToUnicodeCMAP(PDFFile file, (int objIndex, int generation) objPosition, PDF_CID_CMAP cmap)
     {
-      SharedAllocator allocator = GetObjBuffer(file, objPosition);
-      ReadOnlySpan<byte> buffer = allocator.Buffer.AsSpan(allocator.Range);
       PDF_CommonStreamDict dict = new PDF_CommonStreamDict();
       ParseCommonStream(file, objPosition, ref dict);
 
-      buffer = dict.RawStreamData.AsSpan();
+      ReadOnlySpan<byte> buffer = dict.RawStreamData.AsSpan();
       CIDCmapParserHelper helper = new CIDCmapParserHelper(ref buffer);
       cmap = helper.Parse();
     }
@@ -831,6 +837,7 @@ namespace Converter.Parsers.PDF
       ReadOnlySpan<byte> buffer = allocator.Buffer.AsSpan(allocator.Range);
       PDFSpanParseHelper helper = new PDFSpanParseHelper(ref buffer);
       helper.SkipWhiteSpace();
+      // idk what this is for
       if (helper._char == '[')
       {
         helper.ReadChar();
@@ -1015,16 +1022,21 @@ namespace Converter.Parsers.PDF
             helper.SkipWhiteSpace();
           }
           helper.ReadChar(); // skip ']'
+          
         } else
         {
           CIDEnd = helper.GetNextInt32();
           value = helper.GetNextInt32();
 
+          /// i cant remebmer is this good
           for (int i = CIDStart; i <= CIDEnd; i++)
           {
             widths.Add(i, value);
           }
+          
         }
+        helper.SkipWhiteSpace();
+
       }
       helper.ReadChar(); // ']'
     }
@@ -1041,10 +1053,10 @@ namespace Converter.Parsers.PDF
         switch (tokenString)
         {
           case "Registry":
-            info.Registry = helper.GetNextASCIIString();
+            info.Registry = helper.GetNextStringLiteral();
             break;
           case "Ordering":
-            info.Ordering = helper.GetNextASCIIString();
+            info.Ordering = helper.GetNextStringLiteral();
             break;
           case "Supplement":
             info.Supplement = helper.GetNextInt32();
@@ -1056,6 +1068,7 @@ namespace Converter.Parsers.PDF
           break;
         tokenString = helper.GetNextToken();
       }
+      helper.ReadChar(); // move off first > so outside check doesnt think its end of that dict
     }
 
     private void ParseFontEncodingDictionary(PDFFile file, ReadOnlySpan<byte> buffer, ref PDF_FontEncodingData data)

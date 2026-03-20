@@ -364,6 +364,11 @@ namespace Converter.Parsers.PDF
             break;
           #endregion textPositioning;
           #region textShowing
+          // NOTE:
+          // When the current font is composite,
+          // the text-showing operators shall behave differently than with simple fonts.
+          // For simple fonts, each byte of a string to be shown selects one glyph, whereas for composite fonts,
+          // a sequence of one or more bytes are decoded to select a glyph from the descendant CIDFont.
           case 0x6a54: // Tj
             literal = GetNextStackValAsString();
             PDFGI_DrawState state = new PDFGI_DrawState();
