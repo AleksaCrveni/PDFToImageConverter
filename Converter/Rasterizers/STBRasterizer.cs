@@ -50,13 +50,6 @@ namespace Converter.Rasterizers
         __encodingArray = PDFEncodings.MacRomanEncoding;
         __encodingSource = PDF_FontEncodingSource.ENCODING;
       }
-      else if (string.IsNullOrEmpty(encoding))
-      {
-        __encodingArray = new int[0];
-        __encodingSource = PDF_FontEncodingSource.CMAP;
-        // TODO: These should be some more work done with prepending cmap data with some bytes, but figure out that later
-
-      }
       else if (encoding == PDF_FontEncodingType.StandardEncoding.ToString())
       {
         __encodingArray = PDFEncodings.AdobeSandardEncoding;
@@ -64,7 +57,10 @@ namespace Converter.Rasterizers
       }
       else
       {
-        throw new InvalidDataException("Invalid font encoding!");
+        //TODO: Maybe in future we should check if its one of predefined CMAPs
+        __encodingArray = new int[0];
+        __encodingSource = PDF_FontEncodingSource.CMAP;
+        // TODO: These should be some more work done with prepending cmap data with some bytes, but figure out that later
       }
     }
 

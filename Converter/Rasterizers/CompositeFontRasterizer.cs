@@ -4,12 +4,15 @@ using Converter.FileStructures.PDF.GraphicsInterpreter;
 
 namespace Converter.Rasterizers
 {
+  /// <summary>
+  /// THIS IS PDF Version of composite font ITS DIFFERENT THAN POSTSCRIPT VERSION due to some limitations
+  /// </summary>
   public class CompositeFontRasterizer : STBRasterizer, IRasterizer
   {
     private IRasterizer _actualRasterizer;
     private PDF_FontInfo _fontInfo;
     private CompositeFontInfo _cFontData;
-    public CompositeFontRasterizer(byte[] rawFontBuffer, PDF_FontInfo fontInfo) : base(rawFontBuffer, fontInfo.EncodingData.BaseEncoding)
+    public CompositeFontRasterizer(byte[] rawFontBuffer, PDF_FontInfo fontInfo) : base(rawFontBuffer, null)
     {
       _cFontData = fontInfo.DescendantFontsInfo[0]; // PDF Only supports one so always take first 
       _fontInfo = fontInfo;
@@ -21,10 +24,11 @@ namespace Converter.Rasterizers
         PDF_FontFileType.Three => throw new NotImplementedException(),
       };
     }
+    protected override void InitFont() { }
 
     public override void GetGlyphBoundingBox(ref GlyphInfo glyphInfo, float scaleX, float scaleY, ref int ix0, ref int iy0, ref int ix1, ref int iy1)
     {
-      throw new NotImplementedException();
+      _actualRasterizer.GetGlyphBoundingBox(ref glyphInfo, scaleX, scaleY, ref ix0, ref iy0, ref ix1, ref iy1);
     }
 
     public void GetGlyphInfo(int codepoint, ref GlyphInfo glyphInfo)
@@ -34,17 +38,14 @@ namespace Converter.Rasterizers
 
     public (float scaleX, float scaleY) GetScale(int glyphName, double[,] textRenderingMatrix, float width)
     {
-      throw new NotImplementedException();
+      return _actualRasterizer.GetScale(glyphName, textRenderingMatrix, width);
     }
 
     public override void RasterizeGlyph(byte[] bitmapArr, int byteOffset, int glyphWidth, int glyphHeight, int glyphStride, float scaleX, float scaleY, float shiftX, float shiftY, ref GlyphInfo glyphInfo)
     {
-      throw new NotImplementedException();
+      _actualRasterizer.RasterizeGlyph(bitmapArr, byteOffset, glyphWidth, glyphHeight, glyphStride, scaleX, scaleY, shiftX, shiftY, ref glyphInfo);
     }
 
-    protected override void InitFont()
-    {
-      throw new NotImplementedException();
-    }
+    
   }
 }
