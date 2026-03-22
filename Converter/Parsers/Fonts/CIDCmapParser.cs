@@ -1,5 +1,6 @@
 ﻿using Converter.FileStructures.PDF;
 using Converter.StaticData;
+using System.Diagnostics;
 using System.Globalization;
 using System.Text;
 
@@ -7,14 +8,17 @@ namespace Converter.Parsers.Fonts
 {
   public ref struct CIDCmapParserHelper
   {
+    // THESE SHOULDNT BE RUNES I GUESS
     public ReadOnlySpan<byte> _buffer;
     private string _lastWord;
     private int _position;
     private int _readPosition;
     private byte _char = 0x1b;
-    public CIDCmapParserHelper(ref ReadOnlySpan<byte> buffer)
+    private int _capacity = 4;
+    public CIDCmapParserHelper(ref ReadOnlySpan<byte> buffer, string CMAPEncoding)
     {
       _buffer = buffer;
+      SetCapacity(CMAPEncoding);
     }
 
     // TODO: Optimize this
@@ -48,9 +52,9 @@ namespace Converter.Parsers.Fonts
     {
       int n = Convert.ToInt32(_lastWord);
       SkipWhiteSpaceAndNewline();
-      ushort CIDStart = 0;
-      ushort CIDEnd = 0;
-      uint code = 0;
+      char CIDStart = '0';
+      char CIDEnd = '0';
+      char code = '0';
       Rune r;
       for (int i = 0; i < n; i++)
       {
@@ -60,20 +64,39 @@ namespace Converter.Parsers.Fonts
         if (_char == '<')
         {
           code = GetNextCodePoint();
-          for (ushort j = CIDStart; j <= CIDEnd; j++)
+          for (char j = CIDStart; j <= CIDEnd; j++)
           {
-            cmap.Cmap.Add(j, new Rune(code++));
+            cmap.Cmap.Add(j, code);
           }
           
         } else {
           // _char == '['
           ReadChar();
-          int m = CIDEnd - CIDStart + 1;
-          for (int j = 0; j < m; j++)
+          uint m = (uint)CIDEnd - CIDStart + 1;
+          for (uint j = 0; j < m; j++)
           {
-            cmap.LigatureCmap.Add(CIDStart++, GetLigatureRunes());
+            SkipWhiteSpaceAndNewline();
+
+            // if true it means that we are expecting a ligature
+            if (_position + 5 != '>')
+            {
+              ReadChar();
+              List<char> list = new List<char>();
+              while (_char != '>' && _char != PDFConstants.NULL)
+              {
+                list.Add((char)UInt16.Parse(_buffer.Slice(_position, 4), NumberStyles.HexNumber));
+                SetChar(_position + 4);
+                SkipWhiteSpaceOnly();
+              }
+              cmap.LigatureCmap.Add(CIDStart++, list);
+              ReadChar();
+            }
+            else
+            {
+              cmap.Cmap.Add(CIDStart++, ReadUShortBE());
+            }
           }
-          ReadChar();
+          ReadChar(); // ]
         }
 
         SkipWhiteSpaceAndNewline();
@@ -83,7 +106,7 @@ namespace Converter.Parsers.Fonts
     {
       SkipWhiteSpaceAndNewline();
       ReadChar(); // '<'
-      List<Rune> list = new List<Rune>();
+      List<Rune> list = new List<Rune>(_capacity);
       while (_char != '>')
       {
         list.Add(new Rune(UInt16.Parse(_buffer.Slice(_position, 4), NumberStyles.HexNumber)));
@@ -98,42 +121,49 @@ namespace Converter.Parsers.Fonts
     {
       int n = Convert.ToInt32(_lastWord);
       SkipWhiteSpaceAndNewline();
-      ushort CID = 0;
-      Rune r;
+      char CID = '0';
+      char c = '0';
       for (int i =0; i < n; i++)
       {
-        CID = ReadUShortBE();
-        r = ReadRune();
-        cmap.Cmap.Add(CID, r);
+        CID = GetNextCodePoint();
+        c = ReadUShortBE();
+        cmap.Cmap.Add(CID, c);
         SkipWhiteSpaceAndNewline();
       }
     }
 
-    public ushort ReadUShortBE()
+    /// <summary>
+    /// Added this becuase I am really not certain what char (CID) limit is so we will be safe and use uint always
+    /// </summary>
+    /// <returns></returns>
+    public uint GetNextUIntFromHex()
+    {
+      if (_buffer[_position + 5] == '>')
+        return UInt16.Parse(_buffer.Slice(_position + 1, 4), NumberStyles.HexNumber);
+      else
+        return UInt32.Parse(_buffer.Slice(_position + 1, 8), NumberStyles.HexNumber);
+    }
+
+    public char ReadUShortBE()
     {
       SkipWhiteSpaceOnly();
       ushort u = UInt16.Parse(_buffer.Slice(_position + 1, 4), NumberStyles.HexNumber);
       // 1 (<) + 4  + 1 (>)
       SetChar(_position + 6);
-      return u;
+      return (char)u;
     }
 
-    public uint GetNextCodePoint()
+    public char GetNextCodePoint()
     {
       SkipWhiteSpaceOnly();
       if (_buffer[_position + 5] == '>')
       {
-        return ReadUShortBE();
+        return (char)ReadUShortBE();
       }
       else
       {
-        // surogate
-        ushort high = UInt16.Parse(_buffer.Slice(_position + 1, 4), NumberStyles.HexNumber);
-        ushort low = UInt16.Parse(_buffer.Slice(_position + 5, 4), NumberStyles.HexNumber);
-        // 1 (<) + 8  + 1 (>)
-        SetChar(_position + 10);
-        uint code = 65_536 + (uint)((high - 55_296) * 1024) + (uint)(low - 56_320);
-        return code;
+        uint val = UInt32.Parse(_buffer.Slice(_position + 1, 8), NumberStyles.HexNumber);
+        return (char)val;
       }
     }
     public Rune ReadRune()
@@ -199,6 +229,15 @@ namespace Converter.Parsers.Fonts
 
       // set curr and go next
       _position = _readPosition++;
+    }
+
+    private void SetCapacity(string encoding)
+    {
+      // can't use switch since 'consts' are actually readonly
+      if (encoding == PDFConstants.Identity_H)
+        _capacity = 2;
+      else
+        _capacity = 4;
     }
   }
 }
