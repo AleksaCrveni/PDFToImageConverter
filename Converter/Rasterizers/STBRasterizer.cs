@@ -5,6 +5,7 @@ using Converter.FileStructures.TTF;
 using Converter.StaticData;
 using System.Buffers.Binary;
 using System.Diagnostics;
+using System.Text;
 
 namespace Converter.Rasterizers
 {
@@ -1679,6 +1680,16 @@ namespace Converter.Rasterizers
       // TODO: maybe this should be index -1 or name .notdef
       glyphInfo.Index = 0;
       glyphInfo.Name = string.Empty;
+    }
+
+    public virtual char? FindCharFromCID(char CID)
+    {
+      throw new NotImplementedException();
+    }
+
+    public virtual List<char> FindLigatureFromCID(char CID)
+    {
+      throw new NotImplementedException();
     }
     #endregion 
 

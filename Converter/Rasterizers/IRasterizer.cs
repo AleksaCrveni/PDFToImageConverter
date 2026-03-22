@@ -1,5 +1,6 @@
 ﻿using Converter.FileStructures.PDF.GraphicsInterpreter;
 using Converter.FileStructures.TTF;
+using System.Text;
 
 namespace Converter.Rasterizers
 {
@@ -52,5 +53,7 @@ namespace Converter.Rasterizers
     void STB_SortEdgesQuickSort(ref Span<TTFEdge> oRefEdges, int n, int prevIndex = 0);
     void STB_TesselateCubic(List<PointF> points, ref int numOfPoints, float x0, float y0, float x1, float y1, float x2, float y2, float x3, float y3, float objspaceFlatnessSquared, int n);
     int STB_TesselateCurve(List<PointF> points, ref int numOfPoints, float x0, float y0, float x1, float y1, float x2, float y2, float objspaceFlatnessSquared, int n);
+    char? FindCharFromCID(char CID);
+    List<char> FindLigatureFromCID(char CID);
   }
 }

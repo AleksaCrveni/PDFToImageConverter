@@ -149,12 +149,12 @@ namespace Converter.Rasterizers
         tOff.hhea.Length == 0 ||
         tOff.loca.Length == 0 ||
         tOff.maxp.Length == 0 ||
-        tOff.cvt.Length == 0 ||
-        tOff.prep.Length == 0 ||
+       // tOff.cvt.Length == 0 ||
+        //tOff.prep.Length == 0 ||
         tOff.glyf.Length == 0 ||
         tOff.hmtx.Length == 0 ||
-        tOff.fpgm.Length == 0 ||
-        tOff.cmap.Length == 0)
+       // tOff.fpgm.Length == 0 ||
+        (tOff.cmap.Length == 0 && __encodingSource != PDF_FontEncodingSource.CMAP))
       {
         throw new InvalidDataException("Missing one of the required tables!");
       }
@@ -163,7 +163,7 @@ namespace Converter.Rasterizers
       __ttf.Svg = -1; // ??
       slice = buffer.Slice(tOff.cmap.Position, tOff.cmap.Length);
       // Find number of cmap subtables and check encodings
-      ushort numOfCmapSubtables = ReadUInt16(ref slice, 2);
+      ushort numOfCmapSubtables = tOff.cmap.Length > 0 ? ReadUInt16(ref slice, 2) : (ushort)0;
       ReadOnlySpan<byte> encodingSubtable;
       ushort platformID;
       ushort platformSpecificID;
@@ -226,9 +226,13 @@ namespace Converter.Rasterizers
         _ttfTableCMAP.Format10 = ReadUInt16(ref buffer, _ttfTableCMAP.Index10SubtableOffset);
 
 
-      if (__ttf.IndexMapOffset == 0)
-        throw new InvalidDataException("Missing index map!");
-      __ttf.CmapFormat = ReadUInt16(ref buffer, __ttf.IndexMapOffset);
+      if (tOff.cmap.Length > 0)
+      {
+        if (__ttf.IndexMapOffset == 0)
+          throw new InvalidDataException("Missing index map!");
+        __ttf.CmapFormat = ReadUInt16(ref buffer, __ttf.IndexMapOffset);
+      }
+
       slice = buffer.Slice(tOff.head.Position, tOff.head.Length);
       __ttf.IndexToLocFormat = ReadUInt16(ref slice, 50);
 

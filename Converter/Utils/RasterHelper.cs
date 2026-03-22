@@ -1,6 +1,9 @@
 ﻿using Converter.FileStructures.PostScript;
 using Converter.FileStructures.TTF;
 using Converter.Rasterizers;
+using System.Diagnostics;
+using System.Globalization;
+using System.Text;
 
 namespace Converter.Utils
 {
@@ -79,6 +82,34 @@ namespace Converter.Utils
       iy0 = (int)Math.Floor(-fy1 * scale);
       ix1 = (int)Math.Floor(fx1 * scale);
       iy1 = (int)Math.Ceiling(-fy0 * scale);
+    }
+
+    public static Rune ReadRune(string str)
+    {
+      if (str[5] == '>')
+      {
+        return new Rune(UInt16.Parse(str.AsSpan().Slice(1, 4), NumberStyles.HexNumber));
+      }
+      else
+      {
+        // surogate
+        ushort high = UInt16.Parse(str.AsSpan().Slice(1, 4), NumberStyles.HexNumber);
+        ushort low = UInt16.Parse(str.AsSpan().Slice(5, 4), NumberStyles.HexNumber);
+
+        uint code = 65_536 + (uint)((high - 55_296) * 1024) + (uint)(low - 56_320);
+        return new Rune(code);
+      }
+    }
+
+    public static uint ReadUintFromHex(string str)
+    {
+      Debug.Assert(str[0] == '<');
+      Debug.Assert(str[str.Length - 1] == '>');
+      Debug.Assert(str.Length == 6 || str.Length == 10);
+      if (str.Length > 6)
+        return UInt32.Parse(str.AsSpan().Slice(1, 8), NumberStyles.HexNumber);
+      else
+        return UInt16.Parse(str.AsSpan().Slice(1, 4), NumberStyles.HexNumber);
     }
   }
 }

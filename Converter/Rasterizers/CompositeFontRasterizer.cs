@@ -1,6 +1,7 @@
 ﻿
 using Converter.FileStructures.PDF;
 using Converter.FileStructures.PDF.GraphicsInterpreter;
+using System.Text;
 
 namespace Converter.Rasterizers
 {
@@ -33,7 +34,7 @@ namespace Converter.Rasterizers
 
     public void GetGlyphInfo(int codepoint, ref GlyphInfo glyphInfo)
     {
-      throw new NotImplementedException();
+      _actualRasterizer.GetGlyphInfo(codepoint, ref glyphInfo);
     }
 
     public (float scaleX, float scaleY) GetScale(int glyphName, double[,] textRenderingMatrix, float width)
@@ -46,6 +47,16 @@ namespace Converter.Rasterizers
       _actualRasterizer.RasterizeGlyph(bitmapArr, byteOffset, glyphWidth, glyphHeight, glyphStride, scaleX, scaleY, shiftX, shiftY, ref glyphInfo);
     }
 
-    
+    public override char? FindCharFromCID(char CID)
+    {
+      if (_cFontData.Cmap.Cmap.TryGetValue(CID, out char res))
+        return res;
+
+      return null;
+    }
+    public override List<char> FindLigatureFromCID(char CID)
+    {
+      return _cFontData.Cmap.LigatureCmap.GetValueOrDefault(CID, Array.Empty<char>().ToList());
+    }
   }
 }

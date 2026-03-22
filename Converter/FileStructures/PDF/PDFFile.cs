@@ -287,6 +287,7 @@ namespace Converter.FileStructures.PDF
     public PDF_FontEncodingData()
     {
       Differences = new List<(int code, string val)>();
+      BaseEncoding = string.Empty;
     }
     /// <summary>
     /// Returns empty string if it doesn't exist
@@ -390,8 +391,8 @@ namespace Converter.FileStructures.PDF
   /// </summary>
   public class PDF_CID_CMAP
   {
-    public Dictionary<ushort, Rune> Cmap = new Dictionary<ushort, Rune>();
-    public Dictionary<ushort, List<Rune>> LigatureCmap = new Dictionary<ushort, List<Rune>>();
+    public Dictionary<char, char> Cmap = new Dictionary<char, char>();
+    public Dictionary<char, List<char>> LigatureCmap = new Dictionary<char, List<char>>();
   }
 
   // 7.9.5

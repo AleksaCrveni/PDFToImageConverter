@@ -806,7 +806,7 @@ namespace Converter.Parsers.PDF
           cInfo.DescendantDict = CIDFontDictionary;
 
           PDF_CID_CMAP cmap = new PDF_CID_CMAP();
-          ParseToUnicodeCMAP(file, fontInfo.ToUnicodeIR, cmap);
+          ParseToUnicodeCMAP(file, fontInfo.ToUnicodeIR, cmap, fontInfo.EncodingData.BaseEncoding);
           cInfo.Cmap = cmap;
           fontInfo.DescendantFontsInfo.Add(cInfo);
         }
@@ -816,13 +816,13 @@ namespace Converter.Parsers.PDF
         throw new InvalidDataException("Invalid dictionary");
     }
 
-    private void ParseToUnicodeCMAP(PDFFile file, (int objIndex, int generation) objPosition, PDF_CID_CMAP cmap)
+    private void ParseToUnicodeCMAP(PDFFile file, (int objIndex, int generation) objPosition, PDF_CID_CMAP cmap, string cmapEncoding)
     {
       PDF_CommonStreamDict dict = new PDF_CommonStreamDict();
       ParseCommonStream(file, objPosition, ref dict);
 
       ReadOnlySpan<byte> buffer = dict.RawStreamData.AsSpan();
-      CIDCmapParserHelper helper = new CIDCmapParserHelper(ref buffer);
+      CIDCmapParserHelper helper = new CIDCmapParserHelper(ref buffer, cmapEncoding);
       helper.Parse(cmap);
     }
 

@@ -4,6 +4,7 @@ using Converter.FileStructures.PDF;
 using Converter.FileStructures.PDF.GraphicsInterpreter;
 using Converter.Rasterizers;
 using Converter.StaticData;
+using Converter.Utils;
 using System.Diagnostics;
 using System.Globalization;
 using System.Text;
@@ -48,6 +49,7 @@ namespace Converter.Parsers.PDF
     public bool _debug;
     public PDFGO_DEBUG_STATE _debugState;
     private PathRasterizer _shapeRasterizer;
+    private bool isType0;
 
     // TODO: maybe NULL check is redundant if we let it throw to end?
     public PDFGOInterpreter(byte[] contentBuffer, PDF_ResourceDict resourceDict,  IConverter converter, bool debug = false)
@@ -460,7 +462,8 @@ namespace Converter.Parsers.PDF
             // type 3 fonts
             break;
           case 0x5343: // CS
-            throw new NotImplementedException("Operator not i implemented");
+            GetNextStackValAsString();
+            break;
           case 0x7363: // cs
             PDF_ColorSpaceInfo info = new PDF_ColorSpaceInfo();
             bool found = false;
@@ -917,20 +920,57 @@ namespace Converter.Parsers.PDF
       // TODO: just do this once at opettor and assign ref to glolbal obj
       // Get right rasterizer
       PDF_FontData fd = GetFontDataFromKey(currentTextObject.FontRef);
+      
+
       IRasterizer rasterizer = fd.Rasterizer;
       double[] widths = fd.FontInfo.Widths;
 
-      char c;
+      char? c;
       int glyphIndex;
       int baseline = 0;
       GlyphInfo glyphInfo = new GlyphInfo(); // make global??
       // Account for position adjustment
       state.TextObject.TextMatrix[2, 0] -= (positionAdjustment / 1000f) * state.TextObject.TextMatrix[0, 0] * state.TextObject.FontScaleFactor;
-
-      for (int i = 0; i < textToWrite.Length; i++)
+      // Type0 encodes characters in special way and CID can map to either ligature (multiple characters) or single char
+      // So not to make PDF_DrawGlyph weird and those set of interfaces really weird, we will check CID here specifically for Type0 font
+      // since afaik this is the only font that does this
+      if (fd.FontInfo.SubType == PDF_FontType.Type0)
       {
-        PDF_DrawGlyph(textToWrite[i], ref glyphInfo, rasterizer, state, fd, widths, textToWrite, i);
+        char CID = (char)RasterHelper.ReadUintFromHex(textToWrite);
+        c = rasterizer.FindCharFromCID(CID);
+        if (c != null)
+        {
+          PDF_DrawGlyph((char)c, ref glyphInfo, rasterizer, state, fd, widths, textToWrite, 0);
+          return;
+        }
+
+        // Not sure if ligatures should be printed separatetly or I should advance manually for each char
+        // just do this for now and see how it works
+        List<char> ligature = rasterizer.FindLigatureFromCID(CID);
+        if (ligature.Count == 0)
+        {
+          char character = '0';
+          if (AdobeGlyphList.)
+          PDF_DrawGlyph((char)0, ref glyphInfo, rasterizer, state, fd, widths, textToWrite, 0);
+
+          return;
+        }
+        else
+        {
+          for (int i = 0; i < ligature.Count; i++)
+          {
+            PDF_DrawGlyph(ligature[i], ref glyphInfo, rasterizer, state, fd, widths, textToWrite, i);
+          }
+        }
+      } 
+      else
+      {
+        for (int i = 0; i < textToWrite.Length; i++)
+        {
+          PDF_DrawGlyph(textToWrite[i], ref glyphInfo, rasterizer, state, fd, widths, textToWrite, i);
+        }
       }
+      
     }
 
     public void PDF_DrawGlyph(char c, ref GlyphInfo glyphInfo, IRasterizer rasterizer, PDFGI_DrawState state, PDF_FontData fd, double[] widths, string literal, int index)
@@ -1089,8 +1129,6 @@ namespace Converter.Parsers.PDF
 
       return new PDF_FontData();
     }
-
-    
 
   }
 

@@ -228,4 +228,9 @@
     GoTo3DView
   }
 
+  public enum PDF_CMAP_ENCODING
+  {
+    
+  }
+
 }
