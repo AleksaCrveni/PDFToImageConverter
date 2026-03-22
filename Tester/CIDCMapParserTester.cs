@@ -15,8 +15,9 @@ namespace Tester
       for (int i = 0; i < s.Length; i++)
         b[i] = (byte)s[i];
       ReadOnlySpan<byte> buffer = b.Slice(0);
-      CIDCmapParserHelper parser = new CIDCmapParserHelper(ref buffer);
-      var _ = parser.Parse();
+      CIDCmapParserHelper parser = new CIDCmapParserHelper(ref buffer, "");
+      PDF_CID_CMAP cmap = new PDF_CID_CMAP();
+      parser.Parse(cmap);
     }
 
     [TestMethod]
@@ -27,9 +28,10 @@ namespace Tester
       for (int i = 0; i < s.Length; i++)
         b[i] = (byte)s[i];
       ReadOnlySpan<byte> buffer = b.Slice(0);
-      CIDCmapParserHelper parser = new CIDCmapParserHelper(ref buffer);
-      PDF_CID_CMAP cidMap = parser.Parse();
-      Assert.IsTrue(cidMap.Cmap.Count == 55);
+      CIDCmapParserHelper parser = new CIDCmapParserHelper(ref buffer, "");
+      PDF_CID_CMAP cmap = new PDF_CID_CMAP();
+      parser.Parse(cmap);
+      Assert.IsTrue(cmap.Cmap.Count == 55);
     }
   }
 }
