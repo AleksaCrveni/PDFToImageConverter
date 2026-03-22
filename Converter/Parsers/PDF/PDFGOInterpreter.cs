@@ -950,7 +950,6 @@ namespace Converter.Parsers.PDF
         if (ligature.Count == 0)
         {
           char character = '0';
-          if (AdobeGlyphList.)
           PDF_DrawGlyph((char)0, ref glyphInfo, rasterizer, state, fd, widths, textToWrite, 0);
 
           return;
