@@ -1,4 +1,5 @@
-﻿using Converter.FileStructures.General;
+﻿using Converter.FileStructures.CompositeFonts;
+using Converter.FileStructures.General;
 using Converter.FileStructures.PDF;
 using Converter.FileStructures.PDF.GraphicsInterpreter;
 using Converter.FileStructures.TTF;
@@ -15,13 +16,22 @@ namespace Converter.Rasterizers
     private TTF_Table_POST _ttfTablePOST;
     private TTF_Table_CMAP _ttfTableCMAP;
     private float _unitsPerEm = 1000f; // used to covnert from glyph to text space, for ttf its 1/1000 default value
+    private bool _CFF;// flag to know that TTF font program is not standalone but part of composite font
     public TTFRasterizer(byte[] rawFontProgram, ref PDF_FontInfo fontInfo) : base (rawFontProgram, fontInfo.EncodingData.BaseEncoding)
     {
       _fontInfo = fontInfo;
       _encodingData = fontInfo.EncodingData;
 
       InitFont(); // should be called in derived class??
-   }
+    }
+
+    public TTFRasterizer(byte[] rawFontProgram, ref PDF_FontInfo fontInfo, bool CFF) : base(rawFontProgram, fontInfo.EncodingData.BaseEncoding)
+    {
+      _fontInfo = fontInfo;
+      _encodingData = fontInfo.EncodingData;
+      _CFF = CFF;
+      InitFont(); // should be called in derived class??
+    }
 
     protected override void InitFont()
     {
@@ -248,6 +258,14 @@ namespace Converter.Rasterizers
     // Page 274. Make this more robust, ok for basic start
     public void GetGlyphInfo(int codepoint, ref GlyphInfo glyphInfo)
     {
+      if (!_CFF)
+        GetGlyphInfoStandalone(codepoint, ref glyphInfo);
+      else
+        GetGlypgInfoCFF(codepoint, ref glyphInfo);
+    }
+
+    private void GetGlyphInfoStandalone(int codepoint, ref GlyphInfo glyphInfo)
+    {
       // 0. Reset glyphInfo to default
       glyphInfo.Index = 0;
       glyphInfo.Name = string.Empty;
@@ -259,13 +277,13 @@ namespace Converter.Rasterizers
       // unicode values aren't always right?? bug? other converters treat � as DDFE, but its actually FFFD (??), some encoding is wrong on my side?
       // UPDATE: I think that i should be passing codepoint be able to readunicode values, for this issue specifically we aren't able to process ligature since its over 65555 value (unicode)
       // TODO: adress at some point after we figure it out with Type1 font stuff
-
+      // Not sure if we need this if font is TTF
       if (codepoint > 255)
         codepoint = ' ';
       // single byte since its TTF
       byte b = (byte)(codepoint & 255);
       // if its non symbolic font encdoing are mac or win, ther shouldn't be anything in the differences array (or it should be empty in code)
-      
+
       // 1.
       string glyphName = _encodingData.GetGlyphNameFromDifferences(b);
       // not found in differences array so we check encoding array
@@ -276,11 +294,12 @@ namespace Converter.Rasterizers
         {
           int glyphNameIndex = __encodingArray[b];
           glyphName = PDFEncodings.GetGlyphName(glyphNameIndex);
-        } else
+        }
+        else
         {
           glyphName = ".notdef";
         }
-        
+
       }
 
       // 2.
@@ -295,7 +314,7 @@ namespace Converter.Rasterizers
           glyphInfo.Name = glyphName;
           return;
         }
-          
+
       }
 
       // if not found check adobe list
@@ -311,6 +330,21 @@ namespace Converter.Rasterizers
       }
       return;
     }
+
+    private void GetGlypgInfoCFF(int codepoint, ref GlyphInfo glyphInfo)
+    {
+      CIDFontDictionary cfInfo = _fontInfo.DescendantFontsInfo[0].DescendantDict;
+      if (cfInfo.CIDToGIDMap == null && cfInfo.CIDToGIDMapName == CIDToGIDMap.IDENTITY)
+      {
+        glyphInfo.Index = codepoint;
+      }
+      else
+      {
+        throw new NotImplementedException();
+      }
+
+    }
+
     // This has to be called for each character because of widths array, it may or may not be same as advance in hmtx table 
     public (float scaleX, float scaleY) GetScale(int glyphIndex, double[,] textRenderingMatrix, float width)
     {

@@ -21,7 +21,7 @@ namespace Converter.Rasterizers
       {
         PDF_FontFileType.NULL => throw new InvalidDataException("FontFile not found!"),
         PDF_FontFileType.One => throw new NotImplementedException(),
-        PDF_FontFileType.Two => new TTFRasterizer(rawFontBuffer, ref _fontInfo),
+        PDF_FontFileType.Two => new TTFRasterizer(rawFontBuffer, ref _fontInfo, true),
         PDF_FontFileType.Three => throw new NotImplementedException(),
       };
     }

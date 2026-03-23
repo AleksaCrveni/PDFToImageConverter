@@ -487,7 +487,7 @@ namespace Converter.Parsers.PDF
           case 0x4353: // SC
             throw new NotImplementedException("Operator not i implemented");
           case 0x4e4353: // SCN
-            throw new NotImplementedException("Operator not i implemented");
+          //  throw new NotImplementedException("Operator not i implemented");
           case 0x6373: // sc
             // NOTE: dont care about this for now untill we know how to properlt parse ColorInfo
             // Sample and Report have completely different structure and ican't figure it out yet
@@ -499,7 +499,7 @@ namespace Converter.Parsers.PDF
             }
             break;
           case 0x6e6373: // scn
-            throw new NotImplementedException("Operator not i implemented");
+            //throw new NotImplementedException("Operator not i implemented");
           case 0x47: // G
             GetNextStackValAsDouble();
             break;
@@ -612,6 +612,12 @@ namespace Converter.Parsers.PDF
         return 0;
       }
 
+      if (_char == '<')
+      {
+        GetHexString();
+        return 0;
+      }
+
       // array
       if (_char == '[')
       {
@@ -638,7 +644,22 @@ namespace Converter.Parsers.PDF
 
       return 0;
     }
+    /// <summary>
+    /// We should probably interpret this and push it to number stack instead of string stack
+    /// </summary>
+    private void GetHexString()
+    {
+      // we are including <>
+      int startPos = _pos;
+      while (_char != PDFConstants.NULL && _char != '>')
+      {
+        ReadChar();
+      }
+      ReadChar();
 
+      stringOperands.Push(Encoding.Default.GetString(_buffer.AsSpan().Slice(startPos, _pos - startPos)));
+      operandTypes.Push(OperandType.STRING);
+    }
     private void GetNumber()
     {
       int startPos = _pos;
