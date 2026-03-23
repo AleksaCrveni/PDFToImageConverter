@@ -78,7 +78,7 @@ namespace Converter.Parsers.Fonts
             SkipWhiteSpaceAndNewline();
 
             // if true it means that we are expecting a ligature
-            if (_position + 5 != '>')
+            if (_buffer[_position + 5] != '>')
             {
               ReadChar();
               List<char> list = new List<char>();
