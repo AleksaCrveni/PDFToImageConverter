@@ -10,6 +10,7 @@ using Converter.Rasterizers;
 using Converter.Writers.TIFF;
 using System.Diagnostics;
 using System.Drawing.Drawing2D;
+using System.Text;
 
 namespace RasterizeDebugger
 {
@@ -39,6 +40,7 @@ namespace RasterizeDebugger
     readonly float MIN_ZOOM = 1f;
     string _lastFontRef;
     uint _totalStringLiteralCount;
+
     enum ZOOM { IN, OUT }
     string _fileFullPath;
     class ZoomStatePosition
@@ -59,6 +61,7 @@ namespace RasterizeDebugger
       _dialog = new OpenFileDialog();
       _dialog.Filter = "PDF (*.pdf)|*.pdf";
       _dialog.RestoreDirectory = true;
+      tview_fontInfo.NodeMouseDoubleClick += TreeNodeMouseClickEventHandler;
     }
 
     private void Form1_Load(object sender, EventArgs e)
@@ -234,19 +237,32 @@ namespace RasterizeDebugger
         return;
       }
       Stopwatch sw = new Stopwatch();
-      sw.Start();
-      while (!_end)
+      try
       {
-        ProcessText(false);
+        sw.Start();
+        while (!_end)
+        {
+          ProcessText(false);
+        }
+        
+      } catch(Exception ex)
+      {
+
       }
-      long processTime = sw.ElapsedMilliseconds;
-      UpdateImageDataAndPictureBox();
-      UpdateLabels();
-      lbl_charValue.Text = "END";
-      lbl_glyphIndex.Text = "END";
-      lbl_glyphName.Text = "END";
-      sw.Stop();
-      MessageBox.Show($"Process time: {processTime}ms. Total: {sw.ElapsedMilliseconds}ms!");
+      finally
+      {
+        long processTime = sw.ElapsedMilliseconds;
+        UpdateImageDataAndPictureBox();
+        UpdateLabels();
+        lbl_charValue.Text = "END";
+        lbl_glyphIndex.Text = "END";
+        lbl_glyphName.Text = "END";
+        lbl_literalNumber.Text = _totalStringLiteralCount.ToString();
+        sw.Stop();
+        MessageBox.Show($"Process time: {processTime}ms. Total: {sw.ElapsedMilliseconds}ms!");
+      }
+      
+      
 
     }
 
@@ -378,6 +394,7 @@ namespace RasterizeDebugger
     }
 
     // not most efficient since we always recreate tree b ut w/e
+    
     private void UpdateFontInfoTreeView()
     {
       tview_fontInfo.BeginUpdate();
@@ -385,49 +402,92 @@ namespace RasterizeDebugger
       tview_fontInfo.Nodes.Add(_currFontData.Key);
       tview_fontInfo.Nodes[0].Nodes.Add($"Name: {_currFontData.FontInfo.Name}");
       tview_fontInfo.Nodes[0].Nodes.Add($"BaseFont: {_currFontData.FontInfo.BaseFont}");
-      tview_fontInfo.Nodes[0].Nodes.Add($"FirstChar: {_currFontData.FontInfo.FirstChar}");
-      tview_fontInfo.Nodes[0].Nodes.Add($"LastChar: {_currFontData.FontInfo.LastChar}");
-      tview_fontInfo.Nodes[0].Nodes.Add($"Widths");
-      for (int i = 0; i < _currFontData.FontInfo.Widths.Length; i++)
+      tview_fontInfo.Nodes[0].Nodes.Add($"Type: {_currFontData.FontInfo.SubType}");
+      if (_currFontData.FontInfo.SubType == PDF_FontType.Type0)
       {
-        tview_fontInfo.Nodes[0].LastNode.Nodes.Add($"Index: {i} Width: {_currFontData.FontInfo.Widths[i]}");
-      }
-      tview_fontInfo.Nodes[0].Nodes.Add("FontDescriptor");
-      tview_fontInfo.Nodes[0].LastNode.Nodes.Add($"FontName: {_currFontData.FontInfo.FontDescriptor.FontName}");
-      tview_fontInfo.Nodes[0].LastNode.Nodes.Add($"FontFamily: {_currFontData.FontInfo.FontDescriptor.FontFamily}");
-      tview_fontInfo.Nodes[0].LastNode.Nodes.Add($"FontStretch: {_currFontData.FontInfo.FontDescriptor.FontStretch}");
-      tview_fontInfo.Nodes[0].LastNode.Nodes.Add($"FontWeight: {_currFontData.FontInfo.FontDescriptor.FontWeight}");
-      tview_fontInfo.Nodes[0].LastNode.Nodes.Add($"Flags: {_currFontData.FontInfo.FontDescriptor.Flags.ToString()}");
-      tview_fontInfo.Nodes[0].LastNode.Nodes.Add($"FontBBox");
-      tview_fontInfo.Nodes[0].LastNode.LastNode.Nodes.Add($"llX: {_currFontData.FontInfo.FontDescriptor.FontBBox.llX}");
-      tview_fontInfo.Nodes[0].LastNode.LastNode.Nodes.Add($"llY: {_currFontData.FontInfo.FontDescriptor.FontBBox.llY}");
-      tview_fontInfo.Nodes[0].LastNode.LastNode.Nodes.Add($"urX: {_currFontData.FontInfo.FontDescriptor.FontBBox.urX}");
-      tview_fontInfo.Nodes[0].LastNode.LastNode.Nodes.Add($"urY: {_currFontData.FontInfo.FontDescriptor.FontBBox.urY}");
-      tview_fontInfo.Nodes[0].LastNode.Nodes.Add($"ItalicAngle: {_currFontData.FontInfo.FontDescriptor.ItalicAngle}");
-      tview_fontInfo.Nodes[0].LastNode.Nodes.Add($"Ascent: {_currFontData.FontInfo.FontDescriptor.Ascent}");
-      tview_fontInfo.Nodes[0].LastNode.Nodes.Add($"Descent: {_currFontData.FontInfo.FontDescriptor.Descent}");
-      tview_fontInfo.Nodes[0].LastNode.Nodes.Add($"Leading: {_currFontData.FontInfo.FontDescriptor.Leading}");
-      tview_fontInfo.Nodes[0].LastNode.Nodes.Add($"CapHeight: {_currFontData.FontInfo.FontDescriptor.CapHeight}");
-      tview_fontInfo.Nodes[0].LastNode.Nodes.Add($"XHeight: {_currFontData.FontInfo.FontDescriptor.XHeight}");
-      tview_fontInfo.Nodes[0].LastNode.Nodes.Add($"StemV: {_currFontData.FontInfo.FontDescriptor.StemV}");
-      tview_fontInfo.Nodes[0].LastNode.Nodes.Add($"StemH: {_currFontData.FontInfo.FontDescriptor.StemH}");
-      tview_fontInfo.Nodes[0].LastNode.Nodes.Add($"AvgWidth: {_currFontData.FontInfo.FontDescriptor.AvgWidth}");
-      tview_fontInfo.Nodes[0].LastNode.Nodes.Add($"MaxWidth: {_currFontData.FontInfo.FontDescriptor.MaxWidth}");
-      tview_fontInfo.Nodes[0].LastNode.Nodes.Add($"MissingWidth: {_currFontData.FontInfo.FontDescriptor.MissingWidth}");
-      tview_fontInfo.Nodes[0].Nodes.Add("EncodingData");
-      tview_fontInfo.Nodes[0].LastNode.Nodes.Add($"BaseEncoding: {_currFontData.FontInfo.EncodingData.BaseEncoding}");
-      tview_fontInfo.Nodes[0].LastNode.Nodes.Add($"Differences");
-      for (int i = 0; i < _currFontData.FontInfo.EncodingData.Differences.Count; i++)
-      {
-        tview_fontInfo.Nodes[0].LastNode.LastNode.Nodes.Add($"Codepoint: {_currFontData.FontInfo.EncodingData.Differences[i].code} Value: {_currFontData.FontInfo.EncodingData.Differences[i].val}");
-      }
-      tview_fontInfo.Nodes[0].Nodes.Add($"DescendantFontsIR: {_currFontData.FontInfo.DescendantFontsIR[0].ojbIndex} {_currFontData.FontInfo.DescendantFontsIR[0].generation}");
-      tview_fontInfo.Nodes[0].Nodes.Add($"ToUnicodeIR: {_currFontData.FontInfo.ToUnicodeIR.objIndex} {_currFontData.FontInfo.ToUnicodeIR.generation}");
+        CIDFontDictionary fontDict = _currFontData.FontInfo.DescendantFontsInfo[0].DescendantDict;
+        tview_fontInfo.Nodes[0].Nodes.Add($"Widths");
+        foreach (KeyValuePair<int, int> kvp in fontDict.W)
+        {
+          tview_fontInfo.Nodes[0].LastNode.Nodes.Add($"CID: {kvp.Key} Width: {kvp.Value}");
+        }
+        
+        tview_fontInfo.Nodes[0].Nodes.Add("FontDescriptor");
+        tview_fontInfo.Nodes[0].LastNode.Nodes.Add($"SubType: {fontDict.Subtype}");
+        tview_fontInfo.Nodes[0].LastNode.Nodes.Add($"FontName: {fontDict.FontDescriptor.FontName}");
+        if (fontDict.CIDToGIDMap == null)
+        {
+          tview_fontInfo.Nodes[0].LastNode.Nodes.Add($"CIDToGIDMap: {fontDict.CIDToGIDMapName}");
+        }
+        else
+        {
+          tview_fontInfo.Nodes[0].LastNode.Nodes.Add("CIDToGIDMap");
+          tview_fontInfo.Nodes[0].LastNode.LastNode.Nodes.Add(Encoding.Default.GetString(fontDict.CIDToGIDMap.RawStreamData));
+        }
+        
+        tview_fontInfo.Nodes[0].LastNode.Nodes.Add($"FontFamily: {fontDict.FontDescriptor.FontFamily}");
+        tview_fontInfo.Nodes[0].LastNode.Nodes.Add($"FontStretch: {fontDict.FontDescriptor.FontStretch}");
+        tview_fontInfo.Nodes[0].LastNode.Nodes.Add($"FontWeight: {fontDict.FontDescriptor.FontWeight}");
+        tview_fontInfo.Nodes[0].LastNode.Nodes.Add($"Flags: {fontDict.FontDescriptor.Flags.ToString()}");
+        tview_fontInfo.Nodes[0].LastNode.Nodes.Add($"FontBBox");
+        tview_fontInfo.Nodes[0].LastNode.LastNode.Nodes.Add($"llX: {fontDict.FontDescriptor.FontBBox.llX}");
+        tview_fontInfo.Nodes[0].LastNode.LastNode.Nodes.Add($"llY: {fontDict.FontDescriptor.FontBBox.llY}");
+        tview_fontInfo.Nodes[0].LastNode.LastNode.Nodes.Add($"urX: {fontDict.FontDescriptor.FontBBox.urX}");
+        tview_fontInfo.Nodes[0].LastNode.LastNode.Nodes.Add($"urY: {fontDict.FontDescriptor.FontBBox.urY}");
+        tview_fontInfo.Nodes[0].LastNode.Nodes.Add($"ItalicAngle: {fontDict.FontDescriptor.ItalicAngle}");
+        tview_fontInfo.Nodes[0].LastNode.Nodes.Add($"Ascent: {fontDict.FontDescriptor.Ascent}");
+        tview_fontInfo.Nodes[0].LastNode.Nodes.Add($"Descent: {fontDict.FontDescriptor.Descent}");
+        tview_fontInfo.Nodes[0].LastNode.Nodes.Add($"Leading: {fontDict.FontDescriptor.Leading}");
+        tview_fontInfo.Nodes[0].LastNode.Nodes.Add($"CapHeight: {fontDict.FontDescriptor.CapHeight}");
+        tview_fontInfo.Nodes[0].LastNode.Nodes.Add($"XHeight: {fontDict.FontDescriptor.XHeight}");
+        tview_fontInfo.Nodes[0].LastNode.Nodes.Add($"StemV: {fontDict.FontDescriptor.StemV}");
+        tview_fontInfo.Nodes[0].LastNode.Nodes.Add($"StemH: {fontDict.FontDescriptor.StemH}");
+        tview_fontInfo.Nodes[0].LastNode.Nodes.Add($"AvgWidth: {fontDict.FontDescriptor.AvgWidth}");
+        tview_fontInfo.Nodes[0].LastNode.Nodes.Add($"MaxWidth: {fontDict.FontDescriptor.MaxWidth}");
+        tview_fontInfo.Nodes[0].LastNode.Nodes.Add($"MissingWidth: {fontDict.FontDescriptor.MissingWidth}");
+        tview_fontInfo.Nodes[0].LastNode.Nodes.Add($"DescendantFontsIR: {_currFontData.FontInfo.DescendantFontsIR[0].ojbIndex} {_currFontData.FontInfo.DescendantFontsIR[0].generation}");
+        tview_fontInfo.Nodes[0].LastNode.Nodes.Add($"ToUnicodeIR: {_currFontData.FontInfo.ToUnicodeIR.objIndex} {_currFontData.FontInfo.ToUnicodeIR.generation}");
+        tview_fontInfo.Nodes[0].LastNode.Nodes.Add($"BaseEncoding: {_currFontData.FontInfo.EncodingData.BaseEncoding}");
 
-      tview_fontInfo.Nodes[0].Nodes.Add("ComposeFontInfo");
-      if (_currFontData.FontInfo.DescendantFontsInfo != null)
+      }
+      else
       {
-        throw new NotImplementedException("Implement CFONTINFO stuff!");
+        tview_fontInfo.Nodes[0].Nodes.Add($"FirstChar: {_currFontData.FontInfo.FirstChar}");
+        tview_fontInfo.Nodes[0].Nodes.Add($"LastChar: {_currFontData.FontInfo.LastChar}");
+        tview_fontInfo.Nodes[0].Nodes.Add($"Widths");
+        for (int i = 0; i < _currFontData.FontInfo.Widths.Length; i++)
+        {
+          tview_fontInfo.Nodes[0].LastNode.Nodes.Add($"Index: {i} Width: {_currFontData.FontInfo.Widths[i]}");
+        }
+        tview_fontInfo.Nodes[0].Nodes.Add("FontDescriptor");
+        tview_fontInfo.Nodes[0].LastNode.Nodes.Add($"FontName: {_currFontData.FontInfo.FontDescriptor.FontName}");
+        tview_fontInfo.Nodes[0].LastNode.Nodes.Add($"FontFamily: {_currFontData.FontInfo.FontDescriptor.FontFamily}");
+        tview_fontInfo.Nodes[0].LastNode.Nodes.Add($"FontStretch: {_currFontData.FontInfo.FontDescriptor.FontStretch}");
+        tview_fontInfo.Nodes[0].LastNode.Nodes.Add($"FontWeight: {_currFontData.FontInfo.FontDescriptor.FontWeight}");
+        tview_fontInfo.Nodes[0].LastNode.Nodes.Add($"Flags: {_currFontData.FontInfo.FontDescriptor.Flags.ToString()}");
+        tview_fontInfo.Nodes[0].LastNode.Nodes.Add($"FontBBox");
+        tview_fontInfo.Nodes[0].LastNode.LastNode.Nodes.Add($"llX: {_currFontData.FontInfo.FontDescriptor.FontBBox.llX}");
+        tview_fontInfo.Nodes[0].LastNode.LastNode.Nodes.Add($"llY: {_currFontData.FontInfo.FontDescriptor.FontBBox.llY}");
+        tview_fontInfo.Nodes[0].LastNode.LastNode.Nodes.Add($"urX: {_currFontData.FontInfo.FontDescriptor.FontBBox.urX}");
+        tview_fontInfo.Nodes[0].LastNode.LastNode.Nodes.Add($"urY: {_currFontData.FontInfo.FontDescriptor.FontBBox.urY}");
+        tview_fontInfo.Nodes[0].LastNode.Nodes.Add($"ItalicAngle: {_currFontData.FontInfo.FontDescriptor.ItalicAngle}");
+        tview_fontInfo.Nodes[0].LastNode.Nodes.Add($"Ascent: {_currFontData.FontInfo.FontDescriptor.Ascent}");
+        tview_fontInfo.Nodes[0].LastNode.Nodes.Add($"Descent: {_currFontData.FontInfo.FontDescriptor.Descent}");
+        tview_fontInfo.Nodes[0].LastNode.Nodes.Add($"Leading: {_currFontData.FontInfo.FontDescriptor.Leading}");
+        tview_fontInfo.Nodes[0].LastNode.Nodes.Add($"CapHeight: {_currFontData.FontInfo.FontDescriptor.CapHeight}");
+        tview_fontInfo.Nodes[0].LastNode.Nodes.Add($"XHeight: {_currFontData.FontInfo.FontDescriptor.XHeight}");
+        tview_fontInfo.Nodes[0].LastNode.Nodes.Add($"StemV: {_currFontData.FontInfo.FontDescriptor.StemV}");
+        tview_fontInfo.Nodes[0].LastNode.Nodes.Add($"StemH: {_currFontData.FontInfo.FontDescriptor.StemH}");
+        tview_fontInfo.Nodes[0].LastNode.Nodes.Add($"AvgWidth: {_currFontData.FontInfo.FontDescriptor.AvgWidth}");
+        tview_fontInfo.Nodes[0].LastNode.Nodes.Add($"MaxWidth: {_currFontData.FontInfo.FontDescriptor.MaxWidth}");
+        tview_fontInfo.Nodes[0].LastNode.Nodes.Add($"MissingWidth: {_currFontData.FontInfo.FontDescriptor.MissingWidth}");
+        tview_fontInfo.Nodes[0].Nodes.Add("EncodingData");
+        tview_fontInfo.Nodes[0].LastNode.Nodes.Add($"BaseEncoding: {_currFontData.FontInfo.EncodingData.BaseEncoding}");
+        tview_fontInfo.Nodes[0].LastNode.Nodes.Add($"Differences");
+        for (int i = 0; i < _currFontData.FontInfo.EncodingData.Differences.Count; i++)
+        {
+          tview_fontInfo.Nodes[0].LastNode.LastNode.Nodes.Add($"Codepoint: {_currFontData.FontInfo.EncodingData.Differences[i].code} Value: {_currFontData.FontInfo.EncodingData.Differences[i].val}");
+        }
       }
 
       tview_fontInfo.Nodes[0].Expand();
@@ -490,5 +550,13 @@ namespace RasterizeDebugger
       }
       p.Show();
     }
+
+    private void TreeNodeMouseClickEventHandler(object? sender, TreeNodeMouseClickEventArgs e)
+    {
+      TreeView node = (TreeView)sender;
+      DataViewer dw = new DataViewer(node.SelectedNode.Text);
+      dw.Show();
+    }
+
   }
 }
