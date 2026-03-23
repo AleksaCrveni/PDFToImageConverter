@@ -529,8 +529,8 @@ namespace Converter.Parsers.PDF
             // inline images
             break;
           case 0x6f44: // Do
-            throw new NotImplementedException("Operator not i implemented");
-            // XObject
+             // XObject
+            // throw new NotImplementedException("Operator not i implemented");
             break;
           case 0x504d: // MP
             throw new NotImplementedException("Operator not i implemented");
@@ -961,7 +961,7 @@ namespace Converter.Parsers.PDF
         c = rasterizer.FindCharFromCID(CID);
         if (c != null)
         {
-          PDF_DrawGlyph((char)c, ref glyphInfo, rasterizer, state, fd, widths, textToWrite, 0);
+          PDF_DrawGlyph((char)c, ref glyphInfo, rasterizer, state, fd, widths, textToWrite, 0, CID);
           return;
         }
 
@@ -971,7 +971,7 @@ namespace Converter.Parsers.PDF
         if (ligature.Count == 0)
         {
           char character = '0';
-          PDF_DrawGlyph((char)0, ref glyphInfo, rasterizer, state, fd, widths, textToWrite, 0);
+          PDF_DrawGlyph((char)0, ref glyphInfo, rasterizer, state, fd, widths, textToWrite, 0, CID);
 
           return;
         }
@@ -979,7 +979,7 @@ namespace Converter.Parsers.PDF
         {
           for (int i = 0; i < ligature.Count; i++)
           {
-            PDF_DrawGlyph(ligature[i], ref glyphInfo, rasterizer, state, fd, widths, textToWrite, i);
+            PDF_DrawGlyph(ligature[i], ref glyphInfo, rasterizer, state, fd, widths, textToWrite, i, CID);
           }
         }
       } 
@@ -992,8 +992,8 @@ namespace Converter.Parsers.PDF
       }
       
     }
-
-    public void PDF_DrawGlyph(char c, ref GlyphInfo glyphInfo, IRasterizer rasterizer, PDFGI_DrawState state, PDF_FontData fd, double[] widths, string literal, int index)
+    // CID is only used for Composite fonts
+    public void PDF_DrawGlyph(char c, ref GlyphInfo glyphInfo, IRasterizer rasterizer, PDFGI_DrawState state, PDF_FontData fd, double[] widths, string literal, int index, char CID = ' ')
     {
       rasterizer.SetDefaultGlyphInfoValues(ref glyphInfo);
       // TODO: use this instead of c, FIX 
@@ -1008,13 +1008,22 @@ namespace Converter.Parsers.PDF
 
       #region width calculation
 
-      // Does this work for all charcaters
-      int idx = (int)c - fd.FontInfo.FirstChar;
       float width = 0;
-      if (idx < widths.Length)
-        width = (float)widths[idx] / 1000f;
+      if (fd.FontInfo.SubType == PDF_FontType.Type0)
+      {
+        width = RasterHelper.GetCompositeWidth(CID, fd.FontInfo.DescendantFontsInfo![0].DescendantDict);
+      }
       else
-        width = fd.FontInfo.FontDescriptor.MissingWidth / 1000f;
+      {
+        // Does this work for all charcaters
+        int idx = (int)c - fd.FontInfo.FirstChar;
+
+        if (idx < widths.Length)
+          width = (float)widths[idx] / 1000f;
+        else
+          width = fd.FontInfo.FontDescriptor.MissingWidth / 1000f;
+      }
+      Debug.Assert(width != 0);
       #endregion
 
       (float scaleX, float scaleY) s = rasterizer.GetScale(glyphInfo.Index, state.TextRenderingMatrix, width);
@@ -1028,8 +1037,18 @@ namespace Converter.Parsers.PDF
       Debug.Assert(s.scaleY > 0, $"Scale factor Y must be higher than 0! sfY: {s.scaleY}. Lit: {literal}.Ind : {index}");
       #endregion asserts
 
-      int ascent = (int)Math.Round(fd.FontInfo.FontDescriptor.Ascent * s.scaleY);
-      int descent = (int)Math.Round(fd.FontInfo.FontDescriptor.Descent * s.scaleY);
+      int ascent = 0;
+      int descent = 0;
+      if (fd.FontInfo.SubType == PDF_FontType.Type0)
+      {
+        ascent = (int)Math.Round(fd.FontInfo.DescendantFontsInfo![0].DescendantDict.FontDescriptor.Ascent * s.scaleY);
+        descent = (int)Math.Round(fd.FontInfo.DescendantFontsInfo![0].DescendantDict.FontDescriptor.Descent * s.scaleY);
+      }
+      else
+      {
+        ascent = (int)Math.Round(fd.FontInfo.FontDescriptor.Ascent * s.scaleY);
+        descent = (int)Math.Round(fd.FontInfo.FontDescriptor.Descent * s.scaleY);
+      }
 
       #region glyph metrics
 

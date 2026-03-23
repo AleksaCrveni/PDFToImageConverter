@@ -1,4 +1,5 @@
-﻿using Converter.FileStructures.PostScript;
+﻿using Converter.FileStructures.PDF;
+using Converter.FileStructures.PostScript;
 using Converter.FileStructures.TTF;
 using Converter.Rasterizers;
 using System.Diagnostics;
@@ -7,7 +8,9 @@ using System.Text;
 
 namespace Converter.Utils
 {
-  // TODO: think if this should actually be part oF STBRasterizer
+  /// <summary>
+  /// At some point figure out what to do with these functions. Currently they are here only because I am not sure where i want to put them
+  /// </summary>
   public static class RasterHelper
   {
     public static List<TTFVertex> ConvertToTTFVertexFormat(PSShape s)
@@ -101,6 +104,10 @@ namespace Converter.Utils
       }
     }
 
+    public static float GetCompositeWidth(char CID, CIDFontDictionary dict)
+    {
+      return dict.W[CID] / 1000f;
+    }
     public static uint ReadUintFromHex(string str)
     {
       Debug.Assert(str[0] == '<');
