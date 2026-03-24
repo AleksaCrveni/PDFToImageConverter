@@ -42,13 +42,19 @@ namespace RasterizeDebugger
     }
     private void Playground_Load(object sender, EventArgs e)
     {
+      // bad workaround
+      List<string> seen = new List<string>();
+
       if (_pdfFile != null) 
       {
         foreach (PDF_PageInfo pInfo in _pdfFile.PageInformation)
         {
           foreach (PDF_FontData font in pInfo.ResourceDict.Font)
           {
+            if (seen.Contains(font.FontInfo.BaseFont))
+              continue;
             cb_font.Items.Add(font.FontInfo.BaseFont);
+            seen.Add(font.FontInfo.BaseFont);
           }
         }
         cb_font.SelectedIndex = 0;
@@ -92,13 +98,29 @@ namespace RasterizeDebugger
         if (found)
           break;
       }
-
-      // some font types like ttf do not have charset, we have to get data from font reader
-      if (_currFont.FontInfo.FontDescriptor.CharSet.Length == 0)
+      
+      if (_currFont.FontInfo.SubType == PDF_FontType.Type0)
       {
-        throw new NotImplementedException("Only type1 fonts supported atm");
+        PDF_CID_CMAP cmap = _currFont.FontInfo.DescendantFontsInfo[0].Cmap;
+        if (cmap != null)
+        {
+          cb_glyph.BeginUpdate();
+          cb_glyph.Items.Clear();
+          foreach (KeyValuePair<char, char> kvp in cmap.Cmap)
+          {
+            cb_glyph.Items.Add($"{(int)kvp.Key}-{(int)kvp.Value}-{kvp.Value}"); // CID-Actual-Char
+          }
+          foreach (KeyValuePair<char, List<char>> kvp in cmap.LigatureCmap)
+          {
+            cb_glyph.Items.Add($"{(int)kvp.Key}-Ligature"); // CID-Actual-Char
+          }
+          cb_glyph.EndUpdate();
+        } else
+        {
+          throw new NotImplementedException("CMAP EMPTY!");
+        }
       }
-      else
+      else if (_currFont.FontInfo.SubType == PDF_FontType.Type1)
       {
         // this can happen also to be 0 len since font can use other tag , its specified in PDF docs
         // we ignore first char becuase string starts with /
@@ -109,6 +131,10 @@ namespace RasterizeDebugger
         cb_glyph.Items.AddRange(chars);
         cb_glyph.EndUpdate();
         cb_glyph.SelectedIndex = 0;
+      }
+      else
+      {
+        throw new NotImplementedException("Font type not supported in debugger!");
       }
     }
 

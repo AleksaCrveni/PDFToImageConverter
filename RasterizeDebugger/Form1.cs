@@ -424,7 +424,30 @@ namespace RasterizeDebugger
           tview_fontInfo.Nodes[0].LastNode.Nodes.Add("CIDToGIDMap");
           tview_fontInfo.Nodes[0].LastNode.LastNode.Nodes.Add(Encoding.Default.GetString(fontDict.CIDToGIDMap.RawStreamData));
         }
-        
+
+        PDF_CID_CMAP cmap = _currFontData.FontInfo.DescendantFontsInfo[0].Cmap;
+        if (cmap != null)
+        {
+          tview_fontInfo.Nodes[0].LastNode.Nodes.Add($"CMAP");
+          foreach (KeyValuePair<char, char> kvp in cmap.Cmap)
+          {
+            tview_fontInfo.Nodes[0].LastNode.LastNode.Nodes.Add($"CID: {(int)kvp.Key} Index-Char: {(int)kvp.Value}-{kvp.Value}");
+          }
+          tview_fontInfo.Nodes[0].LastNode.Nodes.Add($"Ligatures");
+          foreach (KeyValuePair<char, List<char>> kvp in cmap.LigatureCmap)
+          {
+            tview_fontInfo.Nodes[0].LastNode.LastNode.Nodes.Add($"CID: {(int)kvp.Key}");
+            foreach (char c in kvp.Value)
+            {
+              tview_fontInfo.Nodes[0].LastNode.LastNode.LastNode.Nodes.Add($"Index-Char: {(int)c}-{c}");
+            }
+          }
+        }
+
+        // TODO: Add more info 
+        tview_fontInfo.Nodes[0].LastNode.Nodes.Add($"CIDSystemInfo Supplement: {fontDict.CIDSystemInfo.Supplement}");
+        tview_fontInfo.Nodes[0].LastNode.Nodes.Add($"CIDSystemInfo Registry: {fontDict.CIDSystemInfo.Registry}");
+        tview_fontInfo.Nodes[0].LastNode.Nodes.Add($"CIDSystemInfo Ordering: {fontDict.CIDSystemInfo.Ordering}");
         tview_fontInfo.Nodes[0].LastNode.Nodes.Add($"FontFamily: {fontDict.FontDescriptor.FontFamily}");
         tview_fontInfo.Nodes[0].LastNode.Nodes.Add($"FontStretch: {fontDict.FontDescriptor.FontStretch}");
         tview_fontInfo.Nodes[0].LastNode.Nodes.Add($"FontWeight: {fontDict.FontDescriptor.FontWeight}");
@@ -543,8 +566,7 @@ namespace RasterizeDebugger
       {
         PdfParser parser = new PdfParser();
         PDF_Options options = new PDF_Options();
-
-        PDFFile file = parser.Parse(_fileFullPath, ref options);
+        PDFFile file = parser.Parse(_fileFullPath, ref options, true);
         p = new Playground(file);
         
       }
