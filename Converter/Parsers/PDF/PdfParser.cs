@@ -61,14 +61,14 @@ namespace Converter.Parsers.PDF
     /// <returns>
     /// 
     /// </returns>
-    public PDFFile Parse(string filepath, ref PDF_Options options)
+    public PDFFile Parse(string filepath, ref PDF_Options options, bool DEBUG = false)
     {
       PDFFile file = new PDFFile();
       Stream inStream = File.OpenRead(filepath);
       // have this better just hardcode for now
       Stream outStream = File.Create("convertTest.tiff");
       // go to end to find byte offset to cross refernce table
-      Parse(file, inStream, outStream, ref options);
+      Parse(file, inStream, outStream, ref options, DEBUG);
       inStream.Close();
       outStream.Flush();
       outStream.Close();
