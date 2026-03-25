@@ -7,10 +7,12 @@ using Converter.FileStructures.PDF.GraphicsInterpreter;
 using Converter.FileStructures.TIFF;
 using Converter.Parsers.PDF;
 using Converter.Rasterizers;
+using Converter.Utils;
 using Converter.Writers.TIFF;
 using System.Diagnostics;
 using System.Drawing.Drawing2D;
 using System.Text;
+using static System.Windows.Forms.AxHost;
 
 namespace RasterizeDebugger
 {
@@ -180,7 +182,9 @@ namespace RasterizeDebugger
       }
       _currRasterizer = _currFontData.Rasterizer;
       double[] widths = _currFontData.FontInfo.Widths;
-      DrawGlyphAndUpdateGlyphInfo(c, ref gInfo, _currRasterizer, _interpreter._debugState.State, _currFontData, widths, _localState.currentText, _localState.charIndex);
+
+
+      DrawGlyphAndUpdateGlyphInfo(c, ref gInfo, _currRasterizer, _interpreter._debugState.State, _currFontData, widths, _localState.currentText, _localState.charIndex, true);
 
       UpdateImageDataAndPictureBox();
       UpdateLabels();
@@ -274,12 +278,41 @@ namespace RasterizeDebugger
 
       _currRasterizer = _currFontData.Rasterizer;
       double[] widths = _currFontData.FontInfo.Widths;
-      char c;
-      for (int i = _localState.charIndex; i < _localState.currentText.Length; i++)
+      char? c;
+      if (_currFontData.FontInfo.SubType == PDF_FontType.Type0)
       {
-        c = _localState.currentText[i];
-        DrawGlyphAndUpdateGlyphInfo(c, ref gInfo, _currRasterizer, _interpreter._debugState.State, _currFontData, widths, _localState.currentText, _localState.charIndex, updateUI);
+        char CID = (char)RasterHelper.ReadUintFromHex(_localState.currentText);
+        c = _currRasterizer.FindCharFromCID(CID);
+        if (c != null)
+        {
+          DrawGlyphAndUpdateGlyphInfo((char)CID, ref gInfo, _currRasterizer, _interpreter._debugState.State, _currFontData, widths, _localState.currentText, _localState.charIndex, updateUI, CID);
+        } 
+        else
+        {
+          List<char> ligature = _currRasterizer.FindLigatureFromCID(CID);
+          if (ligature.Count == 0)
+          {
+            DrawGlyphAndUpdateGlyphInfo((char)0, ref gInfo, _currRasterizer, _interpreter._debugState.State, _currFontData, widths, _localState.currentText, _localState.charIndex, updateUI, CID);
+          }
+          else
+          {
+            for (int i = 0; i < ligature.Count; i++)
+            {
+              // thgis will need fixing
+              DrawGlyphAndUpdateGlyphInfo((char)ligature[i], ref gInfo, _currRasterizer, _interpreter._debugState.State, _currFontData, widths, _localState.currentText, _localState.charIndex, updateUI, CID);
+            }
+          }
+        }  
       }
+      else
+      {
+        for (int i = _localState.charIndex; i < _localState.currentText.Length; i++)
+        {
+          c = _localState.currentText[i];
+          DrawGlyphAndUpdateGlyphInfo((char)c, ref gInfo, _currRasterizer, _interpreter._debugState.State, _currFontData, widths, _localState.currentText, _localState.charIndex, updateUI);
+        }
+      }
+      
       _localState.charIndex = _localState.currentText.Length - 1;
       if (updateUI)
       {
@@ -318,15 +351,14 @@ namespace RasterizeDebugger
         * _interpreter._debugState.State.TextObject.FontScaleFactor;
     }
 
-    public void DrawGlyphAndUpdateGlyphInfo(char c, ref GlyphInfo glyphInfo, IRasterizer rasterizer, PDFGI_DrawState state, PDF_FontData fd, double[] widths, string literal, int index, bool updateUI = true)
+    public void DrawGlyphAndUpdateGlyphInfo(char c, ref GlyphInfo glyphInfo, IRasterizer rasterizer, PDFGI_DrawState state, PDF_FontData fd, double[] widths, string literal, int index, bool updateUI, char CID = ' ')
     {
-      _interpreter.PDF_DrawGlyph(c, ref glyphInfo, _currRasterizer, _interpreter._debugState.State, _currFontData, widths, _localState.currentText, _localState.charIndex);
+      _interpreter.PDF_DrawGlyph(c, ref glyphInfo, _currRasterizer, _interpreter._debugState.State, _currFontData, widths, _localState.currentText, _localState.charIndex, CID);
       if (!updateUI)
         return;
       lbl_charValue.Text = ((int)c).ToString();
       lbl_glyphIndex.Text = glyphInfo.Index.ToString();
       lbl_glyphName.Text = glyphInfo.Name;
-
     }
 
     private void pb_mainImage_Click(object sender, EventArgs e)

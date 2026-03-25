@@ -979,6 +979,9 @@ namespace Converter.Parsers.PDF
         {
           for (int i = 0; i < ligature.Count; i++)
           {
+            // NOTE:
+            // Not sure if i should pass CID of ligature of current glyph in ligature
+            // Because we will get width based on CID and then chars in ligature may appear to wide/sparse
             PDF_DrawGlyph(ligature[i], ref glyphInfo, rasterizer, state, fd, widths, textToWrite, i, CID);
           }
         }

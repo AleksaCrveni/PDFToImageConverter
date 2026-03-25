@@ -287,7 +287,7 @@ namespace RasterizeDebugger
         CID = Convert.ToChar(Convert.ToUInt16(vals[0]));
         if (vals.Length == 2)
           return;
-        c = Convert.ToChar(Convert.ToUInt16(vals[1]));
+        c = Convert.ToChar(Convert.ToUInt16(vals[0]));
       }
       else if (_currFont.FontInfo.SubType == PDF_FontType.Type1)
       {
