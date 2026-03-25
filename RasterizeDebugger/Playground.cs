@@ -1,4 +1,5 @@
 ﻿using Converter.FileStructures.PDF;
+using Converter.FileStructures.PDF.GraphicsInterpreter;
 using Converter.FileStructures.PostScript;
 using Converter.FileStructures.TTF;
 using Converter.FileStructures.Type1;
@@ -6,7 +7,9 @@ using Converter.Rasterizers;
 using Converter.Utils;
 using Converter.Writers.TIFF;
 using System.Diagnostics;
+using System.Security.Cryptography;
 using System.Text;
+using static System.Windows.Forms.AxHost;
 
 
 namespace RasterizeDebugger
@@ -144,7 +147,7 @@ namespace RasterizeDebugger
     }
 
     /// <summary>
-    /// TODO: MAKE IT GENERIC IT ONLY WORKS FOR TYPE1 ATM
+    /// TODO: support all fonts
     /// </summary>
     /// <param name="sender"></param>
     /// <param name="e"></param>
@@ -153,8 +156,52 @@ namespace RasterizeDebugger
     {
       if (_pdfFile == null)
         return;
+      Raster();
+    }
 
+    private void Raster()
+    {
+      char c = '0';
+      char CID = '0';
+      string name = ""; // have to do some reversal here as well
+      GetCurrentChar(ref c, ref CID, ref name);
       Array.Clear(_data);
+      ActualRaster(c, CID, name);
+    }
+    private void ActualRaster(char c, char CID, string name)
+    {
+      IRasterizer rasterizer = _currFont.Rasterizer;
+      GlyphInfo glyphInfo = new GlyphInfo();
+      double[] widths = _currFont.FontInfo.Widths;
+      rasterizer.SetDefaultGlyphInfoValues(ref glyphInfo);
+      // TODO: use this instead of c, FIX 
+      if (name == "")
+        rasterizer.GetGlyphInfo(c, ref glyphInfo);
+      else
+        glyphInfo.Name = name;
+
+      int X = 20;
+      int Y = 20;
+
+      #region width calculation
+
+      float width = 0;
+      if (_currFont.FontInfo.SubType == PDF_FontType.Type0)
+      {
+        width = RasterHelper.GetCompositeWidth(CID, _currFont.FontInfo.DescendantFontsInfo![0].DescendantDict);
+      }
+      else
+      {
+        // Does this work for all charcaters
+        int idx = (int)c - _currFont.FontInfo.FirstChar;
+
+        if (idx < widths.Length)
+          width = (float)widths[idx] / 1000f;
+        else
+          width = _currFont.FontInfo.FontDescriptor.MissingWidth / 1000f;
+      }
+      Debug.Assert(width != 0);
+      #endregion
       bool valid = float.TryParse(txb_Scale.Text, out float res);
       if (!valid || res <= 0 || res > 100)
       {
@@ -162,71 +209,99 @@ namespace RasterizeDebugger
         return;
       }
       _scale = res;
-      Type1Rasterizer r = (Type1Rasterizer)_currFont.Rasterizer;
-      //r.GetGlyphInfo();
-      string name = cb_glyph.SelectedItem.ToString();
-      TYPE1_Point2D width = new TYPE1_Point2D();
-      PSShape? shape = r.InterpretByName(name);
-      Debug.Assert(shape != null);
+      (float scaleX, float scaleY) s = (_scale, _scale);
 
-      // already scaled
-      List<TTFVertex> vertices = RasterHelper.ConvertToTTFVertexFormat(shape);
-      StringBuilder sb = new StringBuilder();
-      #region log
-      int j = 0;
-      for (int i = 0; i < shape._moves.Count; i++)
+      #region asserts
+      Debug.Assert(X > 0, $"X is negative at index;");
+      Debug.Assert(Y > 0, $"Y is negative at index;");
+      Debug.Assert(X < _width, $"X must be within bounds.X: {X} - Width: {_width}.");
+      Debug.Assert(Y < _height, $"Y must be within bounds.Y: {Y} - Height: {_height}.");
+      Debug.Assert(s.scaleX > 0, $"Scale factor X must be higher than 0! sfX: {s.scaleX}.");
+      Debug.Assert(s.scaleY > 0, $"Scale factor Y must be higher than 0! sfY: {s.scaleY}.");
+      #endregion asserts
+
+      int ascent = 0;
+      int descent = 0;
+      if (_currFont.FontInfo.SubType == PDF_FontType.Type0)
       {
-        PS_COMMAND v = shape._moves[i];
-        if (v == PS_COMMAND.MOVE_TO)
-        {
-          sb.Append($"{vertices[i].x} {vertices[i].y} ");
-          sb.Append("MOVE_TO ");
-        }
-        else if (v == PS_COMMAND.LINE_TO)
-        {
-          sb.Append($"{vertices[i].x} {vertices[i].y} ");
-          sb.Append("LINE_TO ");
-        }
-        else if (v == PS_COMMAND.CURVE_TO)
-        {
-          sb.Append($"{vertices[i].cx} {vertices[i].cy} {vertices[i].cx1} {vertices[i].cy1} {vertices[i].x} {vertices[i].y} ");
-          sb.Append("CURVE_TO ");
-        }
-        else
-        {
-          throw new InvalidDataException("Invalid PS_COMMAND!");
-        }
-
+        ascent = (int)Math.Round(_currFont.FontInfo.DescendantFontsInfo![0].DescendantDict.FontDescriptor.Ascent * s.scaleY);
+        descent = (int)Math.Round(_currFont.FontInfo.DescendantFontsInfo![0].DescendantDict.FontDescriptor.Descent * s.scaleY);
+      }
+      else
+      {
+        ascent = (int)Math.Round(_currFont.FontInfo.FontDescriptor.Ascent * s.scaleY);
+        descent = (int)Math.Round(_currFont.FontInfo.FontDescriptor.Descent * s.scaleY);
       }
 
-      //File.WriteAllText($"TTF_VERTEX_FROM_TYPE1__{name}__{scale.ToString()}.txt", sb.ToString());
-      #endregion log
+      #region glyph metrics
 
-      List<int> windingLengths = new List<int>();
-      int windingCount = 0;
+      int c_x0 = 0;
+      int c_y0 = 0;
+      int c_x1 = 0;
+      int c_y1 = 0;
+      rasterizer.GetGlyphBoundingBox(ref glyphInfo, s.scaleX, s.scaleY, ref c_x0, ref c_y0, ref c_x1, ref c_y1);
 
-      List<Converter.FileStructures.TTF.PointF> windings = r.STB_FlattenCurves(ref vertices, vertices.Count, 0.35f / _scale, ref windingLengths, ref windingCount);
-      int ix0 = 0;
-      int iy0 = 0;
-      int ix1 = 0;
-      int iy1 = 0;
-      int height = 0;
-      RasterHelper.GetFakeBoundingBoxFromPoints(windings, ref ix0, ref iy0, ref ix1, ref iy1, _scale);
+      Debug.Assert(c_x0 != int.MaxValue && c_x0 != int.MinValue);
+      Debug.Assert(c_y0 != int.MaxValue && c_y0 != int.MinValue);
+      Debug.Assert(c_x1 != int.MaxValue && c_x1 != int.MinValue);
+      Debug.Assert(c_y1 != int.MaxValue && c_y1 != int.MinValue);
 
-      height = iy1 - iy0;
-      if (width.Y > 0)
-        height = (int)(width.Y * _scale);
-      BmpS result = new BmpS();
-      result.H = height;
-      result.W = (int)(shape._width.X * _scale);
-      result.Offset = 20 * _height + 20; // draw at 20,20
-      result.Pixels = _data;
-      result.Stride = _width;
-      r.STB_InternalRasterize(ref result, ref windings, ref windingLengths, windingCount, _scale, _scale, 0, 0, ix0, iy0, true);
+      // char height - different than bounding box height
+      int y = Y + c_y0;
+      // I think that this should be replaced from value in Widths array
+      // NOTE: widths array wont work since this width is not in units but in pixels after its been scaled down
+      int glyphWidth = c_x1 - c_x0;
+      int glyphHeight = c_y1 - c_y0;
+
+      //// Added when type1 interpreter had height 0 and caused issues, I didnt see impact on TTF files 
+      //if (glyphHeight == 0)
+      //  glyphHeight = 2;
+
+      //if (glyphWidth == 0)
+      //  glyphWidth = 2;
+      //Debug.Assert(glyphWidth > 0);
+      //Debug.Assert(glyphHeight > 0);
+
+      #endregion
+
+      int byteOffset = X + (20 * _width);
+      int shiftX = 0;
+      int shiftY = 0;
+
+      rasterizer.RasterizeGlyph(_data, byteOffset, glyphWidth, glyphHeight, _width, s.scaleX, s.scaleY, shiftX, shiftY, ref glyphInfo);
 
       UpdateImage();
     }
 
+    private void GetCurrentChar(ref char c, ref char CID, ref string name)
+    {
+      if (cb_glyph.SelectedItem == null)
+      {
+        MessageBox.Show("Glyph not must be selected!");
+        return;
+      }
+      string cbValue = cb_glyph.SelectedItem.ToString();
+      if (_currFont.FontInfo.SubType == PDF_FontType.Type0)
+      {
+        string[] vals = cbValue.Split('-');
+        CID = Convert.ToChar(Convert.ToUInt16(vals[0]));
+        if (vals.Length == 2)
+          return;
+        c = Convert.ToChar(Convert.ToUInt16(vals[1]));
+      }
+      else if (_currFont.FontInfo.SubType == PDF_FontType.Type1)
+      {
+        name = cbValue;
+      }
+      else if (_currFont.FontInfo.SubType == PDF_FontType.TrueType)
+      {
+        throw new NotImplementedException();
+      }
+      else
+      {
+        throw new NotImplementedException();
+      }
+    }
     private void btn_loadShape_Click(object sender, EventArgs e)
     {
       DialogResult dialogResult = _dialog.ShowDialog();
@@ -337,6 +412,19 @@ namespace RasterizeDebugger
     {
       Array.ConstrainedCopy(_data, 0, _imageData, _imageDataStartPos, _data.Length);
       pb_main.Image = Image.FromStream(new MemoryStream(_imageData));
+    }
+    public PDF_FontData GetFontDataFromKey(string searchKey)
+    {
+      foreach (PDF_PageInfo pInfo in _pdfFile.PageInformation)
+      {
+        foreach (PDF_FontData font in pInfo.ResourceDict.Font)
+        {
+            if (font.Key == searchKey)
+              return font;
+        }
+      }
+
+      return new PDF_FontData();
     }
   }
 }
