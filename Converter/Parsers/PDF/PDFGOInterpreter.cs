@@ -225,7 +225,13 @@ namespace Converter.Parsers.PDF
           #endregion pathConstruction
           #region pathPainting
           case 0x53: // S
-            PDF_RasterShape();
+            // temporary, find way to do handle errors during rasterziation
+            try
+            {
+              PDF_RasterShape();
+            } catch(Exception ex)
+            {
+            }
             currentPC.Shape = new PSShape();
             break;
           case 0x73: // s
@@ -959,6 +965,12 @@ namespace Converter.Parsers.PDF
       {
         char CID = (char)RasterHelper.ReadUintFromHex(textToWrite);
         c = rasterizer.FindCharFromCID(CID);
+
+        // Page 271 -> Even though the CIDs are not used to select glyphs in a Type 2 CIDFont, they shall always be used to determine the glyph metrics, as described in the next sub-clause.
+        // not sure fi this is right....
+        if (fd.FontInfo.DescendantFontsInfo[0].DescendantDict.Subtype == PDF_FontType.CIDFontType2)
+          c = CID;
+
         if (c != null)
         {
           PDF_DrawGlyph((char)c, ref glyphInfo, rasterizer, state, fd, widths, textToWrite, 0, CID);

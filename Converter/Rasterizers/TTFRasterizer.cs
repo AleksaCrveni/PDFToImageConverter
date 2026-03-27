@@ -2,6 +2,7 @@
 using Converter.FileStructures.General;
 using Converter.FileStructures.PDF;
 using Converter.FileStructures.PDF.GraphicsInterpreter;
+using Converter.FileStructures.TIFF;
 using Converter.FileStructures.TTF;
 using Converter.Parsers.PDF;
 using Converter.StaticData;
@@ -15,7 +16,7 @@ namespace Converter.Rasterizers
     private PDF_FontEncodingData _encodingData;
     private TTF_Table_POST _ttfTablePOST;
     private TTF_Table_CMAP _ttfTableCMAP;
-    private float _unitsPerEm = 1000f; // used to covnert from glyph to text space, for ttf its 1/1000 default value
+    private float _unitsPerEm = 1024f; // used to covnert from glyph to text space, for ttf its 1/1000 default value
     private bool _CFF;// flag to know that TTF font program is not standalone but part of composite font
     public TTFRasterizer(byte[] rawFontProgram, ref PDF_FontInfo fontInfo) : base (rawFontProgram, fontInfo.EncodingData.BaseEncoding)
     {
@@ -246,6 +247,10 @@ namespace Converter.Rasterizers
       slice = buffer.Slice(tOff.head.Position, tOff.head.Length);
       __ttf.IndexToLocFormat = ReadUInt16(ref slice, 50);
 
+      _unitsPerEm = ReadSignedInt16(ref slice, 18);
+      if (_unitsPerEm == 0)
+        _unitsPerEm = 1024;
+
       __ttf.FontDirectory = fd;
       __ttf.Offsets = tOff;
     }
@@ -340,6 +345,7 @@ namespace Converter.Rasterizers
       }
       else
       {
+        //we should search codepoint * 2 or something like that 
         throw new NotImplementedException();
       }
 
@@ -354,7 +360,7 @@ namespace Converter.Rasterizers
 
       float advance = aw / _unitsPerEm;
       float widthScale = width / advance;
-
+      
       // 1 x 1 space that can be scaled (glyph -> text space)
       // later we will cache these values with unscaled vertex data and multiply on scale
       // so we dont have to compute vertexes each time but can just scale
