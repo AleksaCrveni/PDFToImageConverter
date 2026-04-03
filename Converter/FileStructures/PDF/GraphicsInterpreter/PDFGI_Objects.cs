@@ -51,4 +51,10 @@
     public double[,] CTM;
     public PDFGI_TextObject TextObject;
   }
+
+  public class PDFGI_ColorState
+  {
+    public PDF_ColorSpaceFamily ColorSpace;
+  }
+
 }
