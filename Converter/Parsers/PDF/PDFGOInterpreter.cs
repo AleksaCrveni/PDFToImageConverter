@@ -49,7 +49,8 @@ namespace Converter.Parsers.PDF
     public bool _debug;
     public PDFGO_DEBUG_STATE _debugState;
     private PathRasterizer _shapeRasterizer;
-    private bool isType0;
+    private PDFGI_ColorState _strokingColorState;
+    private PDFGI_ColorState _nonStrokingColorState;
 
     // TODO: maybe NULL check is redundant if we let it throw to end?
     public PDFGOInterpreter(byte[] contentBuffer, PDF_ResourceDict resourceDict,  IConverter converter, bool debug = false)
@@ -73,8 +74,13 @@ namespace Converter.Parsers.PDF
       _outputBuffer = new byte[_targetSize.Height * _targetSize.Width];
       _debug = debug;
       _shapeRasterizer = new PathRasterizer(Array.Empty<byte>(), "");
+
+      // not sure what would here be default values
+      _strokingColorState = new PDFGI_ColorState();
+      _nonStrokingColorState = new PDFGI_ColorState();
       if (debug)
         _debugState = new PDFGO_DEBUG_STATE();
+
       InitGS();
     }
     public void InitGS()
@@ -471,24 +477,24 @@ namespace Converter.Parsers.PDF
             GetNextStackValAsString();
             break;
           case 0x7363: // cs
-            PDF_ColorSpaceInfo info = new PDF_ColorSpaceInfo();
-            bool found = false;
-            string key = GetNextStackValAsString();
-            for (int i =0; i < _resourceDict.ColorSpace.Count; i++)
-            {
-              if (key == _resourceDict.ColorSpace[i].Key)
-              {
-                // DO 0 for now, but check if there can be multiple and which to choose then!
-                info = _resourceDict.ColorSpace[i].ColorSpaceInfo[0];
-                found = true;
-                break;
-              }
-            }
-            // NOTE: dont care about this for now untill we know how to properlt parse ColorInfo
-            // Sample and Report have completely different structure and ican't figure it out yet
-            //if (!found)
-            //  throw new InvalidDataException("Missing color space information!");
-            currentGS.ColorSpaceInfo = info;
+            //PDF_ColorSpaceInfo info = new PDF_ColorSpaceInfo();
+            //bool found = false;
+            //string key = GetNextStackValAsString();
+            //for (int i =0; i < _resourceDict.ColorSpace.Count; i++)
+            //{
+            //  if (key == _resourceDict.ColorSpace[i].Key)
+            //  {
+            //    // DO 0 for now, but check if there can be multiple and which to choose then!
+            //    info = _resourceDict.ColorSpace[i].ColorSpaceInfo[0];
+            //    found = true;
+            //    break;
+            //  }
+            //}
+            //// NOTE: dont care about this for now untill we know how to properlt parse ColorInfo
+            //// Sample and Report have completely different structure and ican't figure it out yet
+            ////if (!found)
+            ////  throw new InvalidDataException("Missing color space information!");
+            //currentGS.ColorSpaceInfo = info;
             break;
           case 0x4353: // SC
             throw new NotImplementedException("Operator not i implemented");
@@ -1194,6 +1200,4 @@ namespace Converter.Parsers.PDF
     ARRAY,
     INSTRUCTION
   }
-
- 
 }

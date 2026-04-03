@@ -185,7 +185,7 @@ namespace Converter.FileStructures.PDF
   public class PDF_ResourceDict()
   {
     public Dictionary<object, object> ExtGState;
-    public List<PDF_ColorSpaceData> ColorSpace;
+    public List<PDF_ColorSpace> ColorSpace;
     public Dictionary<object, object> Pattern;
     public Dictionary<object, object> Shading;
     public Dictionary<object, object> XObject;
@@ -194,8 +194,36 @@ namespace Converter.FileStructures.PDF
     public List<PDF_ProcedureSet> ProcSets;
     public Dictionary<object, object> Properties;
   }
+  /// <summary>
+  /// We fit key in here as well so we dont have to have another class and another pointer its just making it more complicated
+  /// Should probably do same thing with fonts
+  /// </summary>
+  public class PDF_ColorSpace
+  {
+    public string Key;
+    public PDF_ColorSpaceFamily Family;
+    public bool HasExtraData;
+    public IPDF_ExtraColorSpaceData ExtraCSData; // this is casted based on Family
+  }
 
-  public class PDF_ColorSpaceDictionary
+  public interface IPDF_ExtraColorSpaceData { }
+
+  // Table 65
+  public class PDF_LabColorSpaceExtraData : IPDF_ExtraColorSpaceData
+  {
+    public double[] WhitePoint;
+    public double[] BlackPoint = [0, 0, 0];
+    public double[] Range = [-100, 100, -100, 100]; // aMin, aMax, bMin, bMax
+  }
+
+  // Table 66
+  // PDF Version  ICC Specification Version  
+  // 1.3          3.3
+  // 1.4          ICC.1:1998-09 and its addendum ICC.1A:1999-04
+  // 1.5          ICC.1:2001-12
+  // 1.6          ICC.1:2003-09
+  // 1.7          ICC.1:2004-10 (ISO 15076-1:2005)
+  public class PDF_ICCExtraData : IPDF_ExtraColorSpaceData
   {
     public PDF_CommonStreamDict CommonStreamDict;
     public int N;
@@ -204,17 +232,9 @@ namespace Converter.FileStructures.PDF
     public object Metadata;
   }
 
-  public class PDF_ColorSpaceData
-  {
-    public string Key;
-    public List<PDF_ColorSpaceInfo> ColorSpaceInfo;
-  }
+  
 
-  public class PDF_ColorSpaceInfo
-  {
-    public PDF_ColorSpaceFamily ColorSpaceFamily;
-    public PDF_ColorSpaceDictionary Dict;
-  }
+
 
   public class PDF_FontData
   {

@@ -15,7 +15,8 @@ namespace Converter.FileStructures.PDF.GraphicsInterpreter
     // Device Independent
     public double[,] CTM;
     public object ClippingPath;
-    public PDF_ColorSpaceInfo ColorSpaceInfo;
+    public PDF_ColorSpace StrokingColorSpace;
+    public PDF_ColorSpace NonStrokingColorSpace;
     public object Color;
     public object TextState;
     public double LineWidth;
@@ -56,7 +57,8 @@ namespace Converter.FileStructures.PDF.GraphicsInterpreter
 
       // TODO: make sure these are coppied propely
       newGS.ClippingPath = this.ClippingPath;
-      newGS.ColorSpaceInfo = this.ColorSpaceInfo;
+      newGS.StrokingColorSpace = this.StrokingColorSpace;
+      newGS.NonStrokingColorSpace = this.NonStrokingColorSpace;
       newGS.Color = this.Color;
       newGS.TextState = this.TextState;
       newGS.LineWidth = this.LineWidth;

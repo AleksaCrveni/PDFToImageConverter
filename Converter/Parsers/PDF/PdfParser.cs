@@ -12,7 +12,6 @@ using System.Diagnostics;
 using System.Globalization;
 using System.Numerics;
 using System.Text;
-using static Converter.FileStructures.PDF.PDF_AnnotThreadAction;
 namespace Converter.Parsers.PDF
 {
   // Note to myself - when dealing with variables that are indirect references add 'IR' on the end of the name
@@ -25,7 +24,6 @@ namespace Converter.Parsers.PDF
 
     delegate void ParseAnnotSubTypeData(PDFFile file, IPDF_AnnotData annot, ref PDFSpanParseHelper helper, string key);
     delegate void ParseAnnotActionSubTypeData(PDFFile file, IPDF_AnnotActionData action, ref PDFSpanParseHelper helper, string key);
-
     public void SaveStingRepresentationToDisk(string filepath)
     {
       byte[] arr = File.ReadAllBytes(filepath);
@@ -328,6 +326,8 @@ namespace Converter.Parsers.PDF
 
       string tokenString = helper.GetNextToken();
       SharedAllocator? irAllocator = null;
+      ReadOnlySpan<byte> irSpan;
+      
       while (tokenString != "")
       {
         switch (tokenString)
@@ -337,24 +337,27 @@ namespace Converter.Parsers.PDF
             break;
           case "ColorSpace":
             // NOTE: skip[ for now beacuase i have no idea how to parse
-            List<PDF_ColorSpaceData> csData = new List<PDF_ColorSpaceData>();
-            // temp
-            helper._position--;
-            helper._readPosition--;
-            helper.SkipNextDictOrIR(); 
-            //(bool isDirect, SharedAllocator? allocator) info = ReadIntoDirectOrIndirectDict(file, ref helper);
-            //if (info.isDirect)
-            //{
-            //  ParseColorSpaceIRDictionary(file, ref helper, true, csData);
-              
-            //}
-            //else
-            //{
-            //  ReadOnlySpan<byte> irBuffer = info.allocator.Buffer.AsSpan(info.allocator.Range);
-            //  PDFSpanParseHelper irHelper = new PDFSpanParseHelper(ref irBuffer);
-            //  ParseColorSpaceIRDictionary(file, ref irHelper, false, csData);
-            //}
-            //FreeAllocator(info.allocator);
+            List<PDF_ColorSpace> csData = new List<PDF_ColorSpace>();
+            helper.SkipWhiteSpace();
+            
+            if (helper._char == '<')
+            {
+              ParseColorSpaceDict(file, ref helper, csData);
+            }
+            else
+            {
+              #region memAllocAndHelper
+              (int objIndex, int generation) objPosition = helper.GetNextIndirectReference();
+              irAllocator = GetObjBuffer(file, objPosition);
+              irSpan = irAllocator.Buffer.AsSpan(irAllocator.Range);
+              PDFSpanParseHelper csIrAllocator = new PDFSpanParseHelper(ref irSpan);
+              PDFSpanParseHelper csIrHelper = new PDFSpanParseHelper(ref irSpan);
+              #endregion memAllocAndHelper
+              ParseColorSpaceDict(file, ref csIrHelper, csData);
+              #region freeMem
+              FreeAllocator(irAllocator);
+              #endregion freeMem
+            }
             resourceDict.ColorSpace = csData;
             break;
           case "Pattern":
@@ -403,21 +406,112 @@ namespace Converter.Parsers.PDF
         throw new InvalidDataException("Invalid dictionary");
     }
 
-    private void ParseColorSpaceStreamAndDictionary(PDFFile file, (int objIndex, int generation) objPosition, PDF_ColorSpaceDictionary dict)
+    private void ParseColorSpaceDict(PDFFile file, ref PDFSpanParseHelper helper, List<PDF_ColorSpace> list)
     {
-      SharedAllocator allocator = GetObjBuffer(file, objPosition);
-      ReadOnlySpan<byte> buffer = allocator.Buffer.AsSpan(allocator.Range);
-
-      PDFSpanParseHelper helper = new PDFSpanParseHelper(ref buffer);
-      bool startDictFound = false;
-      while (!startDictFound)
+      // this should work in both cases where we are at < and when we literally load object with header and stuff
+      helper.GoToStartOfDict();
+      while (helper._char != PDFConstants.NULL)
       {
+        PDF_ColorSpace cs = new PDF_ColorSpace();
+        cs.Key = helper.GetNextToken();
+        helper.SkipWhiteSpace();
+        if (helper.IsCurrentByteDigit())
+        {
+          #region memAllocAndHelper
+          (int objIndex, int generation) objPosition = helper.GetNextIndirectReference();
+          SharedAllocator allocator = GetObjBuffer(file, objPosition);
+          ReadOnlySpan<byte> irSpan = allocator.Buffer.AsSpan(allocator.Range);
+          PDFSpanParseHelper irHelper = new PDFSpanParseHelper(ref irSpan);
+          #endregion memAllocAndHelper
+
+          ParseColorSpaceData(file, ref irHelper, cs);
+          #region freeMem
+          FreeAllocator(allocator);
+          #endregion freeMem
+        }
+        else if (helper._char == '[')
+        {
+          ParseColorSpaceData(file, ref helper, cs);
+        }
+        else
+        {
+          cs.Family = helper.GetNextName<PDF_ColorSpaceFamily>();
+        }
+
+        list.Add(cs);
         helper.ReadUntilNonWhiteSpaceDelimiter();
-        if (helper._char == '<')
-          startDictFound = helper.IsCurrentCharacterSameAsNext();
+        if ((helper._char == '>' && helper.IsCurrentCharacterSameAsNext()) )
+          break;
+      }
+      helper.ReadChar();
+    }
+
+    // th is is pretty much just a dispatch function
+    private void ParseColorSpaceData(PDFFile file, ref PDFSpanParseHelper helper, PDF_ColorSpace cs)
+    {
+      // we dont have to wroy about getting into array or skipping obj header
+      cs.Family = helper.GetNextName<PDF_ColorSpaceFamily>();
+      cs.HasExtraData = true;
+      IPDF_ExtraColorSpaceData extraData = null;
+      switch (cs.Family)
+      {
+        case PDF_ColorSpaceFamily.DeviceGray:
+          break;
+        case PDF_ColorSpaceFamily.DeviceRGB:
+          break;
+        case PDF_ColorSpaceFamily.DeviceCMYK:
+          break;
+        case PDF_ColorSpaceFamily.CalGray:
+          break;
+        case PDF_ColorSpaceFamily.CalRGB:
+          break;
+        case PDF_ColorSpaceFamily.Lab:
+          break;
+        case PDF_ColorSpaceFamily.ICCBased:
+          extraData = new PDF_ICCExtraData();
+          helper.SkipWhiteSpace();
+          if (helper.IsCurrentByteDigit())
+          {
+            #region memAllocAndHelper
+            (int objIndex, int generation) objPosition = helper.GetNextIndirectReference();
+            SharedAllocator allocator = GetObjBuffer(file, objPosition);
+            ReadOnlySpan<byte> irSpan = allocator.Buffer.AsSpan(allocator.Range);
+            PDFSpanParseHelper ICCHelper = new PDFSpanParseHelper(ref irSpan);
+            #endregion memAllocAndHelper
+            ParseICCBasedCS(file, ref ICCHelper, extraData);
+            #region freeMem
+            FreeAllocator(allocator);
+            #endregion freeMem
+          }
+          else
+          {
+            ParseICCBasedCS(file, ref helper, extraData);
+          }
+          break;
+        case PDF_ColorSpaceFamily.Indexed:
+          break;
+        case PDF_ColorSpaceFamily.Pattern:
+          break;
+        case PDF_ColorSpaceFamily.Separation:
+          break;
+        case PDF_ColorSpaceFamily.DeviceN:
+          break;
+        case PDF_ColorSpaceFamily.NULL:
+        default:
+          throw new InvalidDataException("Invalid ColorSpace data Family!");
+          break;
       }
 
+      cs.ExtraCSData = extraData!;
+    }
 
+    // array of IRs with keys 
+    // i.e [ /ICCBased{we are here} 7 0 R]
+    private void ParseICCBasedCS(PDFFile file, ref PDFSpanParseHelper helper, IPDF_ExtraColorSpaceData extra)
+    {
+      PDF_ICCExtraData data = (PDF_ICCExtraData)extra;
+
+      helper.GoToStartOfDict();
       string tokenString = helper.GetNextToken();
       // TODO: do better validation here
       PDF_CommonStreamDict commonStreamDict = new PDF_CommonStreamDict();
@@ -426,14 +520,14 @@ namespace Converter.Parsers.PDF
         switch (tokenString)
         {
           case "N":
-            dict.N = helper.GetNextInt32();
+            data.N = helper.GetNextInt32();
             break;
           case "Alternate":
             PDF_ColorSpaceFamily cs = helper.GetNextName<PDF_ColorSpaceFamily>();
             if (cs == PDF_ColorSpaceFamily.NULL)
               throw new InvalidDataException("Alternate color space invalid!");
 
-            dict.Alternate = cs;
+            data.Alternate = cs;
             break;
           case "Range":
             throw new NotImplementedException();
@@ -445,9 +539,11 @@ namespace Converter.Parsers.PDF
             ParseCommonStreamDictAsExtension(file, ref helper, tokenString, ref commonStreamDict);
             break;
         }
+
         helper.ReadUntilNonWhiteSpaceDelimiter();
         if (helper._char == '>' && helper.IsCurrentCharacterSameAsNext())
           break;
+
         tokenString = helper.GetNextToken();
       }
 
@@ -456,101 +552,14 @@ namespace Converter.Parsers.PDF
 
       helper.SkipNextToken(); // skip stream
       helper.SkipWhiteSpace(); // skip LF
-      ReadOnlySpan<byte> encodedSpan = buffer.Slice(helper._position, (int)commonStreamDict.Length);
+      ReadOnlySpan<byte> encodedSpan = helper._buffer.Slice(helper._position, (int)commonStreamDict.Length);
       commonStreamDict.RawStreamData = DecompressionHelper.DecodeFilters(ref encodedSpan, commonStreamDict.Filters);
-// this is interfering with tests, it should be appended with fontname and logged outside of this function 
-//#if DEBUG
-//      File.WriteAllBytes(Path.Join(Files.RootFolder, "-ColorSpaceDecodedSample.txt"), commonStreamDict.RawStreamData);
-//#endif
-      dict.CommonStreamDict = commonStreamDict;
-      FreeAllocator(allocator);
+      // this is interfering with tests, it should be appended with fontname and logged outside of this function 
+      //#if DEBUG
+      //      File.WriteAllBytes(Path.Join(Files.RootFolder, "-ColorSpaceDecodedSample.txt"), commonStreamDict.RawStreamData);
+      //#endif
+      data.CommonStreamDict = commonStreamDict;
     }
-
-    // array of IRs with keys 
-    // i.e [ /ICCBased 7 0 R]
-    private void ParseColorSpaceIRArray(PDFFile file, ReadOnlySpan<byte> buffer, ref List<PDF_ColorSpaceInfo> info)
-    {
-      PDFSpanParseHelper helper = new PDFSpanParseHelper(ref buffer);
-      helper.ReadUntilNonWhiteSpaceDelimiter();
-      if (helper._char != '[')
-        throw new InvalidDataException("Invalid ColorSpace Family array!");
-      PDF_ColorSpaceInfo csi;
-      while (helper._char != ']' && helper._char != PDFConstants.NULL)
-      {
-        csi = new PDF_ColorSpaceInfo();
-        PDF_ColorSpaceFamily csf = helper.GetNextName<PDF_ColorSpaceFamily>();
-        if (csf == PDF_ColorSpaceFamily.NULL)
-          throw new InvalidDataException("Invalid Color Space Family!");
-        
-        (int objectIndex, int _) objPosition = helper.GetNextIndirectReference();
-        PDF_ColorSpaceDictionary csd = new PDF_ColorSpaceDictionary();
-        ParseColorSpaceStreamAndDictionary(file, objPosition, csd);
-
-        csi.ColorSpaceFamily = csf;
-        csi.Dict = csd;
-        info.Add(csi);
-        helper.ReadUntilNonWhiteSpaceDelimiter();
-      }
-
-    }
-
-    private int ParseColorSpaceIRDictionary(PDFFile file, ref PDFSpanParseHelper helper, bool dictOpen, List<PDF_ColorSpaceData> csData)
-    {
-      bool dictStartFound = dictOpen;
-      while (!dictStartFound)
-      {
-        helper.ReadUntilNonWhiteSpaceDelimiter();
-        if (helper._char == '<')
-          dictStartFound = helper.IsCurrentCharacterSameAsNext();
-      }
-
-      string key;
-      long objectByteOffset = 0;
-      long objectLength = 0;
-
-      // can also calcualte lenght or largest dict and then alloc but its a bit more complicated because objects can be compressed 
-      // but??? We don't care about compressed objects since that memory will be loaded regardless and we will just slice into it
-      // so just get largest 'normal' size
-      // but i think these should always be under 8k
-
-      long origPos = file.Stream.Position;
-      List<(string key, (int objIndex, int generation) objPosition)> objPositions = new List<(string key, (int objIndex, int generation) objPosition)>();
-      while (helper._char != '>' && !helper.IsCurrentCharacterSameAsNext())
-      {
-        // /Cs1 i.e  its not color space family or similar
-        key = helper.GetNextToken();
-        if (key == "")
-          break;
-        (int objIndex, int generation) IR = helper.GetNextIndirectReference();
-        objPositions.Add((key, IR));
-        helper.ReadUntilNonWhiteSpaceDelimiter();
-      }
-      // skip end of dict
-      helper.ReadChar();
-      helper.ReadChar();
-      SharedAllocator allocator = null;
-      ReadOnlySpan<byte> irBuffer;
-      int largestObjectSize = GetBiggestObjectSizeFromList(file, objPositions);
-      if (largestObjectSize > 0)
-        ForceCreateArrayInsharedPool(largestObjectSize);
-
-      // name -> key
-      foreach ((string name, (int objIndex, int generation) objPosition) in objPositions)
-      {
-        PDF_ColorSpaceData cs = new PDF_ColorSpaceData();
-        List<PDF_ColorSpaceInfo> csInfo = new List<PDF_ColorSpaceInfo>();
-
-        allocator = GetObjBuffer(file, objPosition);
-        irBuffer = allocator.Buffer.AsSpan(allocator.Range);
-        ParseColorSpaceIRArray(file, irBuffer, ref csInfo);
-        cs.Key = name;
-        cs.ColorSpaceInfo = csInfo;
-        csData.Add(cs);
-        FreeAllocator(allocator);
-      }
-      return helper._position;
-    }
-
     
     private void ParseFontIRDictionary(PDFFile file, ref PDFSpanParseHelper helper, bool dictOpen, List<PDF_FontData> fontData)
     {
@@ -1152,8 +1161,8 @@ namespace Converter.Parsers.PDF
       helper.SkipNextToken();
       // have to do some manual stuff because we can't convert /3D because we cant start enum entry with number
       helper.ReadUntilNonWhiteSpaceDelimiter();
-      helper.ReadChar();
-      if (helper._char == 3)
+      // next char
+      if (helper._buffer[readPos] == 3)
       {
         helper.ReadChar();
         if (helper._char == 'D')

@@ -98,16 +98,35 @@ namespace Converter.Parsers.PDF
 
       return Encoding.ASCII.GetString(_buffer.Slice(starter, _position - starter));
     }
-    // this gives positions of start and end of next token
-    public void GetNextTokenPositionInt32(ref int start, ref int end)
+    /// <summary>
+    /// 
+    /// </summary>
+    /// <param name="start"></param>
+    /// <param name="end"></param>
+    /// <param name="delimiter">Skip to specific delimiter</param>
+    public void GetNextTokenPositionInt32(ref int start, ref int end, byte delimiter = 0)
     {
-      SkipWhiteSpaceAndDelimiters();
+      if (delimiter == 0)
+      {
+        SkipWhiteSpaceAndDelimiters();
+      }
+      else
+      {
+        SkipUntil(delimiter);
+        ReadChar();
+      }
       start = _position;
       while (!IsCurrentCharPdfWhiteSpace() && !delimiters.Contains(_char))
       {
         ReadChar();
       }
       end = _position;
+    }
+
+    public void SkipUntil(byte b)
+    {
+      while (_char != b && _readPosition < _buffer.Length)
+        ReadChar();
     }
     // this will go to delimiter or regular character
     public void GoToNextNonPdfWhiteSpace()
@@ -182,7 +201,7 @@ namespace Converter.Parsers.PDF
     {
       int start = 0;
       int end = 0;
-      GetNextTokenPositionInt32(ref start, ref end);
+      GetNextTokenPositionInt32(ref start, ref end, StandardCharConstants.SLASH);
       int len = end - start;
       if (len > 256)
         throw new InvalidDataException("Name too long!");
@@ -262,7 +281,7 @@ namespace Converter.Parsers.PDF
       res.b = GetNextInt32();
       SkipWhiteSpaceAndDelimiters();
       if (_char != 'R')
-        throw new InvalidDataException("Invalid trailer data. Expected R");
+        throw new InvalidDataException("Invalid indirect reference data. Expected R");
       ReadChar();
       return res;
     }
@@ -617,6 +636,25 @@ namespace Converter.Parsers.PDF
       return isMatched;     
     }
 
+    public bool GoToStartOfArray()
+    {
+      bool startOfDictFound = false;
+      // Check first in case we already read into first char of start of the dict
+      if (_char == '[')
+        startOfDictFound = IsCurrentCharacterSameAsNext();
+
+      if (startOfDictFound)
+        return true;
+
+      while (!startOfDictFound && _readPosition < _buffer.Length)
+      {
+        ReadChar();
+        if (_char != '[')
+          return true;
+      }
+      return startOfDictFound;
+    }
+
     public bool GoToStartOfDict()
     {
       bool startOfDictFound = false;
@@ -635,7 +673,7 @@ namespace Converter.Parsers.PDF
       }
       return startOfDictFound;
     }
-
+    
     public bool IsEndOfDict()
     {
       ReadUntilNonWhiteSpaceDelimiter();

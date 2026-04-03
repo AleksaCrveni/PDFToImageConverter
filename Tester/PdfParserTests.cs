@@ -30,6 +30,7 @@ namespace Tester
       pdfParser.Parse(Files.BaseDocFilePath, ref options);
       pdfParser.Parse(Files.Sample, ref options);
       pdfParser.Parse(Files.Prijemni1, ref options);
+      pdfParser.Parse(Files.Report, ref options);
     }
 
   }
