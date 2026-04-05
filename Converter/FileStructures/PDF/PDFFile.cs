@@ -216,6 +216,12 @@ namespace Converter.FileStructures.PDF
     public double[] Range = [-100, 100, -100, 100]; // aMin, aMax, bMin, bMax
   }
 
+  // Pattern can be any cs except pattern itself so thats why PDF_ColorSpace is entry
+  public class PDF_PatternExtraData : IPDF_ExtraColorSpaceData
+  {
+    public PDF_ColorSpace ColorSpace;
+  }
+
   // Table 66
   // PDF Version  ICC Specification Version  
   // 1.3          3.3

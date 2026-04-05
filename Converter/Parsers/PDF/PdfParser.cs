@@ -456,16 +456,23 @@ namespace Converter.Parsers.PDF
       switch (cs.Family)
       {
         case PDF_ColorSpaceFamily.DeviceGray:
+          throw new NotImplementedException();
           break;
         case PDF_ColorSpaceFamily.DeviceRGB:
+          // has no extra data
+          cs.HasExtraData = false;
           break;
         case PDF_ColorSpaceFamily.DeviceCMYK:
+          throw new NotImplementedException();
           break;
         case PDF_ColorSpaceFamily.CalGray:
+          throw new NotImplementedException();
           break;
         case PDF_ColorSpaceFamily.CalRGB:
+          throw new NotImplementedException();
           break;
         case PDF_ColorSpaceFamily.Lab:
+          throw new NotImplementedException();
           break;
         case PDF_ColorSpaceFamily.ICCBased:
           extraData = new PDF_ICCExtraData();
@@ -489,12 +496,17 @@ namespace Converter.Parsers.PDF
           }
           break;
         case PDF_ColorSpaceFamily.Indexed:
+          throw new NotImplementedException();
           break;
         case PDF_ColorSpaceFamily.Pattern:
+          extraData = new PDF_PatternExtraData();
+          ParsePatternCS(file, ref helper, extraData);
           break;
         case PDF_ColorSpaceFamily.Separation:
+          throw new NotImplementedException();
           break;
         case PDF_ColorSpaceFamily.DeviceN:
+          throw new NotImplementedException();
           break;
         case PDF_ColorSpaceFamily.NULL:
         default:
@@ -502,7 +514,7 @@ namespace Converter.Parsers.PDF
           break;
       }
 
-      cs.ExtraCSData = extraData!;
+      cs.ExtraCSData = extraData;
     }
 
     // array of IRs with keys 
@@ -560,7 +572,20 @@ namespace Converter.Parsers.PDF
       //#endif
       data.CommonStreamDict = commonStreamDict;
     }
-    
+
+    private void ParsePatternCS(PDFFile file, ref PDFSpanParseHelper helper, IPDF_ExtraColorSpaceData extra)
+    {
+      PDF_PatternExtraData data = (PDF_PatternExtraData)extra;
+      PDF_ColorSpace cs = new PDF_ColorSpace();
+      ParseColorSpaceData(file, ref helper, cs);
+      data.ColorSpace = cs;
+    }
+
+    private void ParseRGBCS(PDFFile file, ref PDFSpanParseHelper helper, IPDF_ExtraColorSpaceData extra)
+    {
+
+    }
+
     private void ParseFontIRDictionary(PDFFile file, ref PDFSpanParseHelper helper, bool dictOpen, List<PDF_FontData> fontData)
     {
       bool dictStartFound = dictOpen;
