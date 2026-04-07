@@ -46,7 +46,7 @@
   {
     NONE = 0,
     APPL = 0x4150504C, // APPLE
-    MSFT = 0x4D534654, // Micrsofot
+    MSFT = 0x4D534654, // Microslop
     SGI = 0x53474920, // silicon graphics
     SUNW = 0x53554E57 // sun microsystems
   }
