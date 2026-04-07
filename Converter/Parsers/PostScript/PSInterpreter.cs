@@ -1,4 +1,5 @@
-﻿using Converter.FileStructures.Type1;
+﻿using Converter.FileStructures.General;
+using Converter.FileStructures.Type1;
 using Converter.Parsers.PDF;
 using Converter.Rasterizers;
 using Converter.StaticData;

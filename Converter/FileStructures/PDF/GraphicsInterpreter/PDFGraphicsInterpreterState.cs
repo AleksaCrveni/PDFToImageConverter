@@ -15,8 +15,8 @@ namespace Converter.FileStructures.PDF.GraphicsInterpreter
     // Device Independent
     public double[,] CTM;
     public object ClippingPath;
-    public PDF_ColorSpace StrokingColorSpace;
-    public PDF_ColorSpace NonStrokingColorSpace;
+    public PDFGI_ColorState StrokingColorSpace;
+    public PDFGI_ColorState NonStrokingColorSpace;
     public object Color;
     public object TextState;
     public double LineWidth;

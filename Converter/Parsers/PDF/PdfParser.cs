@@ -3,6 +3,7 @@ using Converter.Converters.Image.TIFF;
 using Converter.FileStructures.General;
 using Converter.FileStructures.PDF;
 using Converter.Parsers.Fonts;
+using Converter.Parsers.ICC;
 using Converter.Rasterizers;
 using Converter.StaticData;
 using Converter.Utils;
@@ -566,11 +567,14 @@ namespace Converter.Parsers.PDF
       helper.SkipWhiteSpace(); // skip LF
       ReadOnlySpan<byte> encodedSpan = helper._buffer.Slice(helper._position, (int)commonStreamDict.Length);
       commonStreamDict.RawStreamData = DecompressionHelper.DecodeFilters(ref encodedSpan, commonStreamDict.Filters);
-      // this is interfering with tests, it should be appended with fontname and logged outside of this function 
+
       //#if DEBUG
-      //      File.WriteAllBytes(Path.Join(Files.RootFolder, "-ColorSpaceDecodedSample.txt"), commonStreamDict.RawStreamData);
+      //  File.WriteAllBytes(Path.Join(Files.RootFolder, "BaseDoc-ICCSample.txt"), commonStreamDict.RawStreamData);
       //#endif
       data.CommonStreamDict = commonStreamDict;
+
+      ICCParser iCCParser = new ICCParser(commonStreamDict.RawStreamData);
+      throw new Exception();
     }
 
     private void ParsePatternCS(PDFFile file, ref PDFSpanParseHelper helper, IPDF_ExtraColorSpaceData extra)

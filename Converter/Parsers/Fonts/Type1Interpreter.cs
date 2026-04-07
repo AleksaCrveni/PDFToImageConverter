@@ -1,4 +1,5 @@
-﻿using Converter.FileStructures.PDF;
+﻿using Converter.FileStructures.General;
+using Converter.FileStructures.PDF;
 using Converter.FileStructures.PostScript;
 using Converter.FileStructures.Type1;
 using Converter.Parsers.PostScript;
@@ -316,21 +317,21 @@ namespace Converter.Parsers.Fonts
                   {
                     // push only 2 args
                     __numberOperands.Push(opStack.Pop());
-                    __operandTypes.Push(PDF.OperandType.DOUBLE);
+                    __operandTypes.Push(OperandType.DOUBLE);
                     __numberOperands.Push(opStack.Pop());
-                    __operandTypes.Push(PDF.OperandType.DOUBLE);
+                    __operandTypes.Push(OperandType.DOUBLE);
                   }
                   else if (oSubr == 3)
                   {
                     __numberOperands.Push(3);
-                    __operandTypes.Push(PDF.OperandType.DOUBLE);
+                    __operandTypes.Push(OperandType.DOUBLE);
                   }
                   else
                   {
                     for (int j = 0; j < count; j++)
                     {
                       __numberOperands.Push(opStack.Pop());
-                      __operandTypes.Push(PDF.OperandType.DOUBLE);
+                      __operandTypes.Push(OperandType.DOUBLE);
                     }
                   }
                   Log($"OSubr: {oSubr}");

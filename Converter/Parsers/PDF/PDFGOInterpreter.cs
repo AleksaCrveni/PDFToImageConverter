@@ -1,11 +1,13 @@
 ﻿using Converter.Converters;
 using Converter.FileStructures;
+using Converter.FileStructures.General;
 using Converter.FileStructures.PDF;
 using Converter.FileStructures.PDF.GraphicsInterpreter;
 using Converter.Rasterizers;
 using Converter.StaticData;
 using Converter.Utils;
 using System.Diagnostics;
+using System.Drawing;
 using System.Globalization;
 using System.Text;
 
@@ -49,8 +51,6 @@ namespace Converter.Parsers.PDF
     public bool _debug;
     public PDFGO_DEBUG_STATE _debugState;
     private PathRasterizer _shapeRasterizer;
-    private PDFGI_ColorState _strokingColorState;
-    private PDFGI_ColorState _nonStrokingColorState;
 
     // TODO: maybe NULL check is redundant if we let it throw to end?
     public PDFGOInterpreter(byte[] contentBuffer, PDF_ResourceDict resourceDict,  IConverter converter, bool debug = false)
@@ -75,9 +75,6 @@ namespace Converter.Parsers.PDF
       _debug = debug;
       _shapeRasterizer = new PathRasterizer(Array.Empty<byte>(), "");
 
-      // not sure what would here be default values
-      _strokingColorState = new PDFGI_ColorState();
-      _nonStrokingColorState = new PDFGI_ColorState();
       if (debug)
         _debugState = new PDFGO_DEBUG_STATE();
 
@@ -474,44 +471,21 @@ namespace Converter.Parsers.PDF
             // type 3 fonts
             break;
           case 0x5343: // CS
-            GetNextStackValAsString();
+            currentGS.StrokingColorSpace = InitCurrentColorSpace();
             break;
           case 0x7363: // cs
-            //PDF_ColorSpaceInfo info = new PDF_ColorSpaceInfo();
-            //bool found = false;
-            //string key = GetNextStackValAsString();
-            //for (int i =0; i < _resourceDict.ColorSpace.Count; i++)
-            //{
-            //  if (key == _resourceDict.ColorSpace[i].Key)
-            //  {
-            //    // DO 0 for now, but check if there can be multiple and which to choose then!
-            //    info = _resourceDict.ColorSpace[i].ColorSpaceInfo[0];
-            //    found = true;
-            //    break;
-            //  }
-            //}
-            //// NOTE: dont care about this for now untill we know how to properlt parse ColorInfo
-            //// Sample and Report have completely different structure and ican't figure it out yet
-            ////if (!found)
-            ////  throw new InvalidDataException("Missing color space information!");
-            //currentGS.ColorSpaceInfo = info;
+            currentGS.NonStrokingColorSpace = InitCurrentColorSpace();
             break;
           case 0x4353: // SC
-            throw new NotImplementedException("Operator not i implemented");
+            SetColor(currentGS.StrokingColorSpace);
+            break;
           case 0x4e4353: // SCN
-          //  throw new NotImplementedException("Operator not i implemented");
+            throw new NotImplementedException("Operator not i implemented");
           case 0x6373: // sc
-            // NOTE: dont care about this for now untill we know how to properlt parse ColorInfo
-            // Sample and Report have completely different structure and ican't figure it out yet
-            //int N = currentGS.ColorSpaceInfo.Dict.N;
-            int N = realOperands.Count;
-            for (int i =0; i < N; i++)
-            {
-              GetNextStackValAsInt();
-            }
+            SetColor(currentGS.NonStrokingColorSpace);
             break;
           case 0x6e6373: // scn
-            //throw new NotImplementedException("Operator not i implemented");
+            throw new NotImplementedException("Operator not i implemented");
           case 0x47: // G
             GetNextStackValAsDouble();
             break;
@@ -1189,15 +1163,160 @@ namespace Converter.Parsers.PDF
 
       return new PDF_FontData();
     }
+    public PDFGI_ColorState InitCurrentColorSpace()
+    {
+      PDFGI_ColorState state = new PDFGI_ColorState();
+      string key = GetNextStackValAsString();
+      bool isCS = Enum.TryParse<PDF_ColorSpaceFamily>(key, out PDF_ColorSpaceFamily csf);
+      if (isCS)
+      {
+        foreach (PDF_ColorSpace cs in _resourceDict.ColorSpace)
+        {
+          if (cs.Family == csf)
+          {
+            state.Cs = cs;
+            break;
+          }
+        }
+      }
+      else
+      {
+        foreach (PDF_ColorSpace cs in _resourceDict.ColorSpace)
+        {
+          if (cs.Key == key)
+          {
+            state.Cs = cs;
+            break;
+          }
+        }
+      }
+
+      // not sure if it has to be defined, if it does then remove this
+      if (state.Cs == null)
+        throw new InvalidDataException("Defined ColorSpace not found!");
+
+      MyColor c = new MyColor();
+      // init color 
+      switch (state.Cs.Family)
+      {
+        case PDF_ColorSpaceFamily.NULL:
+          throw new InvalidDataException("Defined ColorSpace not found!");
+          break;
+        case PDF_ColorSpaceFamily.DeviceGray:
+          c.SetColor(0, 0, 0, 0);
+          break;
+        case PDF_ColorSpaceFamily.DeviceRGB:
+          c.SetColor(0, 0, 0, 0);
+          break;
+        case PDF_ColorSpaceFamily.DeviceCMYK:
+          c.SetColor(0, 0, 0, 0);
+          break;
+        case PDF_ColorSpaceFamily.CalGray:
+          c.SetColor(0, 0, 0, 0);
+          break;
+        case PDF_ColorSpaceFamily.CalRGB:
+          c.SetColor(0, 0, 0, 0);
+          break;
+        case PDF_ColorSpaceFamily.Lab:
+          if (state.Cs.HasExtraData == false)
+          {
+            c.SetColor(0, 0, 0, 0);
+          }
+          else
+          {
+            // Implement this when we have extra data and know how Range looks like Table74 CS operator
+            throw new NotImplementedException();
+          }
+          break;
+        case PDF_ColorSpaceFamily.ICCBased:
+          if (state.Cs.HasExtraData == false)
+          {
+            c.SetColor(0, 0, 0, 0);
+          }
+          else
+          {
+            PDF_ICCExtraData ICCExtra = new PDF_ICCExtraData();
+            if (ICCExtra.Range == null || ICCExtra.Range.Length == 0)
+              c.SetColor(0, 0, 0, 0);
+            else 
+              // Implement this when we have extra data and know how Range looks like Table74 CS operator
+              throw new NotImplementedException();
+          }
+          break;
+        case PDF_ColorSpaceFamily.Indexed:
+          state.IndexColor = 0;
+          break;
+        case PDF_ColorSpaceFamily.Pattern:
+          state.Pattern = new PDFGI_Pattern();
+          break;
+        case PDF_ColorSpaceFamily.Separation:
+          state.Tint = 1;
+          break;
+        case PDF_ColorSpaceFamily.DeviceN:
+          state.Tint = 1;
+          break;
+      }
+      state.Color = c;
+      return state;
+    }
+    // sc 
+    public void SetColor(PDFGI_ColorState state)
+    {
+      // i dont think all of the color spaces use this command, some use scn 
+      // 0 usually means least intensitiy and 1 means most (0 black 1 white)
+      // Do not normalize here and let rasterize normalize it OR find out color range before and use it to normalize here
+      // color  range is pretty much channel size
+      switch (state.Cs.Family)
+      {
+        case PDF_ColorSpaceFamily.NULL:
+          throw new NotImplementedException("Invalid ColorSpace!");
+          break;
+        case PDF_ColorSpaceFamily.DeviceGray:
+          // values between 0.0 and 1.0 that will somehow need to be normalized
+          double gray = GetNextStackValAsDouble();
+          state.Color.SetColor(gray, gray, gray, 0);
+          break;
+        case PDF_ColorSpaceFamily.DeviceRGB:
+          double blue = GetNextStackValAsDouble();
+          double green = GetNextStackValAsDouble();
+          double red = GetNextStackValAsDouble();
+          state.Color.SetColor(red, green, blue, 0);
+          break;
+        case PDF_ColorSpaceFamily.DeviceCMYK:
+          double cyan = GetNextStackValAsDouble();
+          double magenta = GetNextStackValAsDouble();
+          double yellow = GetNextStackValAsDouble();
+          double black = GetNextStackValAsDouble();
+          state.Color.SetColor(cyan, magenta, yellow, black);
+          break;
+        case PDF_ColorSpaceFamily.CalGray:
+          throw new NotImplementedException("Invalid ColorSpace!");
+          break;
+        case PDF_ColorSpaceFamily.CalRGB:
+          throw new NotImplementedException("Invalid ColorSpace!");
+          break;
+        case PDF_ColorSpaceFamily.Lab:
+          throw new NotImplementedException("Invalid ColorSpace!");
+          break;
+        case PDF_ColorSpaceFamily.ICCBased:
+          throw new NotImplementedException("Invalid ColorSpace!");
+          break;
+        case PDF_ColorSpaceFamily.Indexed:
+          throw new NotImplementedException("Invalid ColorSpace!");
+          break;
+        case PDF_ColorSpaceFamily.Pattern:
+          throw new NotImplementedException("Invalid ColorSpace!");
+          break;
+        case PDF_ColorSpaceFamily.Separation:
+          throw new NotImplementedException("Invalid ColorSpace!");
+          break;
+        case PDF_ColorSpaceFamily.DeviceN:
+          throw new NotImplementedException("Invalid ColorSpace!");
+          break;
+      }
+    }
 
   }
 
-  public enum OperandType
-  {
-    INT,
-    DOUBLE,
-    STRING,
-    ARRAY,
-    INSTRUCTION
-  }
+
 }

@@ -1,4 +1,6 @@
-﻿namespace Converter.FileStructures.PDF.GraphicsInterpreter
+﻿using System.Drawing;
+
+namespace Converter.FileStructures.PDF.GraphicsInterpreter
 {
   public class PDFGI_TextObject
   {
@@ -54,7 +56,49 @@
 
   public class PDFGI_ColorState
   {
-    public PDF_ColorSpaceFamily ColorSpace;
+    public PDF_ColorSpace Cs;
+    public MyColor Color;
+    public int IndexColor;
+    public double Tint;
+    public PDFGI_Pattern Pattern;
+    // Pattern??
+  }
+
+  // is this similar to shape??
+  public class PDFGI_Pattern()
+  {
+
+  }
+  /// <summary>
+  /// Used to hold 4 color values
+  /// For RGB/A:
+  ///   Val1 -> R;
+  ///   Val2 -> G;
+  ///   Val3 -> B;
+  ///   Val4 -> A;
+  /// for CMYK:
+  ///   val1 -> Cyan
+  ///   val2 -> Magenta
+  ///   val3 -> Yellow
+  ///   val4 -> Black
+  /// for Gray:
+  ///   val1 -> Gray
+  ///   val1 = val2 = val3
+  ///   val4 -> 0
+  /// </summary>
+  public class MyColor
+  {
+    public double Val1;
+    public double Val2;
+    public double Val3;
+    public double Val4;
+    public void SetColor(double v1, double v2, double v3, double v4)
+    {
+      Val1 = v1;
+      Val2 = v2;
+      Val3 = v3;
+      Val4 = v4;
+    }
   }
 
 }

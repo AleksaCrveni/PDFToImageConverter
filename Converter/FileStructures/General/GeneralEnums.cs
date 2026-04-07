@@ -27,4 +27,13 @@
     JPXDecode,
     Crypt
   }
+
+  public enum OperandType
+  {
+    INT,
+    DOUBLE,
+    STRING,
+    ARRAY,
+    INSTRUCTION
+  }
 }
