@@ -574,7 +574,7 @@ namespace Converter.Parsers.PDF
       data.CommonStreamDict = commonStreamDict;
 
       ICCParser iCCParser = new ICCParser(commonStreamDict.RawStreamData);
-      throw new Exception();
+      iCCParser.Parse();
     }
 
     private void ParsePatternCS(PDFFile file, ref PDFSpanParseHelper helper, IPDF_ExtraColorSpaceData extra)

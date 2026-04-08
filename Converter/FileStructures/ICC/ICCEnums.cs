@@ -2,7 +2,6 @@
 {
   public enum ICC_PROFILE_CLASS
   {
-    NULL = 0,
     scnr = 0x73636E72,
     mntr = 0x6D6E7472,
     prtr = 0x70727472,
@@ -14,7 +13,6 @@
 
   public enum ICC_DATA_COLORSPACE
   {
-    NONE = 0,
     XYZ = 0x58595A20, //XYZData
     Lab = 0x4C616220, //labData
     Luv = 0x4C757620, //luvData

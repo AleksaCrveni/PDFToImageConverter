@@ -8,6 +8,7 @@
   public class ICCProfile
   {
     public ICCHeader Header;
+    public List<ICC_TagDef> TagDefinitions;
   }
 
   public class ICCHeader
@@ -50,7 +51,7 @@
     }
   }
 
-  public class ICC_Tag
+  public class ICC_TagDef
   {
     public ICC_TAG_TYPE Type;
     public uint Offset;

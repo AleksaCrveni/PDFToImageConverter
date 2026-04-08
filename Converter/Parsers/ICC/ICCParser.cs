@@ -20,6 +20,7 @@ namespace Converter.Parsers.ICC
     {
       ICCProfile profile = new ICCProfile();
       profile.Header = ParseHeader();
+      profile.TagDefinitions = ParseTagDefinitions();
       return profile;
     }
     public ICCHeader ParseHeader()
@@ -32,14 +33,13 @@ namespace Converter.Parsers.ICC
       // we have to take half byte or something like that
       header.MajorVersion = buffer[pos++];
       header.MinorVersion = buffer[pos++];
-      pos += 2; // skip resevred
-
+      pos += 2; // skip 
       header.ProfileClass = (ICC_PROFILE_CLASS)BufferReader.ReadUInt32BE(ref buffer, ref pos);
-      if (header.ProfileClass == ICC_PROFILE_CLASS.NULL)
+      if (!Enum.IsDefined<ICC_PROFILE_CLASS>(header.ProfileClass))
         throw new InvalidDataException("Invalid profile class!");
 
       header.DataColorSpace = (ICC_DATA_COLORSPACE)BufferReader.ReadUInt32BE(ref buffer, ref pos);
-      if (header.DataColorSpace == ICC_DATA_COLORSPACE.NONE)
+      if (!Enum.IsDefined<ICC_DATA_COLORSPACE>(header.DataColorSpace))
         throw new InvalidDataException("Invalid data color space class!");
 
       if (_partOfPDF)
@@ -58,7 +58,7 @@ namespace Converter.Parsers.ICC
       }
 
       header.ProfileConnectionSpace = (ICC_DATA_COLORSPACE)BufferReader.ReadUInt32BE(ref buffer, ref pos);
-      if (header.ProfileConnectionSpace == ICC_DATA_COLORSPACE.NONE)
+      if (!Enum.IsDefined<ICC_DATA_COLORSPACE>(header.ProfileConnectionSpace))
         throw new InvalidDataException("Invalid profile connection space space class!");
 
       if (header.ProfileClass != ICC_PROFILE_CLASS.link)
@@ -70,10 +70,13 @@ namespace Converter.Parsers.ICC
 
       header.CreatedAt = ParseICCDateTime(ref buffer, ref pos);
       header.FileSignature = BufferReader.ReadUInt32BE(ref buffer, ref pos);
-      if (header.FileSignature != 0x61637379)
+      if (header.FileSignature != 0x61637370) // value from spec is wrong here this is correct one
         throw new InvalidDataException("Invalid file signature!");
 
       header.Platform = (ICC_PRIMARY_PLATFORM)BufferReader.ReadUInt32BE(ref buffer, ref pos);
+      if (!Enum.IsDefined<ICC_PRIMARY_PLATFORM>(header.Platform))
+        throw new InvalidDataException("Invalid PrimayPlatform!");
+
       uint profileFlags = BufferReader.ReadUInt32BE(ref buffer, ref pos);
       header.Embedded = (byte)profileFlags == 0 ? false : true;
       header.Independent = profileFlags >> 2 == 0 ? false : true;
@@ -86,6 +89,8 @@ namespace Converter.Parsers.ICC
 
       pos += 2;
       header.RenderingIntent = (ICC_RENDERING_INTENT)BufferReader.ReadUInt16BE(ref buffer, ref pos);
+      if (!Enum.IsDefined<ICC_RENDERING_INTENT>(header.RenderingIntent))
+        throw new InvalidDataException("Invalid Rendering Intent");
 
       pos += 12; // always just set D50 as default since its only permitted
       header.ConnectionSpaceIlluminant = new ICC_XYZNumber(0.9642, 1, 0.8249);
@@ -96,6 +101,28 @@ namespace Converter.Parsers.ICC
       return header;  
     }
 
+
+    public List<ICC_TagDef> ParseTagDefinitions()
+    {
+
+      int pos = 128;
+      ReadOnlySpan<byte> buffer = _buffer.AsSpan();
+      int tagCount = (int)BufferReader.ReadUInt32BE(ref buffer, ref pos);
+      List<ICC_TagDef> list = new List<ICC_TagDef>(tagCount);
+      int i = 0;
+      while (i++ < tagCount)
+      {
+        ICC_TagDef tDef = new ICC_TagDef();
+        tDef.Type = (ICC_TAG_TYPE)BufferReader.ReadUInt32BE(ref buffer, ref pos);
+        if (!Enum.IsDefined<ICC_TAG_TYPE>(tDef.Type))
+          throw new InvalidDataException("Invalid tag signature!");
+
+        tDef.Offset = BufferReader.ReadUInt32BE(ref buffer, ref pos);
+        tDef.Size = BufferReader.ReadUInt32BE(ref buffer, ref pos);
+        list.Add(tDef);
+      }
+      return list;
+    }
     public DateTime ParseICCDateTime(ref ReadOnlySpan<byte> buffer, ref int pos)
     {
       int year = BufferReader.ReadUInt16BE(ref buffer, ref pos);
