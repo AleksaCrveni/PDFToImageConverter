@@ -511,7 +511,7 @@ namespace Converter.Parsers.ICC
     // NOTE: see if this can be better
     public TEnum ParseSignature<TEnum>(ref ReadOnlySpan<byte> buffer, ref int pos) where TEnum : Enum
     {
-      TEnum t = (TEnum)(object)(BufferReader.ReadUInt32BE(ref buffer, ref pos));
+      TEnum t = (TEnum)Enum.ToObject(typeof(TEnum), BufferReader.ReadUInt32BE(ref buffer, ref pos));
       if (!Enum.IsDefined(typeof(TEnum), t))
         throw new InvalidDataException("Cant match data to signature!");
       return t;
