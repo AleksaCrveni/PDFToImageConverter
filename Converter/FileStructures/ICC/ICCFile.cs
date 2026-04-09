@@ -9,6 +9,7 @@
   {
     public ICCHeader Header;
     public List<ICC_TagDef> TagDefinitions;
+    public ICC_Data Data;
   }
 
   public class ICCHeader
@@ -42,7 +43,8 @@
     public double X;
     public double Y;
     public double Z;
-
+    
+    public ICC_XYZNumber() { }
     public ICC_XYZNumber(double x, double y, double z)
     {
       X = x;
@@ -54,7 +56,15 @@
   public class ICC_TagDef
   {
     public ICC_TAG_TYPE Type;
-    public uint Offset;
-    public uint Size;
+    public int Offset; // we are just going to limit this to int
+    public int Size; // we are just going to limit this to int
   }
+
+  public class ICC_Data
+  {
+    public string Copyright;
+    public string Description;
+    public ICC_XYZNumber[] WhitePoint;
+  }
+
 }

@@ -72,7 +72,6 @@
   // section 9.2 ICC spec
   public enum ICC_TAG_TYPE
   {
-    NULL = 0,
     A2B0 = 0x41324230, // AToB0
     A2B1 = 0x41324231, // AToB1
     A2B2 = 0x41324232, // AToB2
@@ -111,5 +110,46 @@
     tech = 0x74656368, // technology
     vued = 0x76756564, // viewingCondDesc
     view = 0x76696577  // viewingConditions
+
   }
+
+  /// <summary>
+  ///  ICC Data Structure types for most versions equal or lower to 2005 (4.2)
+  /// </summary>
+  public enum ICC_DS_TYPE
+  {
+    // v 4.20
+    CHROMATICITY = 0x6368726D,
+    COLORANT_ORDER = 0x636c726f,
+    COLORANT_TABLE = 0x636c7274,
+    CURVE = 0x63757276,
+    DATA = 0x64617461,
+    DATE_TIME = 0x6474696D,
+    LUT_16 = 0x6D667432,
+    LUT_8 = 0x6D667431,
+    LUT_ATOB = 0x6D414220,
+    LUT_BTOA = 0x6D424120,
+    MEASUREMENT = 0x6D656173,
+    MULTI_LOCALIZED_UNICODE = 0x6D6C7563,
+    NAMED_COLOR_2 = 0x6E636C32,
+    PARAMETRIC_CURVE = 0x70617261,
+    PROFILE_SEQUENCE_DESC = 0x70736571,
+    RESPONSE_CURVE_SET_16 = 0x72637332,
+    S_15_FIXED_16_ARRAY = 0x73663332,
+    SIGNATURE = 0x73696720,
+    TEXT = 0x74657874,
+    U_16_FIXED_16_ARRAY = 0x75663332,
+    U_INT_16_ARRAY = 0x75693136,
+    U_INT_32_ARRAY = 0x75693332,
+    U_INT_64_ARRAY = 0x75693634,
+    U_INT_8_ARRAY = 0x75693038,
+    VIEWING_CONDITIONS = 0x76696577,
+    XYZ = 0x58595A20,
+
+    // 1:2001-0 minor revision
+    TEXT_DESCRIPTION = 0x64657363 // desc
+  }
+
+
 }
+
