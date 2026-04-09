@@ -73,7 +73,7 @@ namespace Tester
       BufferWriter.WriteInt16BE(ref buffer, ref pos, 32767);
       BufferWriter.WriteUInt16BE(ref buffer, ref pos, 65535);
 
-      double expectedRes = 32767 + (65535 / 65536);
+      double expectedRes = 32767 + (65535 / 65536d);
       ICCParser ICCParser = new ICCParser(Array.Empty<byte>(), true);
       pos = 0;
       ReadOnlySpan<byte> readOnly = arr.AsSpan();

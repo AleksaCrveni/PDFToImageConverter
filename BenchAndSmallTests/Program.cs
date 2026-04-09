@@ -2,6 +2,7 @@
 using BenchmarkDotNet.Running;
 using Converter;
 using Converter.FileStructures.BMP;
+using Converter.FileStructures.General;
 using Converter.FileStructures.PDF;
 using Converter.FileStructures.PNG;
 using Converter.Parsers.Images.BMP;
@@ -224,19 +225,25 @@ using System.Text;
 //var runner = BenchmarkRunner.Run<MyBenches>();
 
 //byte[] b = File.ReadAllBytes("bytes.txt");
+
+
 //string s = Encoding.Unicode.GetString(b);
 
-byte[] arr = new byte[] { 1, 2, 0, 12 };
 
-uint val = BinaryPrimitives.ReadUInt32LittleEndian(arr.AsSpan());
+//BMPParser bmp = new BMPParser();
+//bmp.Parse(Files.RootFolder + "\\3b.bmp");
+
+//byte[] arr = new byte[] { 1, 2, 0, 12 };
+
+//uint val = BinaryPrimitives.ReadUInt32LittleEndian(arr.AsSpan());
 
 
-string s = "020";
-int codePoint = Char.ConvertToUtf32(s, 0);
+//string s = "020";
+//int codePoint = Char.ConvertToUtf32(s, 0);
 
 PdfParser parser = new PdfParser();
 PDF_Options options = new PDF_Options();
-parser.Parse(Files.RootFolder + "\\Prijemni-1.pdf", ref options);
+parser.Parse(Files.Report, ref options);
 
 //BMPParser p = new BMPParser();
 //p.Parse(@$"W:\PDFToImageConverter\Files\testBmpMono.bmp");

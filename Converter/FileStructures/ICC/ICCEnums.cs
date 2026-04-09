@@ -150,6 +150,59 @@
     TEXT_DESCRIPTION = 0x64657363 // desc
   }
 
+  public enum ICC_STANDARD_OBSERVER
+  {
+    UNKNOWN = 0,
+    CIE_1931 = 1,
+    CIE_1964 = 2
+  }
+
+  public enum ICC_MEASUREMENT_GEOMETRY
+  {
+    UNKNOWN = 0,
+    TYPE1 = 1, // 0/45 or 45/0
+    TYPE2 = 2 // 0/d or d/0
+  }
+
+
+  public enum ICC_STANDARD_ILLUMINANT
+  {
+    UNKNOWN = 0,
+    D50 = 1,
+    D65 = 2,
+    D93 = 3,
+    F2 = 4,
+    D55 = 5,
+    A = 6,
+    E = 7, // Equi-Power
+    F8 = 8,
+  }
+
+  public enum ICC_TECHNOLOGY_SIGNATURE
+  {
+    FILM_SCANNER = 0x6673636E, // ‘fscn’ 
+    DIGITAL_CAMERA = 0x6463616D, // ‘dcam’ 
+    REFLECTIVE_SCANNER = 0x7273636E, // ‘rscn’ 
+    INK_JET_PRINTER = 0x696A6574, // ‘ijet’ 
+    THERMAL_WAX_PRINTER = 0x74776178, // ‘twax’ 
+    ELECTROPHOTOGRAPHIC_PRINTER = 0x6570686F, // ‘epho’ 
+    ELECTROSTATIC_PRINTER = 0x65737461, // ‘esta’ 
+    DYE_SUBLIMATION_PRINTER = 0x64737562, // ‘dsub’ 
+    PHOTOGRAPHIC_PAPER_PRINTER = 0x7270686F, // ‘rpho’ 
+    FILM_WRITER = 0x6670726E, // ‘fprn’ 
+    VIDEO_MONITOR = 0x7669646D, // ‘vidm’ 
+    VIDEO_CAMERA = 0x76696463, // ‘vidc’ 
+    PROJECTION_TELEVISION = 0x706A7476, // ‘pjtv’ 
+    CATHODE_RAY_TUBE_DISPLAY = 0x43525420, // ‘CRT ’ 
+    PASSIVE_MATRIX_DISPLAY = 0x504D4420, // ‘PMD ’ 
+    ACTIVE_MATRIX_DISPLAY = 0x414D4420, // ‘AMD ’ 
+    PHOTO_CD = 0x4B504344, // ‘KPCD’ 
+    PHOTOIMAGE_SETTER = 0x696D6773, // ‘imgs’ 
+    GRAVURE = 0x67726176, // ‘grav’ 
+    OFFSET_LITHOGRAPHY = 0x6F666673, // ‘offs’ 
+    SILKSCREEN = 0x73696C6B, // ‘silk’ 
+    FLEXOGRAPHY = 0x666C6578, // ‘flex’ 
+  }
 
 }
 

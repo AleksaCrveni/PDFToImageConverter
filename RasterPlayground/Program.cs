@@ -21,39 +21,12 @@ string rightParen = "parenright";
 string plus = "plus";
 //byte[] bitmap = Utils.DrawLine(WIDTH, HEIGHT, 0, 0, 10, 13);
 byte[] bitmap = new byte[HEIGHT * WIDTH];
-// tests
-//688 230
-//702 230
-//707 230
-//688 250
-//bitmap[23 * WIDTH + 68] = 255;
-//bitmap[23 * WIDTH + 72] = 200;
-//bitmap[23 * WIDTH + 77] = 128;
-//bitmap[25 * WIDTH + 68] = 64;
-//byte[] buff1 = Utils.ConvertToWin32RGBBuffer(bitmap, HEIGHT, WIDTH);
-//File.WriteAllBytes("Single\\data.txt", buff1);
-//return;
 
-
-
-
-
-
-byte[] res = Utils.DrawLine(20, 20, 0, 0, 8, 0);
-
-
-res = new byte[20 * 20];
-PathRasterizer sRaster = new PathRasterizer(Array.Empty<byte>(), "");
-sRaster.MY_DrawLine(res, 0, 20, 0, 0, 8, 0);
-for (int i = 0; i < res.Length; i++)
-{
-  if (res[i] > 0)
-    throw new Exception("GAS");
-}
 //string fontName = "FYLNZH+MSAM10";
-string fontName = "GTGWSY+CMR10";
+//string fontName = "GTGWSY+CMR10";
 //string fontName = "ZDDNRG+NimbusRomNo9L-Regu";
 //string fontName = "MSXGKX+CMEX10";
+string fontName = "Composite_Arial-BoldMT";
 PDF_FontInfo fontInfo = new PDF_FontInfo();
 fontInfo.FontDescriptor = new PDF_FontDescriptor();
 fontInfo.FontDescriptor.FontName = fontName;

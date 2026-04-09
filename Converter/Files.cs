@@ -18,7 +18,7 @@
     public static string BMP256b { get; set; }
     public static string PNGSample { get; set; }
     public static string PNGInternlancedSample { get; set; }
-    public static string Prijemni1 { get; set; }
+    public static   string Prijemni1 { get; set; }
     static Files()
     { 
       RootFolder = Path.Combine(Directory.GetParent(Directory.GetCurrentDirectory()).Parent.Parent.Parent.FullName, "Files");

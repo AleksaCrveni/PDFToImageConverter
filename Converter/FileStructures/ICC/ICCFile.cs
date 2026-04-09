@@ -65,6 +65,33 @@
     public string Copyright;
     public string Description;
     public ICC_XYZNumber[] WhitePoint;
+    public ICC_XYZNumber[] BlackPoint;
+    public ICC_XYZNumber[] R_XYZ;
+    public ICC_XYZNumber[] G_XYZ;
+    public ICC_XYZNumber[] B_XYZ;
+    public string DeviceMFGDesc;
+    public string DeviceModelDesc;
+    public string ViewingCondDesc;
+    public ICC_ViewingConditionsType ViewingConditions;
+    public ICC_XYZNumber[] Luminance;
+    public ICC_MeasurementType Measurement;
+    public ICC_TECHNOLOGY_SIGNATURE Technology;
+  }
+
+  public class ICC_ViewingConditionsType()
+  {
+    public ICC_XYZNumber Illuminant;
+    public ICC_XYZNumber Surround;
+    public ICC_STANDARD_ILLUMINANT IlluminantType;
+  }
+
+  public class ICC_MeasurementType()
+  {
+    public ICC_STANDARD_OBSERVER Observer;
+    public ICC_XYZNumber Backing;
+    public ICC_MEASUREMENT_GEOMETRY Geometry;
+    public double Flare;
+    public ICC_STANDARD_ILLUMINANT Illuminant;
   }
 
 }
