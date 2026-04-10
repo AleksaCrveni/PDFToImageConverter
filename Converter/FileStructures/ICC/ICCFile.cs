@@ -76,6 +76,9 @@
     public ICC_XYZNumber[] Luminance;
     public ICC_MeasurementType Measurement;
     public ICC_TECHNOLOGY_SIGNATURE Technology;
+    public ICC_TRC R_TRC;
+    public ICC_TRC G_TRC;
+    public ICC_TRC B_TRC;
   }
 
   public class ICC_ViewingConditionsType()
@@ -93,5 +96,15 @@
     public double Flare;
     public ICC_STANDARD_ILLUMINANT Illuminant;
   }
+
+  public class ICC_TRC
+  {
+    public ICC_DS_TYPE Type; // Either CURVE or PARAMETRIC_CURVE
+    // Different data based on Type
+    // In case of PARAMETRIC_CURVE we can infer function type based on list length, check table 47.
+    public List<double> Points; 
+
+  }
+
 
 }

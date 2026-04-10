@@ -158,7 +158,7 @@ namespace Converter.Parsers.ICC
             ParseBXYZ(profile, tag.Type, ds, ref tagBuffer, ref pos);
             break;
           case ICC_TAG_TYPE.bTRC:
-            throw new NotImplementedException("Tag not supported");
+            ParseBTRC(profile, tag.Type, ds, ref tagBuffer, ref pos);
             break;
           case ICC_TAG_TYPE.B2A0:
             throw new NotImplementedException("Tag not supported");
@@ -209,7 +209,7 @@ namespace Converter.Parsers.ICC
             ParseGXYZ(profile, tag.Type, ds, ref tagBuffer, ref pos);
             break;
           case ICC_TAG_TYPE.gTRC:
-            throw new NotImplementedException("Tag not supported");
+            ParseGTRC(profile, tag.Type, ds, ref tagBuffer, ref pos);
             break;
           case ICC_TAG_TYPE.lumi:
             ParseLuminance(profile, tag.Type, ds, ref tagBuffer, ref pos);
@@ -248,7 +248,7 @@ namespace Converter.Parsers.ICC
             ParseRXYZ(profile, tag.Type, ds, ref tagBuffer, ref pos);
             break;
           case ICC_TAG_TYPE.rTRC:
-            throw new NotImplementedException("Tag not supported");
+            ParseRTRC(profile, tag.Type, ds, ref tagBuffer, ref pos);
             break;
           case ICC_TAG_TYPE.tech:
             ParseTechnology(profile, tag.Type, ds, ref tagBuffer, ref pos);
@@ -404,6 +404,48 @@ namespace Converter.Parsers.ICC
         _ => throw new NotSupportedException($"Structure {ds} not supported for {tagType.ToString()} Tag!"),
       };
     }
+
+    public void ParseRTRC(ICCProfile profile, ICC_TAG_TYPE tagType, ICC_DS_TYPE ds, ref ReadOnlySpan<byte> buffer, ref int pos)
+    {
+      ICC_TRC trc = new ICC_TRC();
+      trc.Type = ds;
+      trc.Points = ds switch
+      {
+        ICC_DS_TYPE.CURVE => ParseCurve(ref buffer, ref pos),
+        ICC_DS_TYPE.PARAMETRIC_CURVE => ParseParametricCurve(ref buffer, ref pos), 
+        _ => throw new NotSupportedException($"Structure {ds} not supported for {tagType.ToString()} Tag!"),
+      };
+
+      profile.Data.R_TRC = trc;
+    }
+
+    public void ParseGTRC(ICCProfile profile, ICC_TAG_TYPE tagType, ICC_DS_TYPE ds, ref ReadOnlySpan<byte> buffer, ref int pos)
+    {
+      ICC_TRC trc = new ICC_TRC();
+      trc.Type = ds;
+      trc.Points = ds switch
+      {
+        ICC_DS_TYPE.CURVE => ParseCurve(ref buffer, ref pos),
+        ICC_DS_TYPE.PARAMETRIC_CURVE => ParseParametricCurve(ref buffer, ref pos),
+        _ => throw new NotSupportedException($"Structure {ds} not supported for {tagType.ToString()} Tag!"),
+      };
+
+      profile.Data.G_TRC = trc;
+    }
+
+    public void ParseBTRC(ICCProfile profile, ICC_TAG_TYPE tagType, ICC_DS_TYPE ds, ref ReadOnlySpan<byte> buffer, ref int pos)
+    {
+      ICC_TRC trc = new ICC_TRC();
+      trc.Type = ds;
+      trc.Points = ds switch
+      {
+        ICC_DS_TYPE.CURVE => ParseCurve(ref buffer, ref pos),
+        ICC_DS_TYPE.PARAMETRIC_CURVE => ParseParametricCurve(ref buffer, ref pos),
+        _ => throw new NotSupportedException($"Structure {ds} not supported for {tagType.ToString()} Tag!"),
+      };
+
+      profile.Data.B_TRC = trc;
+    }
     #endregion TagParsing
 
     #region StructureParsing
@@ -432,7 +474,7 @@ namespace Converter.Parsers.ICC
 
     public ICC_XYZNumber[] ParseXYZType(ref ReadOnlySpan<byte> buffer, ref int pos)
     {
-      int arrSize = (buffer.Length - 8) / 12;
+      int arrSize = (buffer.Length - pos) / 12;
       ICC_XYZNumber[] arr = new ICC_XYZNumber[arrSize];
       int i = 0;
       while (i < arrSize)
@@ -470,6 +512,16 @@ namespace Converter.Parsers.ICC
       res += dec / 65536d;
       return res;
     }
+
+    public double ParseU8Fixed8Number(ref ReadOnlySpan<byte> buffer, ref int pos)
+    {
+      ushort num = buffer[pos++];
+      ushort dec = buffer[pos++];
+      double res = num;
+      res += dec / 256;
+      return res;
+    }
+
     public ICC_ViewingConditionsType ParseViewingConditionsType(ref ReadOnlySpan<byte> buffer, ref int pos)
     {
       ICC_ViewingConditionsType vc = new ICC_ViewingConditionsType();
@@ -517,6 +569,49 @@ namespace Converter.Parsers.ICC
       return t;
     }
 
+    // we will return double with curve because in some cases it can be u8fixed8number..........
+    public List<double> ParseCurve(ref ReadOnlySpan<byte> buffer, ref int pos)
+    {
+      List<double> list = new List<double>();
+      int n = BufferReader.ReadInt32BE(ref buffer, ref pos);
+      if (n == 0)
+      {
+        return list;
+      }
+      else if (n == 1)
+      {
+        list.Add(ParseU8Fixed8Number(ref buffer, ref pos));
+      }
+      else
+      {
+        for (int i = 0; i < n; i++)
+        {
+          list.Add(BufferReader.ReadUInt16BE(ref buffer, ref pos));
+        }
+      }
+      return list;
+    }
+
+    public List<double> ParseParametricCurve(ref ReadOnlySpan<byte> buffer, ref int pos)
+    {
+      List<double> list = new List<double>();
+      ushort functionType = BufferReader.ReadUInt16BE(ref buffer, ref pos);
+      pos += 2;
+      int n = functionType switch
+      {
+        0 => 1,
+        1 => 3,
+        2 => 4,
+        3 => 5,
+        4 => 7
+      };
+
+      for (int i = 0; i < n; i++)
+        list.Add(ParseS15Fixed16Number(ref buffer, ref pos));
+      return list;
+    }
+
+    
     #endregion StructureParsing
   }
 }
