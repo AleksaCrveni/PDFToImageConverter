@@ -1,7 +1,5 @@
 ﻿using Converter.FileStructures.ICC;
 using Converter.Utils;
-using System.ComponentModel;
-using System.Security.Cryptography.X509Certificates;
 using System.Text;
 
 namespace Converter.Parsers.ICC
@@ -203,7 +201,7 @@ namespace Converter.Parsers.ICC
             throw new NotImplementedException("Tag not supported");
             break;
           case ICC_TAG_TYPE.kTRC:
-            throw new NotImplementedException("Tag not supported");
+            ParseKTRC(profile, tag.Type, ds, ref tagBuffer, ref pos);
             break;
           case ICC_TAG_TYPE.gXYZ:
             ParseGXYZ(profile, tag.Type, ds, ref tagBuffer, ref pos);
@@ -258,6 +256,9 @@ namespace Converter.Parsers.ICC
             break;
           case ICC_TAG_TYPE.view:
             ParseViewingConditions(profile, tag.Type, ds, ref tagBuffer, ref pos);
+            break;
+          case ICC_TAG_TYPE.dscm:
+            ParseAppleMLProfileDesc(profile, tag.Type, ds, ref tagBuffer, ref pos);
             break;
         }
       }
@@ -446,6 +447,31 @@ namespace Converter.Parsers.ICC
 
       profile.Data.B_TRC = trc;
     }
+
+    public void ParseKTRC(ICCProfile profile, ICC_TAG_TYPE tagType, ICC_DS_TYPE ds, ref ReadOnlySpan<byte> buffer, ref int pos)
+    {
+      ICC_TRC trc = new ICC_TRC();
+      trc.Type = ds;
+      trc.Points = ds switch
+      {
+        ICC_DS_TYPE.CURVE => ParseCurve(ref buffer, ref pos),
+        ICC_DS_TYPE.PARAMETRIC_CURVE => ParseParametricCurve(ref buffer, ref pos),
+        _ => throw new NotSupportedException($"Structure {ds} not supported for {tagType.ToString()} Tag!"),
+      };
+
+      profile.Data.K_TRC = trc;
+    }
+
+    public void ParseAppleMLProfileDesc(ICCProfile profile, ICC_TAG_TYPE tagType, ICC_DS_TYPE ds, ref ReadOnlySpan<byte> buffer, ref int pos)
+    {
+      profile.Data.AppleMLProfileDesc = ds switch
+      {
+        ICC_DS_TYPE.TEXT_DESCRIPTION => ParseTextDescription(ref buffer, ref pos),
+        ICC_DS_TYPE.MULTI_LOCALIZED_UNICODE => ParseMultiLocalizedUnicode(ref buffer, ref pos),
+        _ => throw new NotSupportedException($"Structure {ds} not supported for {tagType.ToString()} Tag!"),
+      };
+    }
+
     #endregion TagParsing
 
     #region StructureParsing
@@ -458,9 +484,36 @@ namespace Converter.Parsers.ICC
 
     public string ParseMultiLocalizedUnicode(ref ReadOnlySpan<byte> buffer, ref int pos)
     {
-      throw new NotImplementedException();
-    }
+      int n = BufferReader.ReadInt32BE(ref buffer, ref pos); // limit to int w
+      int recordSize = BufferReader.ReadInt32BE(ref buffer, ref pos);
+      if (recordSize != 12)
+        throw new NotSupportedException("Not supported recordSize!");
 
+      ICC_MLUC_LANG lang = (ICC_MLUC_LANG)BufferReader.ReadUInt16BE(ref buffer, ref pos);
+      pos += 2;
+      int firstLen = BufferReader.ReadInt32BE(ref buffer, ref pos);
+      int firstOffset = BufferReader.ReadInt32BE(ref buffer, ref pos);
+      if (lang == ICC_MLUC_LANG.EN || n == 1)
+      {
+        // not sure if this is right encoding
+        return Encoding.BigEndianUnicode.GetString(buffer.Slice(firstOffset, firstLen));
+      }
+      int recStart;
+      
+      for (int i = 1; i < n; i++)
+      {
+        recStart = 28 + (12 * (i - 1)) - 1;
+        lang = (ICC_MLUC_LANG)BufferReader.ReadInt32BE(ref buffer, ref recStart);
+        if (lang == ICC_MLUC_LANG.EN)
+        {
+          int len = BufferReader.ReadInt32BE(ref buffer, ref recStart);
+          int offset = BufferReader.ReadInt32BE(ref buffer, ref recStart);
+          return Encoding.BigEndianUnicode.GetString(buffer.Slice(offset, firstLen));
+        }
+      }
+
+      return Encoding.BigEndianUnicode.GetString(buffer.Slice(firstOffset, firstLen));
+    }
     // 2001 spec
     // ASCII only supported
     public string ParseTextDescription(ref ReadOnlySpan<byte> buffer, ref int pos)

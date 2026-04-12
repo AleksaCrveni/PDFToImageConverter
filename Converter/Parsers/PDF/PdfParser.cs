@@ -569,7 +569,7 @@ namespace Converter.Parsers.PDF
       commonStreamDict.RawStreamData = DecompressionHelper.DecodeFilters(ref encodedSpan, commonStreamDict.Filters);
 
       //#if DEBUG
-      //  File.WriteAllBytes(Path.Join(Files.RootFolder, "BaseDoc-ICCSample.txt"), commonStreamDict.RawStreamData);
+      //  File.WriteAllBytes(Path.Join(Files.RootFolder, "Sample-ICCSample.txt"), commonStreamDict.RawStreamData);
       //#endif
       data.CommonStreamDict = commonStreamDict;
 

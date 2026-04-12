@@ -480,12 +480,14 @@ namespace Converter.Parsers.PDF
             SetColor(currentGS.StrokingColorSpace);
             break;
           case 0x4e4353: // SCN
-            throw new NotImplementedException("Operator not i implemented");
+            SetColorAndName(currentGS.StrokingColorSpace);
+            break;
           case 0x6373: // sc
             SetColor(currentGS.NonStrokingColorSpace);
             break;
           case 0x6e6373: // scn
-            throw new NotImplementedException("Operator not i implemented");
+            SetColorAndName(currentGS.NonStrokingColorSpace);
+            break;
           case 0x47: // G
             GetNextStackValAsDouble();
             break;
@@ -1283,11 +1285,81 @@ namespace Converter.Parsers.PDF
           state.Color.SetColor(red, green, blue, 0);
           break;
         case PDF_ColorSpaceFamily.DeviceCMYK:
-          double cyan = GetNextStackValAsDouble();
-          double magenta = GetNextStackValAsDouble();
-          double yellow = GetNextStackValAsDouble();
           double black = GetNextStackValAsDouble();
+          double yellow = GetNextStackValAsDouble();
+          double magenta = GetNextStackValAsDouble();
+          double cyan = GetNextStackValAsDouble();
           state.Color.SetColor(cyan, magenta, yellow, black);
+          break;
+        case PDF_ColorSpaceFamily.CalGray:
+          throw new NotImplementedException("Invalid ColorSpace!");
+          break;
+        case PDF_ColorSpaceFamily.CalRGB:
+          throw new NotImplementedException("Invalid ColorSpace!");
+          break;
+        case PDF_ColorSpaceFamily.Lab:
+          throw new NotImplementedException("Invalid ColorSpace!");
+          break;
+        case PDF_ColorSpaceFamily.ICCBased:
+          if (!state.Cs.HasExtraData)
+            throw new InvalidDataException("No extra data for ICC profile!");
+          PDF_ICCExtraData extra = (PDF_ICCExtraData)state.Cs.ExtraCSData;
+          if (extra.N == 1)
+          {
+            gray = GetNextStackValAsDouble();
+            state.Color.SetColor(gray, gray, gray, 0);
+          }
+          else if (extra.N == 3)
+          {
+            blue = GetNextStackValAsDouble();
+            green = GetNextStackValAsDouble();
+            red = GetNextStackValAsDouble();
+            state.Color.SetColor(red, green, blue, 0);
+          } 
+          else if (extra.N == 4)
+          {
+            black = GetNextStackValAsDouble();
+            yellow = GetNextStackValAsDouble();
+            magenta = GetNextStackValAsDouble();
+            cyan = GetNextStackValAsDouble();
+            state.Color.SetColor(cyan, magenta, yellow, black);
+          }
+          else
+          {
+            throw new NotSupportedException("N value not supported"); // shouldn't this be in the parser
+          }
+          break;
+        case PDF_ColorSpaceFamily.Indexed:
+          throw new NotImplementedException("Invalid ColorSpace!");
+          break;
+        case PDF_ColorSpaceFamily.Pattern:
+          throw new NotImplementedException("Invalid ColorSpace!");
+          break;
+        case PDF_ColorSpaceFamily.Separation:
+          throw new NotImplementedException("Invalid ColorSpace!");
+          break;
+        case PDF_ColorSpaceFamily.DeviceN:
+          throw new NotImplementedException("Invalid ColorSpace!");
+          break;
+      }
+    }
+
+    public void SetColorAndName(PDFGI_ColorState state)
+    {
+      // Pattern, Separation, DeviceN and ICCBased colour spaces
+      switch (state.Cs.Family)
+      {
+        case PDF_ColorSpaceFamily.NULL:
+          throw new NotImplementedException("Invalid ColorSpace!");
+          break;
+        case PDF_ColorSpaceFamily.DeviceGray:
+          throw new NotImplementedException("Invalid ColorSpace!");
+          break;
+        case PDF_ColorSpaceFamily.DeviceRGB:
+          SetColor(state);
+          break;
+        case PDF_ColorSpaceFamily.DeviceCMYK:
+          throw new NotImplementedException("Invalid ColorSpace!");
           break;
         case PDF_ColorSpaceFamily.CalGray:
           throw new NotImplementedException("Invalid ColorSpace!");
@@ -1315,7 +1387,6 @@ namespace Converter.Parsers.PDF
           break;
       }
     }
-
   }
 
 

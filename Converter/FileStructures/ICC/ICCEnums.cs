@@ -109,8 +109,12 @@
     rTRC = 0x72545243, // redTRC
     tech = 0x74656368, // technology
     vued = 0x76756564, // viewingCondDesc
-    view = 0x76696577  // viewingConditions
+    view = 0x76696577,  // viewingConditions
 
+    // There literally isn't spec out there where this tag is actaully defined
+    // beyond that its apple multi-localized desc string
+    // This will be parsed as mluc or desc data type since thats whats in my sample for now
+    dscm = 0x6473636d // Apple multi-localized description strings.
   }
 
   /// <summary>
@@ -202,6 +206,12 @@
     OFFSET_LITHOGRAPHY = 0x6F666673, // ‘offs’ 
     SILKSCREEN = 0x73696C6B, // ‘silk’ 
     FLEXOGRAPHY = 0x666C6578, // ‘flex’ 
+  }
+
+  // dont care about others for now
+  public enum ICC_MLUC_LANG
+  {
+    EN = 25966,
   }
 
 }

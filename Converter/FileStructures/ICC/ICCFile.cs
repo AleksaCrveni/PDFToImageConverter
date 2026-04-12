@@ -79,6 +79,8 @@
     public ICC_TRC R_TRC;
     public ICC_TRC G_TRC;
     public ICC_TRC B_TRC;
+    public ICC_TRC K_TRC;// gray
+    public string AppleMLProfileDesc;
   }
 
   public class ICC_ViewingConditionsType()
