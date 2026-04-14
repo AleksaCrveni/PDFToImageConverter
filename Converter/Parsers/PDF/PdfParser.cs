@@ -9,6 +9,7 @@ using Converter.StaticData;
 using Converter.Utils;
 using Converter.Writers.TIFF;
 using System.Buffers;
+using System.Buffers.Binary;
 using System.Diagnostics;
 using System.Globalization;
 using System.Numerics;
@@ -103,14 +104,14 @@ namespace Converter.Parsers.PDF
         throw new InvalidDataException("Invalid data");
 
 
-      PDFSpanParseHelper parseHelper = new PDFSpanParseHelper(ref footerBuffer);
-      ParseTrailer(file, ref parseHelper);
+    
+      ParseTrailer(file, ref footerBuffer);
 
       // NOTE: It may already be set in Parse Trailer if xref is cross-reference stream
       // because in that case trailer and xref dict are in one dictionary
       if (file.LastCrossReferenceOffset == 0)
       {
-        ParseLastCrossRefByteOffset(file);
+        ParseLastCrossRefByteOffset(file, ref footerBuffer);
         ParseCrossReferenceTable(file);
       }
 
@@ -2125,8 +2126,9 @@ namespace Converter.Parsers.PDF
       file.CrossReferenceEntries = cRefEntries;
     }
     // TODO:   test case when trailer is not complete ">>" can't be found after opening brackets
-    private void ParseTrailer(PDFFile file, ref PDFSpanParseHelper helper)
+    private void ParseTrailer(PDFFile file, ref Span<byte> footerBuffer)
     {
+      PDFSpanParseHelper helper = new PDFSpanParseHelper(ref footerBuffer);
       // 1. Check if trailer exists
       // 2. if its not found check at xref position if its cross reference stream
       bool trailerFound = false;
@@ -2205,7 +2207,7 @@ namespace Converter.Parsers.PDF
       {
         if (xrefPos == 0)
         {
-          ParseLastCrossRefByteOffset(file);
+          ParseLastCrossRefByteOffset(file, ref footerBuffer);
           xrefPos = file.LastCrossReferenceOffset;
         }
         cRefEntry = new List<PDF_XrefEntry>();
@@ -2534,57 +2536,43 @@ namespace Converter.Parsers.PDF
     // https://stackoverflow.com/questions/11896858/does-the-eof-in-a-pdf-have-to-appear-within-the-last-1024-bytes-of-the-file
     // NOTE: according to specification for NON cross reference stream PDF files, max lengh for byteoffset is 10 digits so 10^10 bytes (10gb) so ulong will be more than enough
     // NOTE: i can't seem to find max lenght for cross refernce stream PDF files
-    // TODO: Fix whatever this is
-    private void ParseLastCrossRefByteOffset(PDFFile file)
+    private void ParseLastCrossRefByteOffset(PDFFile file, ref Span<byte> buffer)
     {
-      file.Stream.Seek(-6, SeekOrigin.End);
-      bool found = false;
-      sbyte index = 0;
-
-      // probably irellevant but in case of big files , long value is 18446744073709551615 which is 20char +2 for \n on end and start
-      Span<byte> buffer = stackalloc byte[20 + 1];
-
-      // not sure if this is needed, but validate if %%EOF exists
-      Span<byte> _eofBytes = stackalloc byte[6] { 37, 37, 69, 79, 70, 10 };
-      Span<byte> _eofByteBuffer = stackalloc byte[6];
-      int bytesRead = file.Stream.Read(_eofByteBuffer);
-      if (bytesRead != _eofByteBuffer.Length)
-        throw new InvalidDataException("Invalid data");
-
-      for (index = 0; index < bytesRead; index++)
+      int endPos = -1;
+      int startPos = -1;
+      bool inDigit = false;
+      byte c;
+      for (int i = buffer.Length - 1; i >= 0; i--)
       {
-        if (_eofBytes[index] != _eofByteBuffer[index])
-          throw new InvalidDataException("Invalid data");
+        c = buffer[i];
+        if (!inDigit)
+        {
+          if (char.IsDigit((char)c))
+          {
+            endPos = i;
+            inDigit = true;
+          }
+        }
+        else if (inDigit)
+        {
+          if (!char.IsDigit((char)c))
+          {
+            startPos = i + 1;
+            break;
+          }
+        }
       }
 
-      // go to max possible position where cross reference offset byte count might start
-      file.Stream.Seek(-_eofByteBuffer.Length - buffer.Length, SeekOrigin.End);
-
-      // try to read byte count offset for cross reference table
-      bytesRead = file.Stream.Read(buffer);
-      if (bytesRead != buffer.Length)
-        throw new InvalidDataException("Invalid data");
-
-      sbyte newLineIndex = -1;
-      for (index = 1; index < bytesRead - 1; index++)
-      {
-        if (buffer[index] == _newLineByte)
-          newLineIndex = index;
-      }
-      if (newLineIndex == -1 && buffer[0] != _newLineByte)
-        throw new InvalidDataException("File too big");
-      if (newLineIndex == buffer.Length - 2)
-        throw new InvalidDataException("Invalid data");
-      // get actual value
       long value = 0;
-      // move newlineindex for one to get past \n to actual first digit
-      for (index = ++newLineIndex; index < buffer.Length - 1; index++)
+      for (int i = startPos; i <= endPos; i++)
       {
-        if (!char.IsDigit((char)buffer[index]))
+        // i dont think we need this check but w/e
+        if (!char.IsDigit((char)buffer[i]))
           throw new InvalidDataException("Invalid data");
-        value = value * 10 + CharUnicodeInfo.GetDecimalDigitValue((char)buffer[index]);
+        value = value * 10 + CharUnicodeInfo.GetDecimalDigitValue((char)buffer[i]);
       }
-      file.LastCrossReferenceOffset =  value;
+
+      file.LastCrossReferenceOffset = value;
     }
 
     // this is probably naive solution wihtout charset taken in account
