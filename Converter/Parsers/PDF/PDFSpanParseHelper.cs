@@ -21,10 +21,23 @@ namespace Converter.Parsers.PDF
     public PDFSpanParseHelper(ref Span<byte> buffer)
     {
       _buffer = (ReadOnlySpan<byte>)buffer;
+      // did this to avoid infinite loops, maybe i should just handle them better instead of this
+      // temp fix i guess
+      if (_buffer.Length == 0)
+        throw new InvalidDataException("No data provided!");
     }
     public PDFSpanParseHelper(ref ReadOnlySpan<byte> buffer)
     {
       _buffer = buffer;
+      if (_buffer.Length == 0)
+        throw new InvalidDataException("No data provided!");
+    }
+
+    public PDFSpanParseHelper(byte[] buffer, int start, int len)
+    {
+      _buffer = buffer.AsSpan(start, len);
+      if (_buffer.Length == 0)
+        throw new InvalidDataException("No data provided!");
     }
 
     /// <summary>
@@ -53,30 +66,7 @@ namespace Converter.Parsers.PDF
       return Encoding.Default.GetString(_buffer.Slice(starter, _position - starter));
     }
 
-    /// <summary>
-    /// Get next raw string
-    /// </summary>
-    /// <param name="delimiter"></param>
-    /// <returns></returns>
-    public string GetNextRawString()
-    {
-      ReadOnlySpan<byte> span = new ReadOnlySpan<byte>();
-      GetNextStringAsReadOnlySpan(ref span);
-      return Encoding.Default.GetString(span);
-    }
-
-    /// <summary>
-    /// Ignoores delimiters when reading a string. Used to parse formats like "/a/b/c/test/deqe"
-    /// Not most efficient, we could technically not read string but impact is negligable
-    /// </summary>
-    /// <returns></returns>
-    public List<string> SplitNextRawString(char delimiter)
-    {
-      ReadOnlySpan<byte> span = new ReadOnlySpan<byte>();
-      GetNextStringAsReadOnlySpan(ref span);
-      return Encoding.Default.GetString(span).Split(delimiter).ToList();
-    }
-
+   
     // TODO: Optimize not to create string
     public bool GetNextBool()
     { 
@@ -154,8 +144,7 @@ namespace Converter.Parsers.PDF
         return true;
       return false;
     }
-    // NOTE: this works only for small values
-    // NOTE: this may not work as I think it does (stack alloacted)
+
     public void GetNextStringAsReadOnlySpan(ref ReadOnlySpan<byte> span)
     {
       SkipWhiteSpaceAndDelimiters();
@@ -318,6 +307,38 @@ namespace Converter.Parsers.PDF
       return result;
     }
 
+    public long GetNextInt64()
+    {
+      SkipWhiteSpaceAndDelimiters();
+      bool isNegative = false;
+      if (_char == '-')
+      {
+        isNegative = true;
+        ReadChar();
+      }
+
+      int starter = _position;
+      // don't have to check if _char is 0 if we reach end of the buffer becaseu its cheked in IsCurrentCharPdfWhiteSpace
+
+      while (IsCurrentByteDigit())
+      {
+        ReadChar();
+      }
+
+      // TODO: maybe dont need new span just read from buffer directly
+      ReadOnlySpan<byte> numberInBytes = _buffer.Slice(starter, _position - starter);
+      long result = 0;
+      for (int i = 0; i < numberInBytes.Length; i++)
+      {
+        // these should be no negative ints so this is okay i believe?
+        result = result * 10 + CharUnicodeInfo.GetDecimalDigitValue((char)numberInBytes[i]);
+      }
+
+      if (isNegative)
+        result *= -1;
+      return result;
+    }
+
     public uint GetNextUnsignedInt32()
     {
       SkipWhiteSpaceAndDelimiters();
@@ -335,6 +356,28 @@ namespace Converter.Parsers.PDF
       {
         // these should be no negative ints so this is okay i believe?
         result = result * 10 + (uint)CharUnicodeInfo.GetDecimalDigitValue((char)numberInBytes[i]);
+      }
+      return result;
+    }
+
+    public ushort GetNextUnsignedInt16()
+    {
+      SkipWhiteSpaceAndDelimiters();
+      int starter = _position;
+      // don't have to check if _char is 0 if we reach end of the buffer becaseu its cheked in IsCurrentCharPdfWhiteSpace
+      while (IsCurrentByteDigit())
+      {
+        ReadChar();
+      }
+
+      // TODO: maybe dont need new span just read from buffer directly
+      ReadOnlySpan<byte> numberInBytes = _buffer.Slice(starter, _position - starter);
+      ushort result = 0;
+      ushort ten = 10;
+      for (int i = 0; i < numberInBytes.Length; i++)
+      {
+        // these should be no negative ints so this is okay i believe?
+        result = (ushort)(result * 10 + CharUnicodeInfo.GetDecimalDigitValue((char)numberInBytes[i]));
       }
       return result;
     }
@@ -791,13 +834,13 @@ namespace Converter.Parsers.PDF
     // maybe first i should readchar
     public void SkipWhiteSpace()
     {
-      while (IsCurrentCharPdfWhiteSpace())
+      while (IsCurrentCharPdfWhiteSpace() && _readPosition < _buffer.Length)
         ReadChar();
     }
 
     public void SkipWhiteSpaceAndDelimiters()
     {
-      while (IsCurrentCharPdfWhiteSpace() || delimiters.Contains(_char))
+      while ((IsCurrentCharPdfWhiteSpace() || delimiters.Contains(_char)) && _readPosition < _buffer.Length)
         ReadChar();
     }
 

@@ -11,6 +11,7 @@ namespace Converter.FileStructures.PDF
   {
     public PDF_Version PdfVersion { get; set; } = PDF_Version.Null;
     public long LastCrossReferenceOffset { get; set; }
+    // in case of multiple trailers when there is incremental update this will be latest trailer
     public PDF_Trailer Trailer { get; set; }
     // List of generations where each generation has object
     public List<PDF_XrefEntry> CrossReferenceEntries { get; set; }
@@ -50,13 +51,14 @@ namespace Converter.FileStructures.PDF
     // Only in hybrid-reference file
     // The byte offset in the decoded stream from the bgegging of the file of a cross reference stream
     public int XrefStm;
+    public bool Hybrid = false;
   }
 
   // Cross reference entry
   // This should maybe be ref struct
   public class PDF_XrefEntry
   {
-    public int Index; // may later be refactored not to use this
+    public int Index = -1; // if its > -1 it meants its set/not null
     public long TenDigitValue;
     public ushort GenerationNumber;
     public int StreamIR; // used only when its Indirect entry type

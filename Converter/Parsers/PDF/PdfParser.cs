@@ -10,9 +10,11 @@ using Converter.Utils;
 using Converter.Writers.TIFF;
 using System.Buffers;
 using System.Buffers.Binary;
+using System.ComponentModel;
 using System.Diagnostics;
 using System.Globalization;
 using System.Numerics;
+using System.Runtime.InteropServices;
 using System.Text;
 namespace Converter.Parsers.PDF
 {
@@ -96,25 +98,7 @@ namespace Converter.Parsers.PDF
     void ReadInitialData(PDFFile file, Stream outStream, bool DEBUG)
     {
       file.PdfVersion = ParsePdfVersionFromHeader(file.Stream);
-      // Read last 1024 bytes and trailer, startxref, (last)cross reference tables bytes and %%EOF
-      file.Stream.Seek(-1024, SeekOrigin.End);
-      Span<byte> footerBuffer = stackalloc byte[1024];
-      int readBytes = file.Stream.Read(footerBuffer);
-      if (readBytes != footerBuffer.Length)
-        throw new InvalidDataException("Invalid data");
-
-
-    
-      ParseTrailer(file, ref footerBuffer);
-
-      // NOTE: It may already be set in Parse Trailer if xref is cross-reference stream
-      // because in that case trailer and xref dict are in one dictionary
-      if (file.LastCrossReferenceOffset == 0)
-      {
-        ParseLastCrossRefByteOffset(file, ref footerBuffer);
-        ParseCrossReferenceTable(file);
-      }
-
+      ParseTrailersAndCrossReferenceData(file);
       ParseCatalogDictionary(file, (file.Trailer.RootIR.Item1, file.Trailer.RootIR.Item2));
       ParseRootPageTree(file, (file.Catalog.PagesIR.Item1, file.Catalog.PagesIR.Item2));
       ParsePagesData(file);
@@ -2073,150 +2057,259 @@ namespace Converter.Parsers.PDF
         throw new InvalidDataException("Invalid dictionary");
     }
 
+    /// <summary>
+    /// Here we need to check if we can find trailer, if we cant find trailer, we KNOW its fully cross-reference stream (compressed) file
+    ///   -> In which case we check xref offset for the dictionary
+    /// If we find trailer
+    ///   -> we will parse normal trailer dict with XRefStm check as well because in this case file may be hybrid file
+    ///   -> and then we will first parse xref and create main table and then parse xrefstm offset and then Prev recusevly
+    ///   -> in hybrid files /Prev may be either compressed or normal afaik
+    /// </summary>
+    /// <param name="file"></param>
+    /// <exception cref="InvalidDataException"></exception>
+    private void ParseTrailersAndCrossReferenceData(PDFFile file)
+    {
+      // 1. Find last trailer
+      // 2. Create xref list with correct size in PDFFile
+      // 3. Process xrefoffsets and /Prevs in last trailer
+      int chunkSize = KB;
+      file.Stream.Seek(-chunkSize, SeekOrigin.End);
+      byte[] arr = ArrayPool<byte>.Shared.Rent(chunkSize);
+      int bytesRead = file.Stream.Read(arr);
+      // not sure if i can do this 
+      if (bytesRead != chunkSize)
+        throw new InvalidDataException("Invalid PDF Data!");
+
+      file.Trailer = new PDF_Trailer();
+      PDFSpanParseHelper helper = new PDFSpanParseHelper(arr, 0, bytesRead);
+      
+      // 1.
+      ReadOnlySpan<byte> tokenSpan = new ReadOnlySpan<byte>();
+      ReadOnlySpan<char> trailerSpan = "trailer".AsSpan();
+      ReadOnlySpan<char> xrefSpan = "startxref".AsSpan();
+      helper.GetNextStringAsReadOnlySpan(ref tokenSpan);
+      int lastTrailerStartPos = -1;
+      int lastXRefStartPos = -1;
+      while (tokenSpan.Length != 0)
+      {
+        if (AreCharsEqualBytes(ref trailerSpan, ref tokenSpan))
+        {
+          lastTrailerStartPos = helper._readPosition;
+        }
+        else if (AreCharsEqualBytes(ref xrefSpan, ref tokenSpan))
+        {
+          lastXRefStartPos = helper._readPosition;
+        }
+        helper.GetNextStringAsReadOnlySpan(ref tokenSpan);
+      }
+
+      // 2.
+      helper._readPosition = lastXRefStartPos;
+      uint xrefOffset = helper.GetNextUnsignedInt32(); // make this long
+      // No trailer keyword found, means its cross-reference stream type
+      if (lastTrailerStartPos == -1)
+      {
+        ParseTrailer(file, xrefOffset, true);
+      }
+      else
+      {
+        helper._readPosition = lastTrailerStartPos;
+        // we will load this once again, it may be redundant if there are no incremental updates
+        // but when there are its easier for each trailer to allocate space themselves because we will be jumping in the file
+        ParseTrailer(file, file.Stream.Length - (chunkSize - helper._readPosition), true);
+      }
+
+      ArrayPool<byte>.Shared.Return(arr);
+    }
+
+    /// <summary>
+    /// We will call this recursevly because in hybrid files Prev may be normal trailer or for cross-reference streams
+    /// </summary>
+    /// <param name="file"></param>
+    /// <param name="trailerOffset"></param>
+    /// <param name="update"></param>
+    private void ParseTrailer(PDFFile file, long trailerOffset, bool update)
+    {
+      int chunkSize = KB * 2; // can maybe be 1kb 
+      file.Stream.Seek(trailerOffset, SeekOrigin.Begin);
+      byte[] arr = ArrayPool<byte>.Shared.Rent(chunkSize);
+      int bytesRead = file.Stream.Read(arr);
+      PDFSpanParseHelper helper = new PDFSpanParseHelper(arr, 0, bytesRead);
+
+      helper.SkipWhiteSpace();
+      if (helper.IsCurrentByteDigit())
+      {
+        int prev = ParseCrossReferenceStreamAndDict(file, ref helper, update, trailerOffset);
+        ArrayPool<byte>.Shared.Return(arr);
+        if (prev != -1)
+          ParseTrailer(file, prev, false);
+      }
+      else
+      {
+        // this means its normal dict
+        int prev = ParseNormalTrailer(file, ref helper, update);
+        ArrayPool<byte>.Shared.Return(arr);
+        if (prev != -1)
+          ParseTrailer(file, prev, false);
+      }
+    }
+    
+    /// <summary>
+    /// 
+    /// </summary>
+    /// <param name="file"></param>
+    /// <param name="helper"></param>
+    /// <param name="update"></param>
+    /// <returns>Prev value. We return it so parent function can release trailer array if necessary, so that we can utilize pool better
+    /// in case of many possible prevs</returns>
+    /// <exception cref="InvalidDataException"></exception>
+    private int ParseNormalTrailer(PDFFile file, ref PDFSpanParseHelper helper, bool update)
+    {
+      string tokenString = helper.GetNextToken();
+      int xRefStm = -1;
+      int prev = -1;
+      while (tokenString != string.Empty)
+      {
+        // put in separate function like parse TrailerDict or something similar  
+        switch (tokenString)
+        {
+          case "Size":
+            int size = helper.GetNextInt32();
+            if (update)
+            {
+              file.Trailer.Size = size;
+              file.CrossReferenceEntries = new List<PDF_XrefEntry>(file.Trailer.Size);
+              // TODO: not sure how efficient this can be if there are thousands of objects
+              // Make it faster. Check how Span2D does it, I just need fill
+              for (int i = 0; i < file.Trailer.Size; i++)
+              {
+                PDF_XrefEntry e = new PDF_XrefEntry();
+                file.CrossReferenceEntries.Add(e);
+              }
+            }
+            break;
+          case "Root":
+            (int objIndex, int generation) ir = helper.GetNextIndirectReference();
+            if (update)
+            {
+              file.Trailer.RootIR = ir;
+            }
+            break;
+          case "Info":
+            ir = helper.GetNextIndirectReference();
+            if (update)
+            {
+              file.Trailer.InfoIR = ir;
+            }
+            break;
+          case "Encrypt":
+            ir = helper.GetNextIndirectReference();
+            if (update)
+            {
+              file.Trailer.EncryptIR = ir;
+            }
+            break;
+          case "Prev":
+            prev = helper.GetNextInt32();
+            if (update)
+            {
+              file.Trailer.Prev = prev;
+            }
+            break;
+          case "ID":
+            string[] ID = helper.GetNextArrayKnownLengthStrict(2);
+            if (update)
+            {
+              file.Trailer.ID = ID;
+            }
+            break;
+          case "XRefStm":
+            file.Trailer.Hybrid = true;
+            xRefStm = helper.GetNextInt32();
+            break;
+          default:
+            break;
+        }
+
+        // end of dict
+        helper.ReadUntilNonWhiteSpaceDelimiter();
+        if (helper._char == '>' && helper.IsCurrentCharacterSameAsNext())
+          break;
+        tokenString = helper.GetNextToken();
+      }
+
+      if (tokenString == string.Empty)
+        throw new InvalidDataException("Invalid trailer!");
+
+      // first we search standard then xRefStm and then Prev
+      tokenString = helper.GetNextToken();
+      if (tokenString != "startxref")
+        throw new InvalidDataException($"Expected startxref, got {tokenString}");
+
+      int xrefPos = helper.GetNextInt32();
+      ParseCrossReferenceTable(file, xrefPos);
+      // parse this
+
+      if (xRefStm != -1)
+      {
+        ParseCrossReferenceTable(file, xRefStm);
+      }
+
+      return prev;
+    }
+
     // TODO: This will work only for one section, not subsections.Fix it later!
-    private void ParseCrossReferenceTable(PDFFile file)
+    private void ParseCrossReferenceTable(PDFFile file, int byteOffset)
     {
       // TODO: I guess byteoffset should be long
       // i really feel i should be loading in more bytes in chunk
-      file.Stream.Position = file.LastCrossReferenceOffset;
+      file.Stream.Position = byteOffset;
+      Span<byte> header = stackalloc byte[64]; // small header to read "xref LF xrefsize"
+      int bytesRead = file.Stream.Read(header);
 
-      // make sure talbe is starting with xref keyword
-      Span<byte> xrefBufferChar = stackalloc byte[4] { (byte)'x', (byte)'r', (byte)'e', (byte)'f' };
-      Span<byte> xrefBuffer = stackalloc byte[4];
-      int readBytes = file.Stream.Read(xrefBuffer);
-      if (xrefBuffer.Length != readBytes)
-        throw new InvalidDataException("Invalid data");
-      if (!AreSpansEqual(xrefBuffer, xrefBufferChar, 4))
-        throw new InvalidDataException("Invalid data");
+      PDFSpanParseHelper helper = new PDFSpanParseHelper(ref header);
+      string tokenString = helper.GetNextToken();
+      if (tokenString != "xref")
+        throw new InvalidDataException($"Expected xref. Got {tokenString}");
 
-      Span<byte> nextLineBuffer = StreamHelper.GetNextLineAsSpan(file.Stream);
-      PDFSpanParseHelper parseHelper = new PDFSpanParseHelper(ref nextLineBuffer);
-      int startObj = parseHelper.GetNextInt32();
-      int endObj = parseHelper.GetNextInt32();
+      int startObj = helper.GetNextInt32();
+      int endObj = helper.GetNextInt32();
       int sectionLen = endObj - startObj;
 
-      List<PDF_XrefEntry> cRefEntries = new List<PDF_XrefEntry>(sectionLen);
-      for (int i = 0; i < sectionLen; i++)
-      {
-        cRefEntries.Add(new PDF_XrefEntry());
-      }
+      // empty 
+      if (sectionLen == 0)
+        return;
+      // 17 bytes for def + bit extra, 2 for CRLF 
+      int arrLen = (20 + 2) * sectionLen;
+      byte[] arr = ArrayPool<byte>.Shared.Rent(arrLen);
 
-      Span<byte> cRefEntryBuffer = stackalloc byte[20];
-      readBytes = 0;
+      file.Stream.Position = byteOffset + helper._position;
+      bytesRead = file.Stream.Read(arr, 0, arrLen);
+      helper = new PDFSpanParseHelper(arr, 0, bytesRead);
       PDF_XrefEntry entry;
       for (int i = startObj; i < endObj; i++)
       {
-        readBytes = file.Stream.Read(cRefEntryBuffer);
-        if (readBytes != cRefEntryBuffer.Length)
-          throw new InvalidDataException("Invalid data");
-
-        entry = cRefEntries[i];
-        entry.TenDigitValue = (long)ConvertBytesToUnsignedInt64(cRefEntryBuffer.Slice(0, 10));
-        entry.GenerationNumber = ConvertBytesToUnsignedInt16(cRefEntryBuffer.Slice(11, 5));
-        entry.Index = i;
-        byte entryType = cRefEntryBuffer[17];
-        if (entryType != (byte)'n' && entryType != (byte)'f')
-          throw new InvalidDataException("Invalid data");
-        if (entryType == 'n')
-          entry.EntryType = PDF_XrefEntryType.NORMAL;
-        else
-          entry.EntryType = PDF_XrefEntryType.FREE;
+        // we shouldn't update if entry exists because it means that it was set correctly
+        // by newer cross-reference table since we parse them from newest to oldest
+        entry = file.CrossReferenceEntries[i];
+        if (entry.Index == -1)
+        {
+          entry.TenDigitValue = helper.GetNextInt64();
+          entry.GenerationNumber = helper.GetNextUnsignedInt16();
+          entry.Index = i;
+          helper.SkipWhiteSpace();
+          byte entryType = helper._char;
+          helper.ReadChar();// move off entry Type
+          if (entryType != (byte)'n' && entryType != (byte)'f')
+            throw new InvalidDataException("Invalid data");
+          if (entryType == 'n')
+            entry.EntryType = PDF_XrefEntryType.NORMAL;
+          else
+            entry.EntryType = PDF_XrefEntryType.FREE;
+        }
       }
 
-      file.CrossReferenceEntries = cRefEntries;
-    }
-    // TODO:   test case when trailer is not complete ">>" can't be found after opening brackets
-    private void ParseTrailer(PDFFile file, ref Span<byte> footerBuffer)
-    {
-      PDFSpanParseHelper helper = new PDFSpanParseHelper(ref footerBuffer);
-      // 1. Check if trailer exists
-      // 2. if its not found check at xref position if its cross reference stream
-      bool trailerFound = false;
-      List<PDF_XrefEntry> cRefEntry;
-      long xrefPos = 0;
-      PDF_Trailer trailer = new PDF_Trailer();
-
-      string tokenString = "-";
-      while (tokenString != string.Empty)
-      {
-        if (tokenString == "trailer")
-        {
-          trailerFound = true;
-          // is this needed, why dont I just get next token
-          bool startOfDictFound = false;
-          while (!startOfDictFound)
-          {
-            helper.ReadUntilNonWhiteSpaceDelimiter();
-            if (helper._char == '<')
-              startOfDictFound = helper.IsCurrentCharacterSameAsNext();
-          }
-          tokenString = helper.GetNextToken();
-          // put in separate function like parse TrailerDict or something similar
-          while (tokenString != "")
-          {
-            switch (tokenString)
-            {
-              case "Size":
-                trailer.Size = helper.GetNextInt32();
-                break;
-              case "Root":
-                trailer.RootIR = helper.GetNextIndirectReference();
-                break;
-              case "Info":
-                trailer.InfoIR = helper.GetNextIndirectReference();
-                break;
-              case "Encrypt":
-                trailer.EncryptIR = helper.GetNextIndirectReference();
-                break;
-              case "Prev":
-                trailer.Prev = helper.GetNextInt32();
-                break;
-              case "ID":
-                trailer.ID = helper.GetNextArrayKnownLengthStrict(2);
-                break;
-              default:
-                break;
-            }
-
-            // end of dict
-            helper.ReadUntilNonWhiteSpaceDelimiter();
-            if (helper._char == '>' && helper.IsCurrentCharacterSameAsNext())
-              break;
-            tokenString = helper.GetNextToken();
-          }
-          // Means that dict is corrupt
-          if (tokenString == "")
-            throw new InvalidDataException("Invalid dictionary");
-          break;
-        }
-        else if (tokenString == "startxref")
-        {
-          // should this be getnextlong?
-          xrefPos = helper.GetNextInt32();
-          break;
-        }
-        else
-        {
-          tokenString = helper.GetNextToken();
-        }
-          
-      }
-
-      // trailer keyword not found, so that means its in cross-reference stream dictionary 7.5.8.1
-      if (!trailerFound)
-      {
-        if (xrefPos == 0)
-        {
-          ParseLastCrossRefByteOffset(file, ref footerBuffer);
-          xrefPos = file.LastCrossReferenceOffset;
-        }
-        cRefEntry = new List<PDF_XrefEntry>();
-        ParseCrossReferenceStreamAndDict(file, xrefPos, ref trailer, cRefEntry);
-        file.CrossReferenceEntries = cRefEntry;
-      }
-
-      file.LastCrossReferenceOffset = xrefPos;
-      file.Trailer = trailer;
+      ArrayPool<byte>.Shared.Return(arr);
     }
 
     public (bool isDirectObject, SharedAllocator? allocator) ReadIntoDirectOrIndirectArray(PDFFile file, ref PDFSpanParseHelper helper, bool returnIRBuffer = true)
@@ -2264,58 +2357,70 @@ namespace Converter.Parsers.PDF
       return (false, allocator);
     }
 
-    // TODO: Use shared pool
-    public void ParseCrossReferenceStreamAndDict(PDFFile file, long xrefOffset, ref PDF_Trailer trailer, List<PDF_XrefEntry> cRefEntry) 
+    public int ParseCrossReferenceStreamAndDict(PDFFile file, ref PDFSpanParseHelper helper, bool update, long xrefPos) 
     {
-      // Load dict in stack buffer becuase i dont know how big content stream might be
       
-      int sBufferSize = KB * 4;
-      byte[] arr = new byte[sBufferSize];
-      
-      file.Stream.Position = xrefOffset;
-      int bytesRead = file.Stream.Read(arr);
-      ReadOnlySpan<byte> buffer = arr.AsSpan();
-      PDFSpanParseHelper helper = new PDFSpanParseHelper(ref buffer);
-      bool startOfDictFound = false;
       // This is data needed for parsing, no need to save it anywhere later
       List<(int, int)> indexes = new List<(int, int)>();
       int size = 0;
-      int prev;
+      int prev = -1;
       // NOTE: this can be byte since values are low or simply 3 int variables
       Span<int> W = stackalloc int[3]; // its always 3
       PDF_CommonStreamDict commonStreamDict = new PDF_CommonStreamDict();
+      helper.SkipObjHeader();
+      if (!helper.GoToStartOfDict())
+        throw new InvalidDataException("Expected Dict got EOF!");
 
-      while (!startOfDictFound && helper._readPosition < buffer.Length)
-      {
-        helper.ReadUntilNonWhiteSpaceDelimiter();
-        if (helper._char == '<')
-          startOfDictFound = helper.IsCurrentCharacterSameAsNext();
-      }
-      
       string tokenString = helper.GetNextToken();
       while (tokenString != "")
       {
         switch (tokenString)
         {
           case "Size":
-            trailer.Size = helper.GetNextInt32();
-            size = trailer.Size;
+            size = helper.GetNextInt32();
+            if (update)
+            {
+              file.Trailer.Size = size;
+              file.CrossReferenceEntries = new List<PDF_XrefEntry>(file.Trailer.Size);
+              // TODO: not sure how efficient this can be if there are thousands of objects
+              // Make it faster. Check how Span2D does it, I just need fill
+              for (int i = 0; i < file.Trailer.Size; i++)
+              {
+                PDF_XrefEntry e = new PDF_XrefEntry();
+                file.CrossReferenceEntries.Add(e);
+              }
+            }
             break;
           case "Root":
-            trailer.RootIR = helper.GetNextIndirectReference();
+            (int objIndex, int generation) ir = helper.GetNextIndirectReference();
+            if (update)
+            {
+              file.Trailer.RootIR = ir;
+            }
             break;
           case "Info":
-            trailer.InfoIR = helper.GetNextIndirectReference();
+            ir = helper.GetNextIndirectReference();
+            if (update)
+            {
+              file.Trailer.InfoIR = ir;
+            }
             break;
           case "Encrypt":
-            trailer.EncryptIR = helper.GetNextIndirectReference();
+            ir = helper.GetNextIndirectReference();
+            if (update)
+            {
+              file.Trailer.EncryptIR = ir;
+            }
             break;
           case "Prev":
-            trailer.Prev = helper.GetNextInt32();
-            prev = trailer.Prev;
+            prev = helper.GetNextInt32();
             break;
           case "ID":
-            trailer.ID = helper.GetNextArrayKnownLengthStrict(2);
+            string[] ID = helper.GetNextArrayKnownLengthStrict(2);
+            if (update)
+            {
+              file.Trailer.ID = ID;
+            }
             break;
           case "Index":
             // these are not IR but pair of ints which is what this function parses efficiently
@@ -2350,62 +2455,68 @@ namespace Converter.Parsers.PDF
           break;
         tokenString = helper.GetNextToken();
       }
+
       helper.SkipNextToken(); // skip 'stream'
       helper.SkipWhiteSpace(); // skip new line
+
       // set pos at start of the stream
-      long streamStartPos = xrefOffset + helper._position;
-      // parse stream 
-      arr = new byte[commonStreamDict.Length];
+      long streamStartPos = xrefPos + helper._position;
+
+      // TODO: i think we can avoid this catsing and creating new array by passing Stream directly to Decode method!
+      byte[] arr = ArrayPool<byte>.Shared.Rent((int)commonStreamDict.Length);
       file.Stream.Position = streamStartPos;
-      int readBytes = file.Stream.Read(arr);
-      if (readBytes != arr.Length)
+      int readBytes = file.Stream.Read(arr, 0, (int)commonStreamDict.Length);
+      if (readBytes != commonStreamDict.Length)
         throw new InvalidDataException("Invalid cross reference stream!");
-      buffer = arr.AsSpan();
+      ReadOnlySpan<byte> buffer = arr.AsSpan(0, (int)commonStreamDict.Length);
       byte[] decoded = DecompressionHelper.DecodeFilters(ref buffer, commonStreamDict.Filters);
 
       if (indexes.Count == 0)
         indexes.Add((0, size));
 
       buffer = decoded.AsSpan();
-      helper = new PDFSpanParseHelper(ref buffer);
+      helper = new PDFSpanParseHelper(decoded, 0, decoded.Length);
 
       int type;
       int secondField;
       int thirdField;
+      PDF_XrefEntry entry;
       foreach((int start, int end) subSection in indexes)
       {
         for (int i = subSection.start; i < subSection.end; i++)
         {
-          type = helper.ReadSpecificSizeInt32(W[0]);
-          secondField = helper.ReadSpecificSizeInt32(W[1]);
-          thirdField = helper.ReadSpecificSizeInt32(W[2]);
-          PDF_XrefEntry entry = new PDF_XrefEntry();
-          if (type == 0)
+          entry = file.CrossReferenceEntries[i];
+          if (entry.Index == -1)
           {
-            entry.EntryType = PDF_XrefEntryType.FREE;
-            entry.GenerationNumber = (ushort)thirdField;
-          }
-          else if (type == 1)
-          {
-            entry.EntryType = PDF_XrefEntryType.NORMAL;
-            entry.TenDigitValue = secondField;
-            entry.GenerationNumber = (ushort)thirdField;
+            type = helper.ReadSpecificSizeInt32(W[0]);
+            secondField = helper.ReadSpecificSizeInt32(W[1]);
+            thirdField = helper.ReadSpecificSizeInt32(W[2]);
             
-          }
-          else if (type == 2)
-          {
-            entry.EntryType = PDF_XrefEntryType.COMPRESSED;
-            entry.StreamIR = secondField;
-            entry.IndexInOS = thirdField;
-          }
+            if (type == 0)
+            {
+              entry.EntryType = PDF_XrefEntryType.FREE;
+              entry.GenerationNumber = (ushort)thirdField;
+            }
+            else if (type == 1)
+            {
+              entry.EntryType = PDF_XrefEntryType.NORMAL;
+              entry.TenDigitValue = secondField;
+              entry.GenerationNumber = (ushort)thirdField;
 
-          entry.Index = i;
-          if (cRefEntry.Count > i)
-            cRefEntry[i] = entry;
-          else
-            cRefEntry.Insert(i, entry);
+            }
+            else if (type == 2)
+            {
+              entry.EntryType = PDF_XrefEntryType.COMPRESSED;
+              entry.StreamIR = secondField;
+              entry.IndexInOS = thirdField;
+            }
+            entry.Index = i;
+          }
         }
       }
+
+      ArrayPool<byte>.Shared.Return(arr);
+      return prev;
     }
 
     // TODO: account for this later
@@ -2527,54 +2638,6 @@ namespace Converter.Parsers.PDF
       }
     }
 
-    // TODO: Fix EOF finding
-    // Adobe 1.3 PDF spec
-    // Acrobat viewers require only that the %%EOF marker appear somewhere within the last 1024 bytes of the file.
-    // Adobe 1.7 PDF spec
-    // The trailer of a PDF file enables a conforming reader to quickly find the cross-reference table and certain special objects.
-    // Conforming readers should read a PDF file from its end. The last line of the file shall contain only the end-of-file marker, %%EOF
-    // https://stackoverflow.com/questions/11896858/does-the-eof-in-a-pdf-have-to-appear-within-the-last-1024-bytes-of-the-file
-    // NOTE: according to specification for NON cross reference stream PDF files, max lengh for byteoffset is 10 digits so 10^10 bytes (10gb) so ulong will be more than enough
-    // NOTE: i can't seem to find max lenght for cross refernce stream PDF files
-    private void ParseLastCrossRefByteOffset(PDFFile file, ref Span<byte> buffer)
-    {
-      int endPos = -1;
-      int startPos = -1;
-      bool inDigit = false;
-      byte c;
-      for (int i = buffer.Length - 1; i >= 0; i--)
-      {
-        c = buffer[i];
-        if (!inDigit)
-        {
-          if (char.IsDigit((char)c))
-          {
-            endPos = i;
-            inDigit = true;
-          }
-        }
-        else if (inDigit)
-        {
-          if (!char.IsDigit((char)c))
-          {
-            startPos = i + 1;
-            break;
-          }
-        }
-      }
-
-      long value = 0;
-      for (int i = startPos; i <= endPos; i++)
-      {
-        // i dont think we need this check but w/e
-        if (!char.IsDigit((char)buffer[i]))
-          throw new InvalidDataException("Invalid data");
-        value = value * 10 + CharUnicodeInfo.GetDecimalDigitValue((char)buffer[i]);
-      }
-
-      file.LastCrossReferenceOffset = value;
-    }
-
     // this is probably naive solution wihtout charset taken in account
     private bool AreSpansEqual(Span<byte> a, Span<byte> b, int len, bool strict = true)
     {
@@ -2587,18 +2650,23 @@ namespace Converter.Parsers.PDF
       return true;
     }
 
-    // do these better, seems odd?
-    private ushort ConvertBytesToUnsignedInt16(Span<byte> buffer)
+    /// <summary>
+    /// Use this only when we know target encoding i.e that char < 256
+    /// </summary>
+    /// <param name="a">string as char span</param>
+    /// <param name="b">string as byte span</param>
+    /// <returns></returns>
+    public bool AreCharsEqualBytes(ref ReadOnlySpan<char> a, ref ReadOnlySpan<byte> b)
     {
-      uint res = 0;
-      for (int i = 0; i < buffer.Length; i++)
-      {
-        // these should be no negative ints so this is okay i believe?
-        res = res * 10 + (uint)CharUnicodeInfo.GetDecimalDigitValue((char)buffer[i]);
-      }
-      // this should wrap, idk if i should throw exception
-      return (ushort)res;
+      if (a.Length != b.Length)
+        return false;
+
+      for (int i = 0; i < a.Length; i++)
+        if (a[i] != b[i]) return false;
+
+      return true;
     }
+
 
     // generation is always 0 for object streams
     // Fix this to save correct size of objctss not always 8k
@@ -2717,9 +2785,12 @@ namespace Converter.Parsers.PDF
           index = i;
         }
       }
+      // TODO: Not sure if this is best approach,
+      // but this makes it treaky when there are incremental updates, so we can't be sure i guess
+      // for now just load till the end of the stream
       // means that this is last object so next object is assumed to be cross reference table
       if (index == entry.Index)
-        return file.LastCrossReferenceOffset - entry.TenDigitValue;
+        return file.Stream.Length - entry.TenDigitValue;
       return minPositiveDiff;
     }
 
