@@ -713,6 +713,7 @@ namespace Converter.Parsers.PDF
         ReadUntilNonWhiteSpaceDelimiter();
         if (_char == '<')
           startOfDictFound = IsCurrentCharacterSameAsNext();
+        ReadChar();
       }
       return startOfDictFound;
     }

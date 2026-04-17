@@ -2126,12 +2126,12 @@ namespace Converter.Parsers.PDF
     /// We will call this recursevly because in hybrid files Prev may be normal trailer or for cross-reference streams
     /// </summary>
     /// <param name="file"></param>
-    /// <param name="trailerOffset"></param>
+    /// <param name="offset"></param>
     /// <param name="update"></param>
-    private void ParseTrailer(PDFFile file, long trailerOffset, bool update)
+    private void ParseTrailer(PDFFile file, long offset, bool update)
     {
       int chunkSize = KB * 2; // can maybe be 1kb 
-      file.Stream.Seek(trailerOffset, SeekOrigin.Begin);
+      file.Stream.Seek(offset, SeekOrigin.Begin);
       byte[] arr = ArrayPool<byte>.Shared.Rent(chunkSize);
       int bytesRead = file.Stream.Read(arr);
       PDFSpanParseHelper helper = new PDFSpanParseHelper(arr, 0, bytesRead);
@@ -2139,10 +2139,15 @@ namespace Converter.Parsers.PDF
       helper.SkipWhiteSpace();
       if (helper.IsCurrentByteDigit())
       {
-        int prev = ParseCrossReferenceStreamAndDict(file, ref helper, update, trailerOffset);
+        int prev = ParseCrossReferenceStreamAndDict(file, ref helper, update, offset);
         ArrayPool<byte>.Shared.Return(arr);
-        if (prev != -1)
-          ParseTrailer(file, prev, false);
+        if (prev != -1 && file.Trailer.Hybrid == false)
+          // this should will always be stream, we just call this since it will alloc and jump to correct place
+          ParseTrailer(file, prev, false); 
+      }
+      else if (helper._char == 'x') // xref
+      {
+        ParseCrossReferenceTable(file, offset);
       }
       else
       {
@@ -2150,7 +2155,9 @@ namespace Converter.Parsers.PDF
         int prev = ParseNormalTrailer(file, ref helper, update);
         ArrayPool<byte>.Shared.Return(arr);
         if (prev != -1)
+        {
           ParseTrailer(file, prev, false);
+        } 
       }
     }
     
@@ -2252,14 +2259,14 @@ namespace Converter.Parsers.PDF
 
       if (xRefStm != -1)
       {
-        ParseCrossReferenceTable(file, xRefStm);
+        ParseTrailer(file, xRefStm, false);
       }
 
       return prev;
     }
 
     // TODO: This will work only for one section, not subsections.Fix it later!
-    private void ParseCrossReferenceTable(PDFFile file, int byteOffset)
+    private void ParseCrossReferenceTable(PDFFile file, long byteOffset)
     {
       // TODO: I guess byteoffset should be long
       // i really feel i should be loading in more bytes in chunk
