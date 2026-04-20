@@ -52,6 +52,7 @@ namespace Converter.Parsers.PDF
     public bool _debug;
     public PDFGO_DEBUG_STATE _debugState;
     private PathRasterizer _shapeRasterizer;
+    public byte[] _delimiters = [(byte)'(', (byte)')', (byte)'/', (byte)'[', (byte)']', (byte)'<', (byte)'>'];
 
     // TODO: maybe NULL check is redundant if we let it throw to end?
     public PDFGOInterpreter(byte[] contentBuffer, PDF_ResourceDict resourceDict,  IConverter converter, bool debug = false)
@@ -761,7 +762,7 @@ namespace Converter.Parsers.PDF
     {
       ReadChar();
       int startPos = _pos;
-      while (!IsCurrentCharPDFWhitespaceOrNewLine() && _char != PDFConstants.NULL)
+      while (!IsCurrentCharPDFWhitespaceOrNewLine() && !_delimiters.Contains(_char) && _char != PDFConstants.NULL)
       {
         ReadChar();
       }
