@@ -6,6 +6,7 @@ using Converter.FileStructures.PDF.GraphicsInterpreter;
 using Converter.Rasterizers;
 using Converter.StaticData;
 using Converter.Utils;
+using System.ComponentModel.Design;
 using System.Diagnostics;
 using System.Drawing;
 using System.Globalization;
@@ -560,7 +561,7 @@ namespace Converter.Parsers.PDF
     /// </summary>
     /// <returns></returns>
     // TODO: think about storing byte[] instead of string, not sure if it matters
-    private uint ReadNext()
+    private uint ReadNext(int depth = 0)
     {
       SkipWhiteSpace();
      
@@ -602,8 +603,38 @@ namespace Converter.Parsers.PDF
 
       if (_char == '<')
       {
-        GetHexString();
-        return 0;
+        if (_buffer[_readPos] == '<')
+        {
+          ReadChar();
+          int count = 0;
+          SkipWhiteSpace();
+          depth++;
+          // not sure if i should ever put some limit here
+          if (depth > 10)
+            throw new StackOverflowException("Depth too large!");
+
+          while (_char != PDFConstants.NULL)
+          {
+            ReadNext(depth);
+            count++;
+            SkipWhiteSpace();
+            if (_char == '>' && _buffer[_readPos] == '>')
+              break;
+          }
+          depth--;
+          ReadChar(); // move off 1st '>'
+          ReadChar(); // move off 2nd '>'
+          operandTypes.Push(OperandType.DICT);
+          Debug.Assert(count % 2 == 0);
+          // count only keys because if there are nested arrays or dicts they will their own count
+          arrayLengths.Push(count / 2); 
+          return 0;
+        }
+        else
+        {
+          GetHexString();
+          return 0;
+        }
       }
 
       // array
@@ -612,18 +643,18 @@ namespace Converter.Parsers.PDF
         ReadChar();
         int count = 0;
         SkipWhiteSpace();
+        depth++;
+        // not sure if i should ever put some limit here
+        if (depth > 10)
+          throw new StackOverflowException("Depth too large!");
+
         while (_char != ']' && _char != PDFConstants.NULL)
         {
-          if (IsCurrentCharDigit() || _char == '-')
-            GetNumber();
-          else if (_char == '/')
-            GetName();
-          else if (_char == '(')
-            GetStringLiteral();
-
+          ReadNext(depth);
           count++;
           SkipWhiteSpace();
         }
+        depth--;
         ReadChar(); // move off ']'
         operandTypes.Push(OperandType.ARRAY);
         arrayLengths.Push(count);
@@ -814,7 +845,7 @@ namespace Converter.Parsers.PDF
       operandTypes.Push(OperandType.STRING);
       ReadChar();
     }
-    
+
     private void ReadChar()
     {
       if (_readPos >= _buffer.Length)

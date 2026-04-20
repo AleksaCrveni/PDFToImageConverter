@@ -34,6 +34,7 @@
     DOUBLE,
     STRING,
     ARRAY,
-    INSTRUCTION
+    INSTRUCTION,
+    DICT
   }
 }
