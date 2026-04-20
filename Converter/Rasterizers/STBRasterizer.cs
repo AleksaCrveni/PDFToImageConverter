@@ -5,7 +5,6 @@ using Converter.FileStructures.TTF;
 using Converter.StaticData;
 using System.Buffers.Binary;
 using System.Diagnostics;
-using System.Text;
 
 namespace Converter.Rasterizers
 {

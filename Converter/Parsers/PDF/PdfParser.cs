@@ -139,12 +139,17 @@ namespace Converter.Parsers.PDF
         ParsePageContents(file, file.PageInformation[i].ContentsIR, ref contentDict);
         pInfo.ContentDict = contentDict;
 
-        //File.WriteAllBytes(Path.Join(Files.RootFolder, "Prijemni-1_content.txt"), contentDict.RawStreamData);
-        // Process Resources
-        PDF_ResourceDict resourceDict = new PDF_ResourceDict();
-        ParseResourceDictionary(file, file.PageInformation[i].ResourcesIR, resourceDict);
-        pInfo.ResourceDict = resourceDict;
-
+        // We need this check because rDict can be embedded into pages data instead of IR
+        // and instead of parsing IR there as well I kept it like this because I after i figure out 
+        // how to parse specific pages data and orgnize code better this will change as well and this 
+        // will be preferable way of doing it if possible since we can check largest IR and use only one buffer to parse them all (this logic applies to all IR parsing)
+        if (pInfo.ResourceDict == null)
+        {
+          PDF_ResourceDict resourceDict = new PDF_ResourceDict();
+          ParseResourceDictionary(file, file.PageInformation[i].ResourcesIR, resourceDict);
+          pInfo.ResourceDict = resourceDict;
+        }
+        
         file.PageInformation[i] = pInfo;
       }
     }
@@ -390,6 +395,7 @@ namespace Converter.Parsers.PDF
 
       if (tokenString == "")
         throw new InvalidDataException("Invalid dictionary");
+      helper.ReadChar(); // needs to be done so if its embedded so outside dict isnt dettected
     }
 
     private void ParseColorSpaceDict(PDFFile file, ref PDFSpanParseHelper helper, List<PDF_ColorSpace> list)
@@ -627,29 +633,71 @@ namespace Converter.Parsers.PDF
         // TODO: assume that data is filled ? 
         // TODO: create right rasterized based on subtype and fontfile // Do I still eneed to do this?
 #if DEBUG
-        if (fontInfo.FontDescriptor != null)
-          File.WriteAllBytes(Files.RootFolder + @$"\{fontInfo.FontDescriptor.FontName}" + @"-fontFile.txt", fontInfo.FontDescriptor.FontFile.CommonStreamInfo.RawStreamData);
-        else
+        // it can happen that font file is not embedded
+        if (fontInfo.FontDescriptor != null && fontInfo.FontDescriptor.FontFile != null)
         {
-          foreach(var entry in fontInfo.DescendantFontsInfo)
+          File.WriteAllBytes(Files.RootFolder + @$"\{fontInfo.FontDescriptor.FontName}" + @"-fontFile.txt", fontInfo.FontDescriptor.FontFile.CommonStreamInfo.RawStreamData);
+        }
+        else if (fontInfo.DescendantFontsInfo != null)
+        {
+          foreach (var entry in fontInfo.DescendantFontsInfo)
           {
-            File.WriteAllBytes(Files.RootFolder + @$"\Composite_{entry.DescendantDict.BaseFont}" + @"-fontFile.txt", entry.DescendantDict.FontDescriptor.FontFile.CommonStreamInfo.RawStreamData);
+            if (entry.DescendantDict.FontDescriptor.FontFile != null)
+            {
+              File.WriteAllBytes(Files.RootFolder + @$"\Composite_{entry.DescendantDict.BaseFont}" + @"-fontFile.txt", entry.DescendantDict.FontDescriptor.FontFile.CommonStreamInfo.RawStreamData);
+            }
           }
         }
 #endif
-
-        IRasterizer rasterizer = fontInfo.SubType switch
+        IRasterizer rasterizer = null;
+        // for now if font file is missing (font program is not embedded) assign null and let it fail in Interpreter or handle it in fo nt search function there
+        // this makes it easier to continue development and fix it later
+        switch (fontInfo.SubType)
         {
-          PDF_FontType.Null => throw new NotImplementedException(),
-          PDF_FontType.Type0 => new CompositeFontRasterizer(fontInfo.DescendantFontsInfo[0].DescendantDict.FontDescriptor.FontFile.CommonStreamInfo.RawStreamData, fontInfo),
-          PDF_FontType.Type1 => new Type1Rasterizer(fontInfo.FontDescriptor.FontFile.CommonStreamInfo.RawStreamData, ref fontInfo),
-          PDF_FontType.MMType1 => throw new NotImplementedException(),
-          PDF_FontType.Type3 => throw new NotImplementedException(),
-          PDF_FontType.TrueType => new TTFRasterizer(fontInfo.FontDescriptor.FontFile.CommonStreamInfo.RawStreamData, ref fontInfo),
-          PDF_FontType.CIDFontType0 => throw new NotImplementedException(),
-          PDF_FontType.CIDFontType2 => throw new NotImplementedException(),
-          PDF_FontType.OpenType => throw new NotImplementedException(),
-        };
+          case PDF_FontType.Null:
+            throw new NotImplementedException();
+          case PDF_FontType.Type0:
+            if (fontInfo.DescendantFontsInfo != null && fontInfo.DescendantFontsInfo[0].DescendantDict.FontDescriptor.FontFile != null)
+            {
+              rasterizer = new CompositeFontRasterizer(fontInfo.DescendantFontsInfo[0].DescendantDict.FontDescriptor.FontFile.CommonStreamInfo.RawStreamData, fontInfo);
+            }
+            else
+            {
+              rasterizer = null;
+            }
+            break;
+          case PDF_FontType.Type1:
+            if (fontInfo.FontDescriptor != null && fontInfo.FontDescriptor.FontFile != null)
+            {
+              rasterizer = new Type1Rasterizer(fontInfo.FontDescriptor.FontFile.CommonStreamInfo.RawStreamData, ref fontInfo);
+            }
+            else
+            {
+              rasterizer = null;
+            }
+            break;
+          case PDF_FontType.MMType1:
+            throw new NotImplementedException();
+          case PDF_FontType.Type3:
+            throw new NotImplementedException();
+          case PDF_FontType.TrueType:
+            if (fontInfo.FontDescriptor != null && fontInfo.FontDescriptor.FontFile != null)
+            {
+              rasterizer = new TTFRasterizer(fontInfo.FontDescriptor.FontFile.CommonStreamInfo.RawStreamData, ref fontInfo);
+            }
+            else
+            {
+              rasterizer = null;
+            }
+            break;
+          case PDF_FontType.CIDFontType0:
+            throw new NotImplementedException();
+          case PDF_FontType.CIDFontType2:
+            throw new NotImplementedException();
+          case PDF_FontType.OpenType:
+            break;
+        }
+
         fd.Rasterizer = rasterizer;
         fontData.Add(fd);
         FreeAllocator(allocator);
@@ -859,8 +907,12 @@ namespace Converter.Parsers.PDF
       SharedAllocator allocator = GetObjBuffer(file, objPosition);
       ReadOnlySpan<byte> buffer = allocator.Buffer.AsSpan(allocator.Range);
       PDFSpanParseHelper helper = new PDFSpanParseHelper(ref buffer);
+      helper.SkipObjHeader();
       helper.SkipWhiteSpace();
-      // idk what this is for
+      // Ok this is stupid:
+      // Aside from DescnedantFonts entry sometimes not being an array...
+      // it can also happend that IR is listed (again not in array) THAT points to array object
+      // that contains 1 IR and WE CAN'T TELL WHAT IT IS WITHOUT LITERALLY LOOKING AT THE DATA AT OFFSET
       if (helper._char == '[')
       {
         helper.ReadChar();
@@ -1031,6 +1083,10 @@ namespace Converter.Parsers.PDF
       int CIDEnd = 0;
       int width = 0;
       int value = 0;
+      helper.SkipWhiteSpace();
+      if (helper._char != '[') // in case of double IR to array
+        helper.SkipObjHeader();
+
       while (helper._char != ']' && helper._readPosition < helper._buffer.Length)
       {
         CIDStart = helper.GetNextInt32();
@@ -1815,7 +1871,7 @@ namespace Converter.Parsers.PDF
                 ParseResourceDictionary(file, ref helper, false, rDict);
                 pageInfo.ResourceDict = rDict;
               }
-              else 
+              else
                 pageInfo.ResourcesIR = helper.GetNextIndirectReference();
               FreeAllocator(info.allocator);
               break;

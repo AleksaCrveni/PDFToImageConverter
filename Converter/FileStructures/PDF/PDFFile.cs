@@ -151,7 +151,7 @@ namespace Converter.FileStructures.PDF
     public PDF_PageInfo() { }
     public (int, int) ParentIR;
     public DateTime LastModified;
-    public (int, int) ResourcesIR; // use generic dict but later implement it right Table 33
+    public (int, int) ResourcesIR;
     public PDF_Rect MediaBox; // 7.9.5
     public PDF_Rect CropBox; // defualt value is media box also check 14.11.2
     public PDF_Rect BleedBox;
