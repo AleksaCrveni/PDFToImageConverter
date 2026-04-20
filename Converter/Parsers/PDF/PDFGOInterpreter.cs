@@ -606,6 +606,7 @@ namespace Converter.Parsers.PDF
         if (_buffer[_readPos] == '<')
         {
           ReadChar();
+          ReadChar();
           int count = 0;
           SkipWhiteSpace();
           depth++;
