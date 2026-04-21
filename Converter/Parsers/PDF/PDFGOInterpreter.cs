@@ -8,7 +8,6 @@ using Converter.StaticData;
 using Converter.Utils;
 using System.ComponentModel.Design;
 using System.Diagnostics;
-using System.Drawing;
 using System.Globalization;
 using System.Text;
 
@@ -55,7 +54,7 @@ namespace Converter.Parsers.PDF
     public byte[] _delimiters = [(byte)'(', (byte)')', (byte)'/', (byte)'[', (byte)']', (byte)'<', (byte)'>'];
 
     // TODO: maybe NULL check is redundant if we let it throw to end?
-    public PDFGOInterpreter(byte[] contentBuffer, PDF_ResourceDict resourceDict,  IConverter converter, bool debug = false)
+    public PDFGOInterpreter(byte[] contentBuffer, PDF_ResourceDict resourceDict, IConverter converter, bool debug = false)
     {
       _buffer = contentBuffer;
       intOperands = new Stack<int>();
@@ -68,7 +67,7 @@ namespace Converter.Parsers.PDF
       currentGS = new GraphicsState();
       currentPC = new PDFGI_PathConstruction();
       _resourceDict = resourceDict;
-      textRenderingMatrix = new double[3,3];
+      textRenderingMatrix = new double[3, 3];
       reUsableMatrix1 = new double[3, 3];
       reUsableMatrix2 = new double[3, 3];
       _converter = converter;
@@ -127,7 +126,7 @@ namespace Converter.Parsers.PDF
             PDFGI_DashPattern dashPattern = new PDFGI_DashPattern();
             int phase = GetNextStackValAsInt();
             int[] dashArr = new int[arrayLengths.Pop()];
-            for (int dpIndex = dashArr.Length -1 ; dpIndex >= 0; dpIndex--)
+            for (int dpIndex = dashArr.Length - 1; dpIndex >= 0; dpIndex--)
             {
               dashArr[dpIndex] = GetNextStackValAsInt();
             }
@@ -178,7 +177,7 @@ namespace Converter.Parsers.PDF
             // this is relavive to current point
             double y = GetNextStackValAsDouble();
             double x = GetNextStackValAsDouble();
-            
+
             currentPC.Shape.MoveTo(x, y);
             break;
           case 0x6c: // l
@@ -202,7 +201,7 @@ namespace Converter.Parsers.PDF
             mp.X3 = GetNextStackValAsInt();
             mp.Y2 = GetNextStackValAsInt();
             mp.X2 = GetNextStackValAsInt();
-           // throw new NotImplementedException();
+            // throw new NotImplementedException();
             break;
           case 0x79: // y
             mp = new PDFGI_Point();
@@ -210,11 +209,11 @@ namespace Converter.Parsers.PDF
             mp.X3 = GetNextStackValAsInt();
             mp.Y1 = GetNextStackValAsInt();
             mp.X1 = GetNextStackValAsInt();
-          //  throw new NotImplementedException();
+            //  throw new NotImplementedException();
             break;
           case 0x68: // h
             mp = new PDFGI_Point();
-//            throw new NotImplementedException();
+            //            throw new NotImplementedException();
             break;
           case 0x6572: // re
             mp = new PDFGI_Point();
@@ -225,7 +224,7 @@ namespace Converter.Parsers.PDF
             mp.Y3 = GetNextStackValAsInt();
             mp.Y1 = GetNextStackValAsInt();
             mp.X1 = GetNextStackValAsInt();
-         //   throw new NotImplementedException();
+            //   throw new NotImplementedException();
             break;
           #endregion pathConstruction
           #region pathPainting
@@ -234,23 +233,30 @@ namespace Converter.Parsers.PDF
             try
             {
               PDF_RasterShape();
-            } catch(Exception ex)
+            }
+            catch (Exception ex)
             {
+
             }
             currentPC.Shape = new PSShape();
             break;
           case 0x73: // s
             throw new NotImplementedException("Operator not i implemented");
           case 0x66: // f
-
             currentPC.Shape = new PSShape();
             currentPC.EvenOddClippingPath = false;
-            currentPC.NonZeroClippingPath = false;
+            currentPC.NonZeroClippingPath = true;
             break;
           case 0x46: // F
-            throw new NotImplementedException("Operator not i implemented");
+            currentPC.Shape = new PSShape();
+            currentPC.EvenOddClippingPath = false;
+            currentPC.NonZeroClippingPath = true;
+            break;
           case 0x2a66: // f*
-            throw new NotImplementedException("Operator not i implemented");
+            currentPC.Shape = new PSShape();
+            currentPC.EvenOddClippingPath = true;
+            currentPC.NonZeroClippingPath = false;
+            break;
           case 0x42: // B
             throw new NotImplementedException("Operator not i implemented");
           case 0x2a42: // B*
@@ -261,8 +267,8 @@ namespace Converter.Parsers.PDF
             throw new NotImplementedException("Operator not i implemented");
           case 0x6e: // n
             mp = new PDFGI_Point();
-           // throw new NotImplementedException();// CHECK CLIPPING PATH SECTION
-                                                // path painting
+            // throw new NotImplementedException();// CHECK CLIPPING PATH SECTION
+            // path painting
             break;
           #endregion pathPainting
           #region clippingPath
@@ -398,7 +404,7 @@ namespace Converter.Parsers.PDF
               _debugState.State = state;
               return;
             }
-              
+
             PDF_DrawText(currentTextObject.FontRef, literal, state);
 
             break;
@@ -440,7 +446,7 @@ namespace Converter.Parsers.PDF
               if (_debug)
               {
                 _debugState.FontRef = currentTextObject.FontRef;
-                
+
                 for (int i = literalsList.Count - 1; i >= 0; i--)
                 {
                   LiteralToDrawState lState = new LiteralToDrawState(literalsList[i].Literal, literalsList[i].PosCorrection);
@@ -455,7 +461,7 @@ namespace Converter.Parsers.PDF
               for (int i = literalsList.Count - 1; i >= 0; i--)
               {
                 PDF_DrawText(currentTextObject.FontRef, literalsList[i].Literal, state, literalsList[i].PosCorrection);
-              } 
+              }
             }
             break;
           case 0x27:   // '
@@ -519,20 +525,27 @@ namespace Converter.Parsers.PDF
             // inline images
             break;
           case 0x6f44: // Do
-             // XObject
-            // throw new NotImplementedException("Operator not i implemented");
+                       // XObject
+                       // throw new NotImplementedException("Operator not i implemented");
             break;
           case 0x504d: // MP
             throw new NotImplementedException("Operator not i implemented");
           case 0x5044: // DP
             throw new NotImplementedException("Operator not i implemented");
+          // Marked content
+          // It seems like this isnt required for rendering and we can just pop it off the stack
           case 0x434d42: // BMC
-            throw new NotImplementedException("Operator not i implemented");
+            PopString();
+            break;
           case 0x434442: // BDC
-            throw new NotImplementedException("Operator not i implemented");
+            if (operandTypes.Peek() == OperandType.DICT)
+              VoidDict();
+            else
+              PopString();
+            PopString();
+            break;
           case 0x434d45: // EMC
-            throw new NotImplementedException("Operator not i implemented");
-            // Marked content
+            // do nothing since we dont support marked content 
             break;
           case 0x5842: // BX
             throw new NotImplementedException("Operator not i implemented");
@@ -565,7 +578,7 @@ namespace Converter.Parsers.PDF
     private uint ReadNext(int depth = 0)
     {
       SkipWhiteSpace();
-     
+
 
       if (IsCurrentCharPartOfOperator() && _char != PDFConstants.NULL)
       {
@@ -629,7 +642,7 @@ namespace Converter.Parsers.PDF
           operandTypes.Push(OperandType.DICT);
           Debug.Assert(count % 2 == 0);
           // count only keys because if there are nested arrays or dicts they will their own count
-          arrayLengths.Push(count / 2); 
+          arrayLengths.Push(count);
           return 0;
         }
         else
@@ -739,7 +752,7 @@ namespace Converter.Parsers.PDF
       {
         int x = 0;
       }
-      
+
       if (operandTypes.Pop() == OperandType.INT)
         return intOperands.Pop();
       else
@@ -766,8 +779,8 @@ namespace Converter.Parsers.PDF
       {
         ReadChar();
       }
-     stringOperands.Push(Encoding.Default.GetString(_buffer, startPos, _pos - startPos));
-     operandTypes.Push(OperandType.STRING);
+      stringOperands.Push(Encoding.Default.GetString(_buffer, startPos, _pos - startPos));
+      operandTypes.Push(OperandType.STRING);
     }
 
     // we are at '('
@@ -839,7 +852,7 @@ namespace Converter.Parsers.PDF
           }
         }
 
-        sb.Append((char) c);
+        sb.Append((char)c);
         ReadChar();
       }
 
@@ -962,7 +975,7 @@ namespace Converter.Parsers.PDF
       // TODO: just do this once at opettor and assign ref to glolbal obj
       // Get right rasterizer
       PDF_FontData fd = GetFontDataFromKey(currentTextObject.FontRef);
-      
+
 
       IRasterizer rasterizer = fd.Rasterizer;
       double[] widths = fd.FontInfo.Widths;
@@ -1012,7 +1025,7 @@ namespace Converter.Parsers.PDF
             PDF_DrawGlyph(ligature[i], ref glyphInfo, rasterizer, state, fd, widths, textToWrite, i, CID);
           }
         }
-      } 
+      }
       else
       {
         for (int i = 0; i < textToWrite.Length; i++)
@@ -1020,7 +1033,7 @@ namespace Converter.Parsers.PDF
           PDF_DrawGlyph(textToWrite[i], ref glyphInfo, rasterizer, state, fd, widths, textToWrite, i);
         }
       }
-      
+
     }
     // CID is only used for Composite fonts
     public void PDF_DrawGlyph(char c, ref GlyphInfo glyphInfo, IRasterizer rasterizer, PDFGI_DrawState state, PDF_FontData fd, double[] widths, string literal, int index, char CID = ' ')
@@ -1273,7 +1286,7 @@ namespace Converter.Parsers.PDF
             PDF_ICCExtraData ICCExtra = new PDF_ICCExtraData();
             if (ICCExtra.Range == null || ICCExtra.Range.Length == 0)
               c.SetColor(0, 0, 0, 0);
-            else 
+            else
               // Implement this when we have extra data and know how Range looks like Table74 CS operator
               throw new NotImplementedException();
           }
@@ -1348,7 +1361,7 @@ namespace Converter.Parsers.PDF
             green = GetNextStackValAsDouble();
             red = GetNextStackValAsDouble();
             state.Color.SetColor(red, green, blue, 0);
-          } 
+          }
           else if (extra.N == 4)
           {
             black = GetNextStackValAsDouble();
@@ -1420,7 +1433,78 @@ namespace Converter.Parsers.PDF
           break;
       }
     }
+
+    public void VoidDict()
+    {
+      if (operandTypes.Peek() != OperandType.DICT)
+        return;
+
+      operandTypes.Pop();
+      int keyNum = arrayLengths.Pop();
+      OperandType op;
+      for (int i = 0; i < keyNum; i++)
+      {
+        op = operandTypes.Peek();
+        if (op == OperandType.INT)
+        {
+          operandTypes.Pop();
+          intOperands.Pop();
+        }
+        else if (op == OperandType.DOUBLE)
+        {
+          operandTypes.Pop();
+          realOperands.Pop();
+        }
+        else if (op == OperandType.STRING)
+        {
+          operandTypes.Pop();
+          stringOperands.Pop();
+        }
+        else if (op == OperandType.DICT)
+          VoidDict();
+        else if (op == OperandType.ARRAY)
+          VoidArray();
+      }
+    }
+
+    public void VoidArray()
+    {
+      if (operandTypes.Peek() != OperandType.ARRAY)
+        return;
+
+      operandTypes.Pop();
+      int keyNum = arrayLengths.Pop();
+      OperandType op;
+      for (int i = 0; i < keyNum; i++)
+      {
+        op = operandTypes.Peek();
+        if (op == OperandType.INT)
+        {
+          operandTypes.Pop();
+          intOperands.Pop();
+        }
+        else if (op == OperandType.DOUBLE)
+        {
+          operandTypes.Pop();
+          realOperands.Pop();
+        }
+        else if (op == OperandType.STRING)
+        {
+          operandTypes.Pop();
+          stringOperands.Pop();
+        }
+        else if (op == OperandType.DICT)
+          throw new InvalidDataException("Invalid state");
+        else if (op == OperandType.ARRAY)
+          VoidArray();
+      }
+    }
+
+    public string PopString()
+    {
+      OperandType op = operandTypes.Pop();
+      Debug.Assert(op == OperandType.STRING);
+      return stringOperands.Pop();
+    }
   }
-
-
 }

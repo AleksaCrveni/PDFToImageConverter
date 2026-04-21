@@ -636,7 +636,7 @@ namespace Converter.Parsers.PDF
         // it can happen that font file is not embedded
         if (fontInfo.FontDescriptor != null && fontInfo.FontDescriptor.FontFile != null)
         {
-          File.WriteAllBytes(Files.RootFolder + @$"\{fontInfo.FontDescriptor.FontName}" + @"-fontFile.txt", fontInfo.FontDescriptor.FontFile.CommonStreamInfo.RawStreamData);
+          File.WriteAllBytes(Files.RootFolder + @$"\{name}-{fontInfo.FontDescriptor.FontName}" + @"-fontFile.txt", fontInfo.FontDescriptor.FontFile.CommonStreamInfo.RawStreamData);
         }
         else if (fontInfo.DescendantFontsInfo != null)
         {
