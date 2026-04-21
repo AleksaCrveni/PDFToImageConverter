@@ -437,7 +437,7 @@ namespace Converter.Rasterizers
     }
     private int GetGlyphIndexFromCmap(int unicodeCodepoint, int subTableOffset, int format)
     {
-      ReadOnlySpan<byte> buffer = __buffer.AsSpan().Slice(subTableOffset);
+      ReadOnlySpan<byte> buffer = __buffer.AsSpan();
       int startOffset = 0;
       if (format == 0)
       {
