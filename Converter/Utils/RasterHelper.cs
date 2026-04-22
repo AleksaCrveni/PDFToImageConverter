@@ -108,11 +108,15 @@ namespace Converter.Utils
     {
       return dict.W[CID] / 1000f;
     }
-    public static uint ReadUintFromHex(string str)
+    public static uint ReadUintFromHex(string str, int byteSize)
     {
       Debug.Assert(str[0] == '<');
       Debug.Assert(str[str.Length - 1] == '>');
-      Debug.Assert(str.Length == 6 || str.Length == 10);
+      //Debug.Assert(str.Length == 6 || str.Length == 10);
+      // I think that here we should read X amount of bytes based of encoding and iterate over that!
+      if (str.Length != 6 && str.Length != 10)
+        return 0;
+
       if (str.Length > 6)
         return UInt32.Parse(str.AsSpan().Slice(1, 8), NumberStyles.HexNumber);
       else

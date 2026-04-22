@@ -143,7 +143,7 @@ namespace RasterizeDebugger
         _transform = new Matrix();
         _zoomScale = 1.0f;
         _lastFontRef = _interpreter._debugState.FontRef;
-        _currFontData = _interpreter.GetFontDataFromKey(_interpreter._debugState.FontRef);
+        _currFontData = _interpreter.SetupFont(_interpreter._debugState.FontRef);
         UpdateFontInfoTreeView();
         _totalStringLiteralCount = 0;
         lbl_literalNumber.Text = _totalStringLiteralCount.ToString();
@@ -174,7 +174,7 @@ namespace RasterizeDebugger
       char c = _localState.currentText[_localState.charIndex];
       GlyphInfo gInfo = new GlyphInfo();
 
-      _currFontData = _interpreter.GetFontDataFromKey(_interpreter._debugState.FontRef);
+      _currFontData = _interpreter.SetupFont(_interpreter._debugState.FontRef);
       if (_lastFontRef != _interpreter._debugState.FontRef)
       {
         UpdateFontInfoTreeView();
@@ -274,14 +274,14 @@ namespace RasterizeDebugger
     {
       GlyphInfo gInfo = new GlyphInfo();
 
-      _currFontData = _interpreter.GetFontDataFromKey(_interpreter._debugState.FontRef);
+      _currFontData = _interpreter.SetupFont(_interpreter._debugState.FontRef);
 
       _currRasterizer = _currFontData.Rasterizer;
       double[] widths = _currFontData.FontInfo.Widths;
       char? c;
       if (_currFontData.FontInfo.SubType == PDF_FontType.Type0)
       {
-        char CID = (char)RasterHelper.ReadUintFromHex(_localState.currentText);
+        char CID = (char)RasterHelper.ReadUintFromHex(_localState.currentText, _interpreter._byteSize);
         c = _currRasterizer.FindCharFromCID(CID);
         if (c != null)
         {
@@ -608,7 +608,7 @@ namespace RasterizeDebugger
     private void TreeNodeMouseClickEventHandler(object? sender, TreeNodeMouseClickEventArgs e)
     {
       TreeView node = (TreeView)sender;
-      DataViewer dw = new DataViewer(node.SelectedNode.Text);
+      DataViewer dw = new DataViewer(node.SelectedNode?.Text);
       dw.Show();
     }
 

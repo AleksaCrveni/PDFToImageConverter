@@ -52,6 +52,7 @@ namespace Converter.Parsers.PDF
     public PDFGO_DEBUG_STATE _debugState;
     private PathRasterizer _shapeRasterizer;
     public byte[] _delimiters = [(byte)'(', (byte)')', (byte)'/', (byte)'[', (byte)']', (byte)'<', (byte)'>'];
+    public int _byteSize = 2; // Used only for type0 fonts
 
     // TODO: maybe NULL check is redundant if we let it throw to end?
     public PDFGOInterpreter(byte[] contentBuffer, PDF_ResourceDict resourceDict, IConverter converter, bool debug = false)
@@ -584,7 +585,7 @@ namespace Converter.Parsers.PDF
       {
         int startPos = _pos;
         // TODO: this may have to be all more delimiters than '/'
-        while (!IsCurrentCharPDFWhitespaceOrNewLine() && _char != '/')
+        while (!IsCurrentCharPDFWhitespaceOrNewLine() && !_delimiters.Contains(_char))
           ReadChar();
 
         Span<byte> fourByteSlice = stackalloc byte[4];
@@ -974,7 +975,7 @@ namespace Converter.Parsers.PDF
     {
       // TODO: just do this once at opettor and assign ref to glolbal obj
       // Get right rasterizer
-      PDF_FontData fd = GetFontDataFromKey(currentTextObject.FontRef);
+      PDF_FontData fd = SetupFont(currentTextObject.FontRef);
 
 
       IRasterizer rasterizer = fd.Rasterizer;
@@ -991,7 +992,7 @@ namespace Converter.Parsers.PDF
       // since afaik this is the only font that does this
       if (fd.FontInfo.SubType == PDF_FontType.Type0)
       {
-        char CID = (char)RasterHelper.ReadUintFromHex(textToWrite);
+        char CID = (char)RasterHelper.ReadUintFromHex(textToWrite, _byteSize);
         c = rasterizer.FindCharFromCID(CID);
 
         // Page 271 -> Even though the CIDs are not used to select glyphs in a Type 2 CIDFont, they shall always be used to determine the glyph metrics, as described in the next sub-clause.
@@ -1203,13 +1204,26 @@ namespace Converter.Parsers.PDF
       #endregion
     }
 
-    public PDF_FontData GetFontDataFromKey(string searchKey)
+    public PDF_FontData SetupFont(string searchKey)
     {
       foreach (PDF_FontData fd in _resourceDict.Font)
         if (fd.Key == searchKey)
+        {
+          if (fd.FontInfo.SubType == PDF_FontType.Type0)
+            SetEncByteSize(fd.FontInfo.EncodingData.BaseEncoding);
           return fd;
+        }
 
       return new PDF_FontData();
+    }
+
+    public void SetEncByteSize(string encoding)
+    {
+      _byteSize = encoding switch
+      {
+        "Identity-H" => 2,
+        _ => 2
+      };
     }
     public PDFGI_ColorState InitCurrentColorSpace()
     {
