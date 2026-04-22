@@ -143,7 +143,7 @@ namespace RasterizeDebugger
         _transform = new Matrix();
         _zoomScale = 1.0f;
         _lastFontRef = _interpreter._debugState.FontRef;
-        _currFontData = _interpreter.SetupFont(_interpreter._debugState.FontRef);
+        _currFontData = _interpreter.SetupFont();
         UpdateFontInfoTreeView();
         _totalStringLiteralCount = 0;
         lbl_literalNumber.Text = _totalStringLiteralCount.ToString();
@@ -174,7 +174,7 @@ namespace RasterizeDebugger
       char c = _localState.currentText[_localState.charIndex];
       GlyphInfo gInfo = new GlyphInfo();
 
-      _currFontData = _interpreter.SetupFont(_interpreter._debugState.FontRef);
+      _currFontData = _interpreter.SetupFont();
       if (_lastFontRef != _interpreter._debugState.FontRef)
       {
         UpdateFontInfoTreeView();
@@ -274,7 +274,7 @@ namespace RasterizeDebugger
     {
       GlyphInfo gInfo = new GlyphInfo();
 
-      _currFontData = _interpreter.SetupFont(_interpreter._debugState.FontRef);
+      _currFontData = _interpreter.SetupFont();
 
       _currRasterizer = _currFontData.Rasterizer;
       double[] widths = _currFontData.FontInfo.Widths;
@@ -353,7 +353,7 @@ namespace RasterizeDebugger
 
     public void DrawGlyphAndUpdateGlyphInfo(char c, ref GlyphInfo glyphInfo, IRasterizer rasterizer, PDFGI_DrawState state, PDF_FontData fd, double[] widths, string literal, int index, bool updateUI, char CID = ' ')
     {
-      _interpreter.PDF_DrawGlyph(c, ref glyphInfo, _currRasterizer, _interpreter._debugState.State, _currFontData, widths, _localState.currentText, _localState.charIndex, CID);
+      _interpreter.PDF_DrawGlyph(c, ref glyphInfo, _localState.currentText, _localState.charIndex, CID);
       if (!updateUI)
         return;
       lbl_charValue.Text = ((int)c).ToString();

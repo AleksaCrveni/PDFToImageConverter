@@ -246,7 +246,7 @@ namespace Converter.FileStructures.PDF
 
   public class PDF_FontData
   {
-    public string Key;
+    public string Key = string.Empty;
     public PDF_FontInfo FontInfo;
     public IRasterizer Rasterizer;
   }
