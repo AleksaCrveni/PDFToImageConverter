@@ -106,7 +106,10 @@ namespace Converter.Utils
 
     public static float GetCompositeWidth(char CID, CIDFontDictionary dict)
     {
-      return dict.W[CID] / 1000f;
+      if (dict.W.ContainsKey(CID))
+        return dict.W[CID] / 1000f;
+      else
+        return dict.FontDescriptor.MissingWidth / 1000f;
     }
     public static uint ReadUintFromHex(string str, int byteSize)
     {
@@ -116,7 +119,7 @@ namespace Converter.Utils
       // I think that here we should read X amount of bytes based of encoding and iterate over that!
       if (str.Length != 6 && str.Length != 10)
         return 0;
-
+      
       if (str.Length > 6)
         return UInt32.Parse(str.AsSpan().Slice(1, 8), NumberStyles.HexNumber);
       else
