@@ -37,9 +37,9 @@ namespace Converter.Parsers.PDF
     // this is more memory efficient I think
     private Stack<int> arrayLengths;
     private Stack<GraphicsState> GSS;
-    private GraphicsState currentGS;
+    public GraphicsState currentGS;
     private PDFGI_PathConstruction currentPC;
-    private PDFGI_TextObject currentTextObject;
+    public PDFGI_TextObject currentTextObject;
     private PDF_ResourceDict _resourceDict;
     private long tokensParsed = 0; // for debugging
     private double[,] textRenderingMatrix;
@@ -979,40 +979,64 @@ namespace Converter.Parsers.PDF
     public void PDF_DrawTextMultiByte(string textToWrite, ref GlyphInfo glyphInfo)
     {
       char? c;
-      char CID = (char)RasterHelper.ReadUintFromHex(textToWrite, _byteSize);
-      c = _currentFont.Rasterizer.FindCharFromCID(CID);
+      char CID;
+      Debug.Assert(textToWrite[0] == '<');
+      Debug.Assert(textToWrite[textToWrite.Length - 1] == '>');
+      //Debug.Assert(str.Length == 6 || str.Length == 10);
+      // I think that here we should read X amount of bytes based of encoding and iterate over that!
 
-      // Page 271 -> Even though the CIDs are not used to select glyphs in a Type 2 CIDFont, they shall always be used to determine the glyph metrics, as described in the next sub-clause.
-      // not sure fi this is right....
-      if (_currentFont.FontInfo.DescendantFontsInfo[0].DescendantDict.Subtype == PDF_FontType.CIDFontType2)
-        c = CID;
-
-      if (c != null)
+      // support only 2 or 4 bytes for now
+      for (int i = 1; i < textToWrite.Length -1; i += _byteSize)
       {
-        PDF_DrawGlyph((char)c, ref glyphInfo, textToWrite, 0, CID);
-        return;
-      }
-
-      // Not sure if ligatures should be printed separatetly or I should advance manually for each char
-      // just do this for now and see how it works
-      List<char> ligature = _currentFont.Rasterizer.FindLigatureFromCID(CID);
-      if (ligature.Count == 0)
-      {
-        char character = '0';
-        PDF_DrawGlyph((char)0, ref glyphInfo, textToWrite, 0, CID);
-
-        return;
-      }
-      else
-      {
-        for (int i = 0; i < ligature.Count; i++)
+        // this doesnt work i think...?
+        if (_byteSize == 4)
         {
-          // NOTE:
-          // Not sure if i should pass CID of ligature of current glyph in ligature
-          // Because we will get width based on CID and then chars in ligature may appear to wide/sparse
-          PDF_DrawGlyph(ligature[i], ref glyphInfo, textToWrite, i, CID);
+          CID = (char)UInt32.Parse(textToWrite.AsSpan().Slice(i, _byteSize * 2), NumberStyles.HexNumber);
+        }
+        else if (_byteSize == 2)
+        {
+          CID = CID = (char)UInt16.Parse(textToWrite.AsSpan().Slice(i, _byteSize * 2), NumberStyles.HexNumber);
+        }
+        else
+        {
+          throw new NotSupportedException("Other byte size not supported yet!");
+        }
+
+        c = _currentFont.Rasterizer.FindCharFromCID(CID);
+
+        // Page 271 -> Even though the CIDs are not used to select glyphs in a Type 2 CIDFont, they shall always be used to determine the glyph metrics, as described in the next sub-clause.
+        // not sure fi this is right....
+        if (_currentFont.FontInfo.DescendantFontsInfo[0].DescendantDict.Subtype == PDF_FontType.CIDFontType2)
+          c = CID;
+
+        if (c != null)
+        {
+          PDF_DrawGlyph((char)c, ref glyphInfo, textToWrite, 0, CID);
+          return;
+        }
+
+        // Not sure if ligatures should be printed separatetly or I should advance manually for each char
+        // just do this for now and see how it works
+        List<char> ligature = _currentFont.Rasterizer.FindLigatureFromCID(CID);
+        if (ligature.Count == 0)
+        {
+          char character = '0';
+          PDF_DrawGlyph((char)0, ref glyphInfo, textToWrite, 0, CID);
+
+          return;
+        }
+        else
+        {
+          for (int j = 0; j < ligature.Count; j++)
+          {
+            // NOTE:
+            // Not sure if i should pass CID of ligature of current glyph in ligature
+            // Because we will get width based on CID and then chars in ligature may appear to wide/sparse
+            PDF_DrawGlyph(ligature[j], ref glyphInfo, textToWrite, j, CID);
+          }
         }
       }
+     
     }
 
     /// <summary>

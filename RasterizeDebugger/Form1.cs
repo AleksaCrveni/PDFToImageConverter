@@ -143,7 +143,7 @@ namespace RasterizeDebugger
         _transform = new Matrix();
         _zoomScale = 1.0f;
         _lastFontRef = _interpreter._debugState.FontRef;
-        _currFontData = _interpreter.SetupFont();
+        _currFontData = _interpreter._currentFont;
         UpdateFontInfoTreeView();
         _totalStringLiteralCount = 0;
         lbl_literalNumber.Text = _totalStringLiteralCount.ToString();
@@ -156,6 +156,11 @@ namespace RasterizeDebugger
 
     private void btn_nextText_Click(object sender, EventArgs e)
     {
+      if (_file == null)
+      {
+        MessageBox.Show("PDF not selected!");
+        return;
+      }
       if (_end)
       {
         MessageBox.Show("End of content!");
@@ -174,7 +179,7 @@ namespace RasterizeDebugger
       char c = _localState.currentText[_localState.charIndex];
       GlyphInfo gInfo = new GlyphInfo();
 
-      _currFontData = _interpreter.SetupFont();
+      _currFontData = _interpreter._currentFont;
       if (_lastFontRef != _interpreter._debugState.FontRef)
       {
         UpdateFontInfoTreeView();
@@ -184,7 +189,7 @@ namespace RasterizeDebugger
       double[] widths = _currFontData.FontInfo.Widths;
 
 
-      DrawGlyphAndUpdateGlyphInfo(c, ref gInfo, _currRasterizer, _interpreter._debugState.State, _currFontData, widths, _localState.currentText, _localState.charIndex, true);
+      DrawGlyphAndUpdateGlyphInfo(c, ref gInfo, _localState.currentText, _localState.charIndex, true);
 
       UpdateImageDataAndPictureBox();
       UpdateLabels();
@@ -274,7 +279,7 @@ namespace RasterizeDebugger
     {
       GlyphInfo gInfo = new GlyphInfo();
 
-      _currFontData = _interpreter.SetupFont();
+      _currFontData = _interpreter._currentFont;
 
       _currRasterizer = _currFontData.Rasterizer;
       double[] widths = _currFontData.FontInfo.Widths;
@@ -285,21 +290,21 @@ namespace RasterizeDebugger
         c = _currRasterizer.FindCharFromCID(CID);
         if (c != null)
         {
-          DrawGlyphAndUpdateGlyphInfo((char)CID, ref gInfo, _currRasterizer, _interpreter._debugState.State, _currFontData, widths, _localState.currentText, _localState.charIndex, updateUI, CID);
+          DrawGlyphAndUpdateGlyphInfo((char)CID, ref gInfo, _localState.currentText, _localState.charIndex, updateUI, CID);
         } 
         else
         {
           List<char> ligature = _currRasterizer.FindLigatureFromCID(CID);
           if (ligature.Count == 0)
           {
-            DrawGlyphAndUpdateGlyphInfo((char)0, ref gInfo, _currRasterizer, _interpreter._debugState.State, _currFontData, widths, _localState.currentText, _localState.charIndex, updateUI, CID);
+            DrawGlyphAndUpdateGlyphInfo((char)0, ref gInfo, _localState.currentText, _localState.charIndex, updateUI, CID);
           }
           else
           {
             for (int i = 0; i < ligature.Count; i++)
             {
               // thgis will need fixing
-              DrawGlyphAndUpdateGlyphInfo((char)ligature[i], ref gInfo, _currRasterizer, _interpreter._debugState.State, _currFontData, widths, _localState.currentText, _localState.charIndex, updateUI, CID);
+              DrawGlyphAndUpdateGlyphInfo((char)ligature[i], ref gInfo, _localState.currentText, _localState.charIndex, updateUI, CID);
             }
           }
         }  
@@ -309,7 +314,7 @@ namespace RasterizeDebugger
         for (int i = _localState.charIndex; i < _localState.currentText.Length; i++)
         {
           c = _localState.currentText[i];
-          DrawGlyphAndUpdateGlyphInfo((char)c, ref gInfo, _currRasterizer, _interpreter._debugState.State, _currFontData, widths, _localState.currentText, _localState.charIndex, updateUI);
+          DrawGlyphAndUpdateGlyphInfo((char)c, ref gInfo, _localState.currentText, _localState.charIndex, updateUI);
         }
       }
       
@@ -345,13 +350,13 @@ namespace RasterizeDebugger
       _totalStringLiteralCount++;
       if (updateUI)
         lbl_literalNumber.Text = _totalStringLiteralCount.ToString();
-      _interpreter._debugState.State.TextObject.TextMatrix[2, 0] -=
+      _interpreter.currentTextObject.TextMatrix[2, 0] -=
         (_interpreter._debugState.Literals[_localState.textIndex].PositionAdjustment / 1000f) *
-        _interpreter._debugState.State.TextObject.TextMatrix[0, 0]
-        * _interpreter._debugState.State.TextObject.FontScaleFactor;
+        _interpreter.currentTextObject.TextMatrix[0, 0]
+        * _interpreter.currentTextObject.FontScaleFactor;
     }
 
-    public void DrawGlyphAndUpdateGlyphInfo(char c, ref GlyphInfo glyphInfo, IRasterizer rasterizer, PDFGI_DrawState state, PDF_FontData fd, double[] widths, string literal, int index, bool updateUI, char CID = ' ')
+    public void DrawGlyphAndUpdateGlyphInfo(char c, ref GlyphInfo glyphInfo, string literal, int index, bool updateUI, char CID = ' ')
     {
       _interpreter.PDF_DrawGlyph(c, ref glyphInfo, _localState.currentText, _localState.charIndex, CID);
       if (!updateUI)

@@ -135,9 +135,12 @@ namespace RasterizeDebugger
         cb_glyph.EndUpdate();
         cb_glyph.SelectedIndex = 0;
       }
+      else if (_currFont.FontInfo.SubType == PDF_FontType.TrueType)
+      {
+      }
       else
       {
-        throw new NotImplementedException("Font type not supported in debugger!");
+        throw new NotImplementedException("s");
       }
     }
 
