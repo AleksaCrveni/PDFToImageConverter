@@ -1456,7 +1456,7 @@ namespace Converter.Rasterizers
         numOfVertices = 0;
         vertex = new TTFVertex();
         List<TTFVertex> compVertex = new List<TTFVertex>();
-        List<TTFVertex> tempVertex = new List<TTFVertex>();
+        TTFVertex[] tempVertex;
         Span<float> mtx = stackalloc float[6] { 1, 0, 0, 1, 0, 0 };
         while (more)
         {
@@ -1471,8 +1471,6 @@ namespace Converter.Rasterizers
           mtx[5] = 0;
           int compNumVerts = 0;
           int i;
-          compVertex.Clear();
-          tempVertex.Clear();
           // end setup
 
           flags = (ushort)ReadSignedInt16(ref buffer, compOffset);
@@ -1554,17 +1552,17 @@ namespace Converter.Rasterizers
 
             // Append vertices
             // null check not needed?
+            tempVertex = new TTFVertex[numOfVertices + compNumVerts];
             if (numOfVertices > 0 && vertices != null)
             {
-              tempVertex.AddRange(vertices);
+              vertices.CopyTo(0, tempVertex, 0, numOfVertices);
             }
-            tempVertex.AddRange(compVertex);
-            vertices.Clear(); // needed?
-            vertices = tempVertex;
+            compVertex.CopyTo(0, tempVertex, numOfVertices, compNumVerts);
+            vertices = tempVertex.ToList();
             numOfVertices += compNumVerts;
           }
 
-          more = (flags & 1 << 5) > 0;
+          more = (flags & (1 << 5)) > 0;
         }
       }
       return numOfVertices;
