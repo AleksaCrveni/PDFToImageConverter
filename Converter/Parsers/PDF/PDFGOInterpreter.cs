@@ -980,13 +980,16 @@ namespace Converter.Parsers.PDF
     {
       char? c;
       char CID;
-      Debug.Assert(textToWrite[0] == '<');
-      Debug.Assert(textToWrite[textToWrite.Length - 1] == '>');
-      //Debug.Assert(str.Length == 6 || str.Length == 10);
-      // I think that here we should read X amount of bytes based of encoding and iterate over that!
+
+      Debug.Assert(textToWrite.Length > 0);
+      if (textToWrite == " ")
+      {
+        PDF_DrawGlyph(' ', ref glyphInfo, textToWrite, 0, ' ');
+        return;
+      }
 
       // support only 2 or 4 bytes for now
-      for (int i = 1; i < textToWrite.Length -1; i += _byteSize)
+      for (int i = 1; i < textToWrite.Length -1; i += (_byteSize * 2))
       {
         // this doesnt work i think...?
         if (_byteSize == 4)
@@ -995,7 +998,7 @@ namespace Converter.Parsers.PDF
         }
         else if (_byteSize == 2)
         {
-          CID = CID = (char)UInt16.Parse(textToWrite.AsSpan().Slice(i, _byteSize * 2), NumberStyles.HexNumber);
+          CID = (char)UInt16.Parse(textToWrite.AsSpan().Slice(i, _byteSize * 2), NumberStyles.HexNumber);
         }
         else
         {
@@ -1012,7 +1015,7 @@ namespace Converter.Parsers.PDF
         if (c != null)
         {
           PDF_DrawGlyph((char)c, ref glyphInfo, textToWrite, 0, CID);
-          return;
+          continue;
         }
 
         // Not sure if ligatures should be printed separatetly or I should advance manually for each char
@@ -1022,8 +1025,7 @@ namespace Converter.Parsers.PDF
         {
           char character = '0';
           PDF_DrawGlyph((char)0, ref glyphInfo, textToWrite, 0, CID);
-
-          return;
+          continue;
         }
         else
         {

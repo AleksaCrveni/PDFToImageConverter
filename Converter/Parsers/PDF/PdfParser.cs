@@ -642,7 +642,7 @@ namespace Converter.Parsers.PDF
         {
           foreach (var entry in fontInfo.DescendantFontsInfo)
           {
-            if (entry.DescendantDict.FontDescriptor.FontFile != null)
+            if (entry.DescendantDict.FontDescriptor != null && entry.DescendantDict.FontDescriptor.FontFile != null)
             {
               File.WriteAllBytes(Files.RootFolder + @$"\Composite_{entry.DescendantDict.BaseFont}" + @"-fontFile.txt", entry.DescendantDict.FontDescriptor.FontFile.CommonStreamInfo.RawStreamData);
             }

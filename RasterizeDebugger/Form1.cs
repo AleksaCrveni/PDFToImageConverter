@@ -11,6 +11,8 @@ using Converter.Utils;
 using Converter.Writers.TIFF;
 using System.Diagnostics;
 using System.Drawing.Drawing2D;
+using System.Globalization;
+using System.Security.Cryptography;
 using System.Text;
 using static System.Windows.Forms.AxHost;
 
@@ -227,8 +229,54 @@ namespace RasterizeDebugger
     {
       lbl_currPosition.Text = _interpreter._pos.ToString();
       lbl_readPos.Text = _interpreter._readPos.ToString();
-      lbl_currentText.Text = _localState.currentText;
-      lbl_currentChar.Text = _localState.currentText[_localState.charIndex].ToString();
+      if (_currFontData?.FontInfo?.SubType == PDF_FontType.Type0)
+      {
+        StringBuilder sb = new StringBuilder();
+        sb.Append(_localState.currentText);
+        sb.Append(" -> ");
+        if (_localState.currentText == " ")
+        {
+          // this kinda sucks because this means that CID is just char value?
+          sb.Append("SPACE");
+          return;
+        }
+        char CID;
+        char? c = null;
+        // support only 2 or 4 bytes for now
+        for (int i = 1; i < _localState.currentText.Length - 1; i += (_interpreter._byteSize * 2))
+        {
+          // this doesnt work i think...?
+          if (_interpreter._byteSize == 4)
+          {
+            CID = (char)UInt32.Parse(_localState.currentText.AsSpan().Slice(i, _interpreter._byteSize * 2), NumberStyles.HexNumber);
+          }
+          else if (_interpreter._byteSize == 2)
+          {
+            CID = (char)UInt16.Parse(_localState.currentText.AsSpan().Slice(i, _interpreter._byteSize * 2), NumberStyles.HexNumber);
+          }
+          else
+          {
+            throw new NotSupportedException("Other byte size not supported yet!");
+          }
+
+          c = _currFontData.Rasterizer.FindCharFromCID(CID);
+          sb.Append("[<");
+          sb.Append(_localState.currentText.AsSpan().Slice(i, _interpreter._byteSize *2));
+          sb.Append("> ");
+          sb.Append((int)CID);
+          sb.Append('-');
+          sb.Append((int)(c ?? -1));
+          sb.Append(']');
+        }
+        lbl_currentText.Text = sb.ToString();
+        lbl_currentChar.Text = c?.ToString();
+      }
+      else
+      {
+        lbl_currentText.Text = _localState.currentText;
+        lbl_currentChar.Text = _localState.currentText[_localState.charIndex].ToString();
+      }
+      
     }
     public void UpdateImageDataAndPictureBox()
     {
@@ -284,39 +332,7 @@ namespace RasterizeDebugger
       _currRasterizer = _currFontData.Rasterizer;
       double[] widths = _currFontData.FontInfo.Widths;
       char? c;
-      if (_currFontData.FontInfo.SubType == PDF_FontType.Type0)
-      {
-        char CID = (char)RasterHelper.ReadUintFromHex(_localState.currentText, _interpreter._byteSize);
-        c = _currRasterizer.FindCharFromCID(CID);
-        if (c != null)
-        {
-          DrawGlyphAndUpdateGlyphInfo((char)CID, ref gInfo, _localState.currentText, _localState.charIndex, updateUI, CID);
-        } 
-        else
-        {
-          List<char> ligature = _currRasterizer.FindLigatureFromCID(CID);
-          if (ligature.Count == 0)
-          {
-            DrawGlyphAndUpdateGlyphInfo((char)0, ref gInfo, _localState.currentText, _localState.charIndex, updateUI, CID);
-          }
-          else
-          {
-            for (int i = 0; i < ligature.Count; i++)
-            {
-              // thgis will need fixing
-              DrawGlyphAndUpdateGlyphInfo((char)ligature[i], ref gInfo, _localState.currentText, _localState.charIndex, updateUI, CID);
-            }
-          }
-        }  
-      }
-      else
-      {
-        for (int i = _localState.charIndex; i < _localState.currentText.Length; i++)
-        {
-          c = _localState.currentText[i];
-          DrawGlyphAndUpdateGlyphInfo((char)c, ref gInfo, _localState.currentText, _localState.charIndex, updateUI);
-        }
-      }
+      _interpreter.PDF_DrawText(_localState.currentText);
       
       _localState.charIndex = _localState.currentText.Length - 1;
       if (updateUI)
@@ -358,7 +374,7 @@ namespace RasterizeDebugger
 
     public void DrawGlyphAndUpdateGlyphInfo(char c, ref GlyphInfo glyphInfo, string literal, int index, bool updateUI, char CID = ' ')
     {
-      _interpreter.PDF_DrawGlyph(c, ref glyphInfo, _localState.currentText, _localState.charIndex, CID);
+      _interpreter.PDF_DrawText(_localState.currentText);
       if (!updateUI)
         return;
       lbl_charValue.Text = ((int)c).ToString();
@@ -556,6 +572,11 @@ namespace RasterizeDebugger
 
     private void btn_upTo_Click(object sender, EventArgs e)
     {
+      if (_file == null)
+      {
+        MessageBox.Show("PDF not selected!");
+        return;
+      }
       // shorcut here just so we can create glyphinfo once if needed 
       if (_end)
       {
