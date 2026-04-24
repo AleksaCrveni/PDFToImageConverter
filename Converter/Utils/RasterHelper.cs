@@ -37,7 +37,7 @@ namespace Converter.Utils
             v.y = (short)(s._shapePoints[i++]);
             break;
           // cubic Bezier
-          case PS_COMMAND.CURVE_TO:
+          case PS_COMMAND.CUBIC_CURVE_TO:
             v = new TTFVertex();
             v.type = (byte)TTF_VMove.VCUBIC;
 

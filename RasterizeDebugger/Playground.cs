@@ -346,7 +346,7 @@ namespace RasterizeDebugger
             sb.Append($"{vertices[i].x} {vertices[i].y} ");
             sb.Append("LINE_TO ");
           }
-          else if (v == PS_COMMAND.CURVE_TO)
+          else if (v == PS_COMMAND.CUBIC_CURVE_TO)
           {
             sb.Append($"{vertices[i].cx} {vertices[i].cy} {vertices[i].cx1} {vertices[i].cy1} {vertices[i].x} {vertices[i].y} ");
             sb.Append("CURVE_TO ");

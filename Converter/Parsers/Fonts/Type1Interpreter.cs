@@ -187,7 +187,7 @@ namespace Converter.Parsers.Fonts
               for (int j = outShape._moves.Count - 1; j >= 0; j--)
               {
                 PS_COMMAND move = outShape._moves[j];
-                if (move == PS_COMMAND.CURVE_TO)
+                if (move == PS_COMMAND.CUBIC_CURVE_TO)
                 {
                   pos -= 6;
                 } 

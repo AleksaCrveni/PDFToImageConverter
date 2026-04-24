@@ -178,13 +178,13 @@ namespace Converter.Parsers.PDF
           #region pathConstruction
           case 0x6d: // m
             // this is relavive to current point
-            double y = GetNextStackValAsDouble();
+            double y = _targetSize.Height - GetNextStackValAsDouble();
             double x = GetNextStackValAsDouble();
 
             currentPC.Shape.MoveTo(x, y);
             break;
           case 0x6c: // l
-            y = GetNextStackValAsDouble();
+            y = _targetSize.Height - GetNextStackValAsDouble();
             x = GetNextStackValAsDouble();
             currentPC.Shape.LineTo(x, y);
             break;
@@ -215,50 +215,45 @@ namespace Converter.Parsers.PDF
             //  throw new NotImplementedException();
             break;
           case 0x68: // h
-            mp = new PDFGI_Point();
-            //            throw new NotImplementedException();
+            currentPC.Shape.CloseShape();
             break;
           case 0x6572: // re
             mp = new PDFGI_Point();
 
-            // use this as width
-            mp.X3 = GetNextStackValAsInt();
-            /// use this as height
-            mp.Y3 = GetNextStackValAsInt();
-            mp.Y1 = GetNextStackValAsInt();
-            mp.X1 = GetNextStackValAsInt();
-            //   throw new NotImplementedException();
+            double height = GetNextStackValAsDouble();
+            double width = GetNextStackValAsDouble();
+            y = _targetSize.Height - GetNextStackValAsDouble();
+            x = GetNextStackValAsDouble();
+            currentPC.Shape.MoveTo(x, y);
+            currentPC.Shape.LineTo(x + width, y);
+            currentPC.Shape.LineTo(x + width, y + height);
+            currentPC.Shape.LineTo(x, y + height);
+            currentPC.Shape.CloseShape();
             break;
           #endregion pathConstruction
           #region pathPainting
           case 0x53: // S
-            // temporary, find way to do handle errors during rasterziation
-            try
-            {
-              PDF_RasterShape();
-            }
-            catch (Exception ex)
-            {
-
-            }
+            StrokePath();
             currentPC.Shape = new PSShape();
             break;
           case 0x73: // s
-            throw new NotImplementedException("Operator not i implemented");
+            currentPC.Shape.CloseShape();
+            StrokePath();
+            break;
           case 0x66: // f
-            currentPC.Shape = new PSShape();
             currentPC.EvenOddClippingPath = false;
             currentPC.NonZeroClippingPath = true;
+            StrokePath();
             break;
           case 0x46: // F
-            currentPC.Shape = new PSShape();
             currentPC.EvenOddClippingPath = false;
             currentPC.NonZeroClippingPath = true;
+            StrokePath();
             break;
           case 0x2a66: // f*
-            currentPC.Shape = new PSShape();
             currentPC.EvenOddClippingPath = true;
             currentPC.NonZeroClippingPath = false;
+            StrokePath();
             break;
           case 0x42: // B
             throw new NotImplementedException("Operator not i implemented");
@@ -1529,6 +1524,21 @@ namespace Converter.Parsers.PDF
       OperandType op = operandTypes.Pop();
       Debug.Assert(op == OperandType.STRING);
       return stringOperands.Pop();
+    }
+
+    public void StrokePath()
+    {
+      try
+      {
+        PDF_RasterShape();
+      }
+      catch (Exception ex)
+      {
+#if DEBUG
+        throw ex;
+#endif
+      }
+      currentPC.Shape = new PSShape();
     }
   }
 }

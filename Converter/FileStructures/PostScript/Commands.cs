@@ -31,7 +31,8 @@
 
      LINE_TO,
      MOVE_TO,
-     CURVE_TO
+     CUBIC_CURVE_TO,
+     QUAD_CURVE_TO
   }
 
 }
