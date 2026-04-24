@@ -27,8 +27,8 @@ namespace Converter.Rasterizers
     public PS_COMMAND _actualLast;
     public PSShape()
     {
-      _moves = new List<PS_COMMAND>();
-      _shapePoints = new List<double>();
+      _moves = new List<PS_COMMAND>(32);
+      _shapePoints = new List<double>(32 * 4);
       _width = new TYPE1_Point2D();
     }
 
@@ -57,6 +57,41 @@ namespace Converter.Rasterizers
       }
     }
 
+    public void CloseShape()
+    {
+      if (_moves.Count > 0 && _actualLast == PS_COMMAND.CLOSEPATH)
+        return;
+
+      int pos = _shapePoints.Count - 1;
+      double targetX = 0;
+      double targetY = 0;
+      // get last move to
+      for (int j = _moves.Count - 1; j >= 0; j--)
+      {
+        PS_COMMAND move = _moves[j];
+        if (move == PS_COMMAND.CUBIC_CURVE_TO)
+        {
+          pos -= 6;
+        }
+        else if (move == PS_COMMAND.QUAD_CURVE_TO)
+        {
+          pos -= 4;
+        }
+        else if (move == PS_COMMAND.LINE_TO)
+        {
+          pos -= 2;
+        }
+        else if (move == PS_COMMAND.MOVE_TO)
+        {
+          targetY = _shapePoints[pos--];
+          targetX = _shapePoints[pos];
+          break;
+        }
+      }
+
+      LineTo(targetX, targetY); // draw line
+      _actualLast = PS_COMMAND.CLOSEPATH; // assign close path so that we can check if last one was closepath
+    }
     public void CurveTo(double dx1, double dy1, double dx2, double dy2, double dx3, double dy3)
     {
       _shapePoints.Add(dx1);
@@ -65,8 +100,8 @@ namespace Converter.Rasterizers
       _shapePoints.Add(dy2);
       _shapePoints.Add(dx3);
       _shapePoints.Add(dy3);
-      _moves.Add(PS_COMMAND.CURVE_TO);
-      _actualLast = PS_COMMAND.CURVE_TO;
+      _moves.Add(PS_COMMAND.CUBIC_CURVE_TO);
+      _actualLast = PS_COMMAND.CUBIC_CURVE_TO;
     }
 
     /// <summary>
