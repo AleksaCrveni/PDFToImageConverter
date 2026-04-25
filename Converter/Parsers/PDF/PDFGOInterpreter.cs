@@ -38,7 +38,7 @@ namespace Converter.Parsers.PDF
     private Stack<int> arrayLengths;
     private Stack<GraphicsState> GSS;
     public GraphicsState currentGS;
-    private PDFGI_PathConstruction currentPC;
+    public PDFGI_PathConstruction currentPC;
     public PDFGI_TextObject currentTextObject;
     private PDF_ResourceDict _resourceDict;
     private long tokensParsed = 0; // for debugging
@@ -54,6 +54,7 @@ namespace Converter.Parsers.PDF
     public byte[] _delimiters = [(byte)'(', (byte)')', (byte)'/', (byte)'[', (byte)']', (byte)'<', (byte)'>'];
     public int _byteSize = 2; // Used only for type0 fonts
     public PDF_FontData _currentFont; // not part of GS, but maybe should be part of currentTextObject
+    public PDFLogger _pathLogger;
 
     // TODO: maybe NULL check is redundant if we let it throw to end?
     public PDFGOInterpreter(byte[] contentBuffer, PDF_ResourceDict resourceDict, IConverter converter, bool debug = false)
@@ -77,7 +78,7 @@ namespace Converter.Parsers.PDF
       _outputBuffer = new byte[_targetSize.Height * _targetSize.Width];
       _debug = debug;
       _shapeRasterizer = new PathRasterizer(Array.Empty<byte>(), "");
-
+      _pathLogger = new PDFLogger();
       if (debug)
         _debugState = new PDFGO_DEBUG_STATE();
 
@@ -180,13 +181,12 @@ namespace Converter.Parsers.PDF
             // this is relavive to current point
             double y = _targetSize.Height - GetNextStackValAsDouble();
             double x = GetNextStackValAsDouble();
-
-            currentPC.Shape.MoveTo(x, y);
+            m(x, y);
             break;
           case 0x6c: // l
             y = _targetSize.Height - GetNextStackValAsDouble();
             x = GetNextStackValAsDouble();
-            currentPC.Shape.LineTo(x, y);
+            l(x, y);
             break;
           case 0x63: // c
             mp = new PDFGI_Point();
@@ -215,29 +215,29 @@ namespace Converter.Parsers.PDF
             //  throw new NotImplementedException();
             break;
           case 0x68: // h
-            currentPC.Shape.CloseShape();
+            h();
             break;
           case 0x6572: // re
             mp = new PDFGI_Point();
 
-            double height = GetNextStackValAsDouble();
+            double height = -GetNextStackValAsDouble();
             double width = GetNextStackValAsDouble();
             y = _targetSize.Height - GetNextStackValAsDouble();
             x = GetNextStackValAsDouble();
-            currentPC.Shape.MoveTo(x, y);
-            currentPC.Shape.LineTo(x + width, y);
-            currentPC.Shape.LineTo(x + width, y + height);
-            currentPC.Shape.LineTo(x, y + height);
-            currentPC.Shape.CloseShape();
+            _pathLogger.Log(" re ");
+            m(x, y);
+            l(x + width, y);
+            l(x + width, y + height);
+            l(x, y + height);
+            h();
             break;
           #endregion pathConstruction
           #region pathPainting
           case 0x53: // S
             StrokePath();
-            currentPC.Shape = new PSShape();
             break;
           case 0x73: // s
-            currentPC.Shape.CloseShape();
+            h();
             StrokePath();
             break;
           case 0x66: // f
@@ -922,24 +922,26 @@ namespace Converter.Parsers.PDF
 
     /// <summary>
     /// Make ShapeRasterizer and use it for this, we need accesds to STBRasterizer
+    /// Path/Shape points are defined in user (absolute) space so we dont have to apply any scalling
+    /// or calculate offsets or anything similar
     /// </summary>
     public void PDF_RasterShape()
     {
-      //currentPC.Shape.SaveAbsolute("shapeExport");
-      // rounding makes it look a bit better?
-      int X = (int)MathF.Round((float)currentGS.CTM[2, 0]);
-      // because origin is bottom-left we have do bitmapHeight - , to get position on the top
-      int Y = _targetSize.Height - (int)(currentGS.CTM[2, 1]);
+      ////currentPC.Shape.SaveAbsolute("shapeExport");
+      //// rounding makes it look a bit better?
+      //int X = (int)MathF.Round((float)currentGS.CTM[2, 0]);
+      //// because origin is bottom-left we have do bitmapHeight - , to get position on the top
+      //int Y = _targetSize.Height - (int)(currentGS.CTM[2, 1]);
 
-      float scaleX = (float)currentGS.CTM[0, 0];
-      float scaleY = (float)currentGS.CTM[1, 1];
+      //float scaleX = (float)currentGS.CTM[0, 0];
+      //float scaleY = (float)currentGS.CTM[1, 1];
 
-      // do one scale for now
-      float scale = scaleX > scaleY ? scaleX : scaleY;
+      //// do one scale for now
+      //float scale = scaleX > scaleY ? scaleX : scaleY;
 
-      int y = Y;
-      int byteOffset = X + (y * _targetSize.Width);
-      _shapeRasterizer.RasterizeShape(_outputBuffer, byteOffset, _targetSize.Width, currentPC.Shape, scale);
+      //int y = Y;
+      //int byteOffset = X + (y * _targetSize.Width);
+      _shapeRasterizer.RasterizeShape(_outputBuffer, 0, 1, currentPC.Shape, 1);
     }
 
     public void PDF_DrawText(string textToWrite, int positionAdjustment = 0)
@@ -1528,6 +1530,13 @@ namespace Converter.Parsers.PDF
 
     public void StrokePath()
     {
+      if (_debug)
+      {
+        // shape and logger reset have to be handled by debugger now
+        _debugState.isPath = true;
+        return;
+      }
+
       try
       {
         PDF_RasterShape();
@@ -1539,6 +1548,32 @@ namespace Converter.Parsers.PDF
 #endif
       }
       currentPC.Shape = new PSShape();
+      _pathLogger.Clear();
+    }
+
+    public void m(double x, double y)
+    {
+      _pathLogger.MoveToLog(x, y);
+      currentPC.Shape.MoveTo(x, y);
+    }
+
+    public void l(double x, double y)
+    {
+      _pathLogger.LineToLog(x, y);
+      currentPC.Shape.LineTo(x, y);
+    }
+
+    // this may produce double CLOSEPATH logs but w/e
+    public void h()
+    {
+      currentPC.Shape.CloseShape();
+      if (currentPC.Shape._shapePoints.Count > 1)
+      {
+        double y = currentPC.Shape._shapePoints[currentPC.Shape._shapePoints.Count - 1];
+        double x = currentPC.Shape._shapePoints[currentPC.Shape._shapePoints.Count - 2];
+        _pathLogger.MoveToLog(x, y);
+      }
     }
   }
+
 }

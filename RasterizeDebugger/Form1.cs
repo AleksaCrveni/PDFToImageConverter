@@ -1,20 +1,15 @@
-using Converter;
 using Converter.Converters;
 using Converter.Converters.Image.TIFF;
 using Converter.FileStructures.General;
 using Converter.FileStructures.PDF;
 using Converter.FileStructures.PDF.GraphicsInterpreter;
-using Converter.FileStructures.TIFF;
 using Converter.Parsers.PDF;
 using Converter.Rasterizers;
-using Converter.Utils;
 using Converter.Writers.TIFF;
 using System.Diagnostics;
 using System.Drawing.Drawing2D;
 using System.Globalization;
-using System.Security.Cryptography;
 using System.Text;
-using static System.Windows.Forms.AxHost;
 
 namespace RasterizeDebugger
 {
@@ -178,52 +173,79 @@ namespace RasterizeDebugger
         return;
       }
 
-      char c = _localState.currentText[_localState.charIndex];
-      GlyphInfo gInfo = new GlyphInfo();
-
-      _currFontData = _interpreter._currentFont;
-      if (_lastFontRef != _interpreter._debugState.FontRef)
+      if (_interpreter._debugState.isPath)
       {
-        UpdateFontInfoTreeView();
-        _lastFontRef = _interpreter._debugState.FontRef;
+        PaintPath(true);
       }
-      _currRasterizer = _currFontData.Rasterizer;
-      double[] widths = _currFontData.FontInfo.Widths;
+      else
+      {
+        char c = _localState.currentText[_localState.charIndex];
+        GlyphInfo gInfo = new GlyphInfo();
 
+        _currFontData = _interpreter._currentFont;
+        if (_lastFontRef != _interpreter._debugState.FontRef)
+        {
+          UpdateFontInfoTreeView();
+          _lastFontRef = _interpreter._debugState.FontRef;
+        }
 
-      DrawGlyphAndUpdateGlyphInfo(c, ref gInfo, _localState.currentText, _localState.charIndex, true);
+        DrawGlyphAndUpdateGlyphInfo(c, ref gInfo, _localState.currentText, _localState.charIndex, true);
+      }
+     
 
       UpdateImageDataAndPictureBox();
       UpdateLabels();
-      _localState.charIndex++;
 
-      if (_localState.charIndex >= _localState.currentText.Length)
+      if (_interpreter._debugState.isPath)
       {
-        _localState.textIndex++;
-        if (_localState.textIndex >= _interpreter._debugState.Literals.Count)
+        ReadNextData(true);
+      }
+      else
+      {
+        _localState.charIndex++;
+
+        if (_localState.charIndex >= _localState.currentText.Length)
         {
-          // Load next from interpreer
-          ReadNextData(true);
-        }
-        else
-        {
-          SetNextTextAndUpdateState(true);
+          _localState.textIndex++;
+          if (_localState.textIndex >= _interpreter._debugState.Literals.Count)
+          {
+            // Load next from interpreer
+            ReadNextData(true);
+          }
+          else
+          {
+            SetNextTextAndUpdateState(true);
+          }
         }
       }
-
     }
 
     public void ReadNextData(bool updateUI)
     {
       _interpreter.ConvertToPixelData();
-      if (_interpreter._debugState.Literals.Count == 0)
+      if (_interpreter._debugState.Literals.Count == 0 && _interpreter._debugState.isPath == false)
       {
         MessageBox.Show("End of content!");
         _end = true;
         return;
       }
-      _localState.textIndex = 0;
-      SetNextTextAndUpdateState(updateUI);
+      if (_interpreter._debugState.isPath)
+      {
+        UpdatePathState(updateUI);
+      }
+      else
+      {
+        _localState.textIndex = 0;
+        SetNextTextAndUpdateState(updateUI);
+      }
+    }
+
+    public void UpdatePathState(bool updateUI)
+    {
+      if (updateUI)
+      {
+        lbl_currentText.Text = "!SHAPE!";
+      }
     }
     public void UpdateLabels()
     {
@@ -638,5 +660,26 @@ namespace RasterizeDebugger
       dw.Show();
     }
 
+    private void PaintPath(bool updateUI)
+    {
+      try
+      {
+        _interpreter.PDF_RasterShape();
+      }
+      catch (Exception ex)
+      {
+        if (updateUI)
+          MessageBox.Show(ex.Message);
+      }
+      _interpreter.currentPC.Shape = new PSShape();
+      _interpreter._pathLogger.Clear();
+      _interpreter._debugState.isPath = false;
+    }
+
+    private void btn_Log_Click(object sender, EventArgs e)
+    {
+      DataViewer dw = new DataViewer(_interpreter);
+      dw.Show();
+    }
   }
 }

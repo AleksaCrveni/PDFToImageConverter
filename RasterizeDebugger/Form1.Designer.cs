@@ -58,6 +58,7 @@
       panel2 = new Panel();
       label5 = new Label();
       lbl_literalNumber = new Label();
+      btn_Log = new Button();
       ((System.ComponentModel.ISupportInitialize)pb_mainImage).BeginInit();
       panel1.SuspendLayout();
       panel2.SuspendLayout();
@@ -371,11 +372,23 @@
       lbl_literalNumber.TabIndex = 24;
       lbl_literalNumber.Text = "0";
       // 
+      // btn_Log
+      // 
+      btn_Log.Anchor = AnchorStyles.Top | AnchorStyles.Right;
+      btn_Log.Location = new Point(12, 38);
+      btn_Log.Name = "btn_Log";
+      btn_Log.Size = new Size(88, 23);
+      btn_Log.TabIndex = 25;
+      btn_Log.Text = "Logs";
+      btn_Log.UseVisualStyleBackColor = true;
+      btn_Log.Click += btn_Log_Click;
+      // 
       // form_main
       // 
       AutoScaleDimensions = new SizeF(7F, 15F);
       AutoScaleMode = AutoScaleMode.Font;
       ClientSize = new Size(1012, 675);
+      Controls.Add(btn_Log);
       Controls.Add(lbl_literalNumber);
       Controls.Add(label5);
       Controls.Add(panel2);
@@ -437,5 +450,6 @@
     private Button btn_upTo;
     private Label label5;
     private Label lbl_literalNumber;
+    private Button btn_Log;
   }
 }

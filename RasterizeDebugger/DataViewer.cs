@@ -1,18 +1,20 @@
-﻿using System;
-using System.Collections.Generic;
-using System.ComponentModel;
-using System.Data;
-using System.Drawing;
-using System.Text;
-using System.Windows.Forms;
+﻿using Converter.Parsers.PDF;
 
 namespace RasterizeDebugger
 {
   public partial class DataViewer : Form
   {
+    private PDFGOInterpreter _interpreter;
     public DataViewer()
     {
       InitializeComponent();
+    }
+
+    public DataViewer(PDFGOInterpreter interpreter)
+    {
+      InitializeComponent();
+      _interpreter = interpreter;
+      txb_Data.Text = _interpreter._pathLogger.ToString();
     }
     public DataViewer(string data)
     {
@@ -27,6 +29,11 @@ namespace RasterizeDebugger
     private void btn_Copy_Click(object sender, EventArgs e)
     {
       Clipboard.SetText(txb_Data.Text);
+    }
+
+    private void btn_refreshLog_Click(object sender, EventArgs e)
+    {
+      txb_Data.Text = _interpreter._pathLogger.ToString();
     }
   }
 }

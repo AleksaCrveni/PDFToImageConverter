@@ -12,8 +12,8 @@ namespace Converter.FileStructures
   {
     public List<LiteralToDrawState> Literals = new List<LiteralToDrawState>();
     public char CurrentChar;
-    public PDFGI_DrawState State;
     public string FontRef;
+    public bool isPath;
   }
 
   public class LiteralToDrawState
