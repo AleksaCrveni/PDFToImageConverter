@@ -117,6 +117,7 @@ namespace RasterizeDebugger
         _interpreter = new PDFGOInterpreter(rawContent, rDict, converter, true);
         lbl_contentLength.Text = rawContent.Length.ToString();
         _localState = new LocalState();
+        _interpreter._debugState.SkipPath = cb_PathPaint.Checked;
         ReadNextData(true);
         UpdateLabels();
         MemoryStream memoryStream = new MemoryStream();
@@ -148,6 +149,8 @@ namespace RasterizeDebugger
         lbl_glyphIndex.Text = "NULL";
         lbl_glyphName.Text = "NULL";
         lbl_currentChar.Text = "NULL";
+
+        
       }
     }
 
@@ -179,10 +182,16 @@ namespace RasterizeDebugger
       }
       else
       {
+        _currFontData = _interpreter._currentFont;
+        if (_currFontData.FontInfo.SubType == PDF_FontType.Type0)
+        {
+          ProcessText();
+          return;
+        }
+
         char c = _localState.currentText[_localState.charIndex];
         GlyphInfo gInfo = new GlyphInfo();
 
-        _currFontData = _interpreter._currentFont;
         if (_lastFontRef != _interpreter._debugState.FontRef)
         {
           UpdateFontInfoTreeView();
@@ -191,7 +200,7 @@ namespace RasterizeDebugger
 
         DrawGlyphAndUpdateGlyphInfo(c, ref gInfo, _localState.currentText, _localState.charIndex, true);
       }
-     
+
 
       UpdateImageDataAndPictureBox();
       UpdateLabels();
@@ -202,6 +211,12 @@ namespace RasterizeDebugger
       }
       else
       {
+        if (_localState.currentText == null)
+        {
+          ReadNextData(true);
+          return;
+        }
+
         _localState.charIndex++;
 
         if (_localState.charIndex >= _localState.currentText.Length)
@@ -283,7 +298,7 @@ namespace RasterizeDebugger
 
           c = _currFontData.Rasterizer.FindCharFromCID(CID);
           sb.Append("[<");
-          sb.Append(_localState.currentText.AsSpan().Slice(i, _interpreter._byteSize *2));
+          sb.Append(_localState.currentText.AsSpan().Slice(i, _interpreter._byteSize * 2));
           sb.Append("> ");
           sb.Append((int)CID);
           sb.Append('-');
@@ -293,12 +308,12 @@ namespace RasterizeDebugger
         lbl_currentText.Text = sb.ToString();
         lbl_currentChar.Text = c?.ToString();
       }
-      else
+      else if (_interpreter._debugState.isPath == false && _localState.currentText != null)
       {
         lbl_currentText.Text = _localState.currentText;
         lbl_currentChar.Text = _localState.currentText[_localState.charIndex].ToString();
       }
-      
+
     }
     public void UpdateImageDataAndPictureBox()
     {
@@ -323,8 +338,9 @@ namespace RasterizeDebugger
         {
           ProcessText(false);
         }
-        
-      } catch(Exception ex)
+
+      }
+      catch (Exception ex)
       {
 
       }
@@ -340,23 +356,29 @@ namespace RasterizeDebugger
         sw.Stop();
         MessageBox.Show($"Process time: {processTime}ms. Total: {sw.ElapsedMilliseconds}ms!");
       }
-      
-      
+
+
 
     }
 
     private void ProcessText(bool updateUI = true)
     {
-      GlyphInfo gInfo = new GlyphInfo();
+      if (_end)
+      {
+        MessageBox.Show("End of content!");
+        return;
+      }
 
-      _currFontData = _interpreter._currentFont;
+      if (_interpreter._debugState.isPath)
+      {
+        PaintPath(true);
+      }
+      else
+      {
+        _currFontData = _interpreter._currentFont;
+        _interpreter.PDF_DrawText(_localState.currentText);
+      }
 
-      _currRasterizer = _currFontData.Rasterizer;
-      double[] widths = _currFontData.FontInfo.Widths;
-      char? c;
-      _interpreter.PDF_DrawText(_localState.currentText);
-      
-      _localState.charIndex = _localState.currentText.Length - 1;
       if (updateUI)
       {
         UpdateImageDataAndPictureBox();
@@ -367,16 +389,66 @@ namespace RasterizeDebugger
           _lastFontRef = _interpreter._debugState.FontRef;
         }
       }
-      _localState.textIndex++;
-      if (_localState.textIndex >= _interpreter._debugState.Literals.Count)
+   
+
+
+      if (_interpreter._debugState.isPath)
       {
-        // Load next from interpreer
-        ReadNextData(updateUI);
+        ReadNextData(true);
       }
       else
       {
-        SetNextTextAndUpdateState(updateUI);
+        if (_localState.currentText == null)
+        {
+          ReadNextData(true);
+          return;
+        }
+
+        _localState.textIndex++;
+        if (_localState.textIndex >= _interpreter._debugState.Literals.Count)
+        {
+          // Load next from interpreer
+          ReadNextData(true);
+        }
+        else
+        {
+          SetNextTextAndUpdateState(true);
+        }
       }
+
+
+
+
+      //GlyphInfo gInfo = new GlyphInfo();
+
+      //_currFontData = _interpreter._currentFont;
+
+      //_currRasterizer = _currFontData.Rasterizer;
+      //double[] widths = _currFontData.FontInfo.Widths;
+      //char? c;
+      //_interpreter.PDF_DrawText(_localState.currentText);
+
+      //_localState.charIndex = _localState.currentText.Length - 1;
+      //if (updateUI)
+      //{
+      //  UpdateImageDataAndPictureBox();
+      //  UpdateLabels();
+      //  if (_lastFontRef != _interpreter._debugState.FontRef)
+      //  {
+      //    UpdateFontInfoTreeView();
+      //    _lastFontRef = _interpreter._debugState.FontRef;
+      //  }
+      //}
+      //_localState.textIndex++;
+      //if (_localState.textIndex >= _interpreter._debugState.Literals.Count)
+      //{
+      //  // Load next from interpreer
+      //  ReadNextData(updateUI);
+      //}
+      //else
+      //{
+      //  SetNextTextAndUpdateState(updateUI);
+      //}
     }
 
 
@@ -394,9 +466,9 @@ namespace RasterizeDebugger
         * _interpreter.currentTextObject.FontScaleFactor;
     }
 
-    public void DrawGlyphAndUpdateGlyphInfo(char c, ref GlyphInfo glyphInfo, string literal, int index, bool updateUI, char CID = ' ')
+    public void DrawGlyphAndUpdateGlyphInfo(char c, ref GlyphInfo glyphInfo, string literal, int index, bool updateUI)
     {
-      _interpreter.PDF_DrawText(_localState.currentText);
+      _interpreter.PDF_DrawGlyph(c, ref glyphInfo, literal, index);
       if (!updateUI)
         return;
       lbl_charValue.Text = ((int)c).ToString();
@@ -469,9 +541,11 @@ namespace RasterizeDebugger
     }
 
     // not most efficient since we always recreate tree b ut w/e
-    
+
     private void UpdateFontInfoTreeView()
     {
+      if (_interpreter._debugState.isPath)
+        return;
       tview_fontInfo.BeginUpdate();
       tview_fontInfo.Nodes.Clear();
       tview_fontInfo.Nodes.Add(_currFontData.Key);
@@ -486,7 +560,7 @@ namespace RasterizeDebugger
         {
           tview_fontInfo.Nodes[0].LastNode.Nodes.Add($"CID: {kvp.Key} Width: {kvp.Value}");
         }
-        
+
         tview_fontInfo.Nodes[0].Nodes.Add("FontDescriptor");
         tview_fontInfo.Nodes[0].LastNode.Nodes.Add($"SubType: {fontDict.Subtype}");
         tview_fontInfo.Nodes[0].LastNode.Nodes.Add($"FontName: {fontDict.FontDescriptor.FontName}");
@@ -642,13 +716,14 @@ namespace RasterizeDebugger
       if (_file == null)
       {
         p = new Playground();
-      } else
+      }
+      else
       {
         PdfParser parser = new PdfParser();
         PDF_Options options = new PDF_Options();
         PDFFile file = parser.Parse(_fileFullPath, ref options, true);
         p = new Playground(file);
-        
+
       }
       p.Show();
     }
@@ -680,6 +755,17 @@ namespace RasterizeDebugger
     {
       DataViewer dw = new DataViewer(_interpreter);
       dw.Show();
+    }
+
+    private void cb_PathPaint_CheckedChanged(object sender, EventArgs e)
+    {
+      if (_interpreter != null)
+        _interpreter._debugState.SkipPath = cb_PathPaint.Checked;
+    }
+
+    private void cb_PathPaint_MouseHover(object sender, EventArgs e)
+    {
+      
     }
   }
 }

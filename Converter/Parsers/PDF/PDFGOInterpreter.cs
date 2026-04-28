@@ -234,25 +234,55 @@ namespace Converter.Parsers.PDF
           #endregion pathConstruction
           #region pathPainting
           case 0x53: // S
+            if (_debug && _debugState.SkipPath == false)
+            {
+              // shape and logger reset have to be handled by debugger now
+              _debugState.isPath = true;
+              return;
+            }
             StrokePath();
             break;
           case 0x73: // s
             h();
+            if (_debug && _debugState.SkipPath == false)
+            {
+              // shape and logger reset have to be handled by debugger now
+              _debugState.isPath = true;
+              return;
+            }
             StrokePath();
             break;
           case 0x66: // f
             currentPC.EvenOddClippingPath = false;
             currentPC.NonZeroClippingPath = true;
+            if (_debug && _debugState.SkipPath == false)
+            {
+              // shape and logger reset have to be handled by debugger now
+              _debugState.isPath = true;
+              return;
+            }
             StrokePath();
             break;
           case 0x46: // F
             currentPC.EvenOddClippingPath = false;
             currentPC.NonZeroClippingPath = true;
+            if (_debug && _debugState.SkipPath == false)
+            {
+              // shape and logger reset have to be handled by debugger now
+              _debugState.isPath = true;
+              return;
+            }
             StrokePath();
             break;
           case 0x2a66: // f*
             currentPC.EvenOddClippingPath = true;
             currentPC.NonZeroClippingPath = false;
+            if (_debug && _debugState.SkipPath == false)
+            {
+              // shape and logger reset have to be handled by debugger now
+              _debugState.isPath = true;
+              return;
+            }
             StrokePath();
             break;
           case 0x42: // B
@@ -1530,13 +1560,6 @@ namespace Converter.Parsers.PDF
 
     public void StrokePath()
     {
-      if (_debug)
-      {
-        // shape and logger reset have to be handled by debugger now
-        _debugState.isPath = true;
-        return;
-      }
-
       try
       {
         PDF_RasterShape();
@@ -1544,6 +1567,7 @@ namespace Converter.Parsers.PDF
       catch (Exception ex)
       {
 #if DEBUG
+        if (!_debug) // handle this somehow better
         throw ex;
 #endif
       }

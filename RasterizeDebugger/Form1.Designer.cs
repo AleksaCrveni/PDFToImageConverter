@@ -59,6 +59,7 @@
       label5 = new Label();
       lbl_literalNumber = new Label();
       btn_Log = new Button();
+      cb_PathPaint = new CheckBox();
       ((System.ComponentModel.ISupportInitialize)pb_mainImage).BeginInit();
       panel1.SuspendLayout();
       panel2.SuspendLayout();
@@ -383,11 +384,24 @@
       btn_Log.UseVisualStyleBackColor = true;
       btn_Log.Click += btn_Log_Click;
       // 
+      // cb_PathPaint
+      // 
+      cb_PathPaint.AutoSize = true;
+      cb_PathPaint.Location = new Point(589, 12);
+      cb_PathPaint.Name = "cb_PathPaint";
+      cb_PathPaint.Size = new Size(88, 19);
+      cb_PathPaint.TabIndex = 26;
+      cb_PathPaint.Text = "Skip Shapes";
+      cb_PathPaint.UseVisualStyleBackColor = true;
+      cb_PathPaint.CheckedChanged += cb_PathPaint_CheckedChanged;
+      cb_PathPaint.MouseHover += cb_PathPaint_MouseHover;
+      // 
       // form_main
       // 
       AutoScaleDimensions = new SizeF(7F, 15F);
       AutoScaleMode = AutoScaleMode.Font;
       ClientSize = new Size(1012, 675);
+      Controls.Add(cb_PathPaint);
       Controls.Add(btn_Log);
       Controls.Add(lbl_literalNumber);
       Controls.Add(label5);
@@ -451,5 +465,6 @@
     private Label label5;
     private Label lbl_literalNumber;
     private Button btn_Log;
+    private CheckBox cb_PathPaint;
   }
 }
