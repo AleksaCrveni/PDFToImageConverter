@@ -114,13 +114,8 @@ namespace Converter.Rasterizers
         _shapePoints[i] = _shapePoints[i] * scale;
     }
 
-    // Positions are absolute so reader should anticipate that
-    public void SaveAbsolute(string name)
+    public void SaveAbsolute(FileStream fs)
     {
-#if RELEASE
-          return;
-#endif
-      FileStream fs = File.Create(Path.Join(Files.RootFolder, $"PS_SHAPE_{name}.shape"));
       byte[] mem = new byte[8096]; // limit for now for 8k shapes
       Span<byte> buffer = mem.AsSpan();
       int pos = 0;
@@ -158,6 +153,14 @@ namespace Converter.Rasterizers
       fs.Flush();
       fs.Close();
       fs.Dispose();
+    }
+    public void SaveAbsolute(string name)
+    {
+#if RELEASE
+          return;
+#endif
+      FileStream fs = File.Create(Path.Join(Files.RootFolder, $"PS_SHAPE_{name}.shape"));
+      SaveAbsolute(fs);
     }
 
     /// <summary>

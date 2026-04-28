@@ -2,14 +2,11 @@
 using Converter.FileStructures.PDF.GraphicsInterpreter;
 using Converter.FileStructures.PostScript;
 using Converter.FileStructures.TTF;
-using Converter.FileStructures.Type1;
 using Converter.Rasterizers;
 using Converter.Utils;
 using Converter.Writers.TIFF;
 using System.Diagnostics;
-using System.Security.Cryptography;
 using System.Text;
-using static System.Windows.Forms.AxHost;
 
 
 namespace RasterizeDebugger
@@ -30,6 +27,17 @@ namespace RasterizeDebugger
     public Playground()
     {
       InitializeComponent();
+      _dialog = new OpenFileDialog();
+      _dialog.Filter = "Shape (*.shape)|*.shape";
+      _dialog.RestoreDirectory = true;
+    }
+
+    public Playground(PSShape shape)
+    {
+      InitializeComponent();
+      if (shape == null)
+        MessageBox.Show("Shape is null!");
+      _shape = shape;
       _dialog = new OpenFileDialog();
       _dialog.Filter = "Shape (*.shape)|*.shape";
       _dialog.RestoreDirectory = true;
@@ -80,6 +88,8 @@ namespace RasterizeDebugger
       _imageDataStartPos = writer.data.InitialImageDataOffset;
       _imageData = memoryStream.ToArray();
       pb_main.Image = Image.FromStream(new MemoryStream(_imageData));
+      if (_shape != null)
+        RasterShape(_shape);
 
     }
 
@@ -158,7 +168,13 @@ namespace RasterizeDebugger
     private void btn_raster_Click(object sender, EventArgs e)
     {
       if (_pdfFile == null)
+      {
+        if (_shape == null)
+          return;
+        RasterShape(_shape);
         return;
+      }
+
       Raster();
     }
 
@@ -312,104 +328,126 @@ namespace RasterizeDebugger
       {
         _shape = new PSShape();
         _shape.LoadData(File.ReadAllBytes(_dialog.FileName));
-        PathRasterizer shapeRasterizer = new PathRasterizer(Array.Empty<byte>(), "");
-        
-          
-        Array.Clear(_data);
-        bool valid = float.TryParse(txb_Scale.Text, out float res);
-        
-        if (!valid || res <= 0 || res > 100)
+        RasterShape(_shape);
+      }
+    }
+
+    private void RasterShape(PSShape shape)
+    {
+      PathRasterizer shapeRasterizer = new PathRasterizer(Array.Empty<byte>(), "");
+
+
+      Array.Clear(_data);
+      bool valid = float.TryParse(txb_Scale.Text, out float res);
+
+      if (!valid || res <= 0 || res > 100)
+      {
+        MessageBox.Show("Invalid scale value!");
+        return;
+      }
+      _scale = res;
+      //_shape.ScaleAll(_scale);
+
+      Debug.Assert(_shape != null);
+
+      // already scaled
+      List<TTFVertex> vertices = RasterHelper.ConvertToTTFVertexFormat(_shape);
+      StringBuilder sb = new StringBuilder();
+      #region log
+      int j = 0;
+      for (int i = 0; i < _shape._moves.Count; i++)
+      {
+        PS_COMMAND v = _shape._moves[i];
+        if (v == PS_COMMAND.MOVE_TO)
         {
-          MessageBox.Show("Invalid scale value!");
-          return;
+          sb.Append($"{vertices[i].x} {vertices[i].y} ");
+          sb.Append("MOVE_TO ");
         }
-        _scale = res;
-        //_shape.ScaleAll(_scale);
-
-        Debug.Assert(_shape != null);
-
-        // already scaled
-        List<TTFVertex> vertices = RasterHelper.ConvertToTTFVertexFormat(_shape);
-        StringBuilder sb = new StringBuilder();
-        #region log
-        int j = 0;
-        for (int i = 0; i < _shape._moves.Count; i++)
+        else if (v == PS_COMMAND.LINE_TO)
         {
-          PS_COMMAND v = _shape._moves[i];
-          if (v == PS_COMMAND.MOVE_TO)
-          {
-            sb.Append($"{vertices[i].x} {vertices[i].y} ");
-            sb.Append("MOVE_TO ");
-          }
-          else if (v == PS_COMMAND.LINE_TO)
-          {
-            sb.Append($"{vertices[i].x} {vertices[i].y} ");
-            sb.Append("LINE_TO ");
-          }
-          else if (v == PS_COMMAND.CUBIC_CURVE_TO)
-          {
-            sb.Append($"{vertices[i].cx} {vertices[i].cy} {vertices[i].cx1} {vertices[i].cy1} {vertices[i].x} {vertices[i].y} ");
-            sb.Append("CURVE_TO ");
-          }
-          else
-          {
-            throw new InvalidDataException("Invalid PS_COMMAND!");
-          }
-
+          sb.Append($"{vertices[i].x} {vertices[i].y} ");
+          sb.Append("LINE_TO ");
         }
-
-        //File.WriteAllText($"TTF_VERTEX_FROM_TYPE1__{name}__{scale.ToString()}.txt", sb.ToString());
-        #endregion log
-
-        List<int> windingLengths = new List<int>();
-        int windingCount = 0;
-
-        List<Converter.FileStructures.TTF.PointF> windings = shapeRasterizer.STB_FlattenCurves(ref vertices, vertices.Count, 0.35f / _scale, ref windingLengths, ref windingCount);
-        int c_x0 = 0;
-        int c_y0 = 0;
-        int c_x1 = 0;
-        int c_y1 = 0;
-        RasterHelper.GetFakeBoundingBoxFromPoints(windings, ref c_x0, ref c_y0, ref c_x1, ref c_y1, _scale);
-        int glyphWidth = c_x1 - c_x0;
-        int glyphHeight = c_y1 - c_y0;
-        if (_shape._width.Y > 0)
-          glyphHeight = (int)(_shape._width.Y * _scale);
-
-        if (glyphHeight == 0)
+        else if (v == PS_COMMAND.CUBIC_CURVE_TO)
         {
-          var w = windings.Last();
-          w.Y = 1;
-          windings[windings.Count - 1] = w;
-          glyphHeight = 1;
+          sb.Append($"{vertices[i].cx} {vertices[i].cy} {vertices[i].cx1} {vertices[i].cy1} {vertices[i].x} {vertices[i].y} ");
+          sb.Append("CURVE_TO ");
         }
-          
-        if (glyphWidth == 0)
+        else
         {
-          glyphWidth = 1;
+          throw new InvalidDataException("Invalid PS_COMMAND!");
         }
-          
-        BmpS result = new BmpS();
-        result.H = glyphHeight;
-        result.W = (int)(glyphWidth);
-        result.Offset = 20 * _height + 20; // draw at 20,20
-        result.Pixels = _data;
-        result.Stride = _width;
-        //shapeRasterizer.STB_InternalRasterize(ref result, ref windings, ref windingLengths, windingCount, _scale, _scale, 0, 0, 0, 0, false);
-        shapeRasterizer.RasterizeShape(_data, result.Offset, _width, _shape, _scale);
-        bool isEmpty = true;
-        foreach (byte b in _data)
-        {
-          if (b > 0)
-          {
-            isEmpty = false;
-            break;
-          }
-        }
-        if (isEmpty)
-          throw new Exception("NE RADI");
-        UpdateImage();
 
       }
+
+      //File.WriteAllText($"TTF_VERTEX_FROM_TYPE1__{name}__{scale.ToString()}.txt", sb.ToString());
+      #endregion log
+
+      List<int> windingLengths = new List<int>();
+      int windingCount = 0;
+
+      List<Converter.FileStructures.TTF.PointF> windings = shapeRasterizer.STB_FlattenCurves(ref vertices, vertices.Count, 0.35f / _scale, ref windingLengths, ref windingCount);
+      int c_x0 = 0;
+      int c_y0 = 0;
+      int c_x1 = 0;
+      int c_y1 = 0;
+      RasterHelper.GetFakeBoundingBoxFromPoints(windings, ref c_x0, ref c_y0, ref c_x1, ref c_y1, _scale);
+      int glyphWidth = c_x1 - c_x0;
+      int glyphHeight = c_y1 - c_y0;
+      if (_shape._width.Y > 0)
+        glyphHeight = (int)(_shape._width.Y * _scale);
+
+      if (glyphHeight == 0)
+      {
+        var w = windings.Last();
+        w.Y = 1;
+        windings[windings.Count - 1] = w;
+        glyphHeight = 1;
+      }
+
+      if (glyphWidth == 0)
+      {
+        glyphWidth = 1;
+      }
+
+      BmpS result = new BmpS();
+      result.H = glyphHeight;
+      result.W = (int)(glyphWidth);
+      result.Offset = 20 * _height + 20; // draw at 20,20
+      result.Pixels = _data;
+      result.Stride = _width;
+      //shapeRasterizer.STB_InternalRasterize(ref result, ref windings, ref windingLengths, windingCount, _scale, _scale, 0, 0, 0, 0, false);
+      // copy shape so we dont modify original shape since we may want to raster it at different sizes
+      PSShape actualShape = DeepCopyShape(_shape);
+      shapeRasterizer.RasterizeShape(_data, result.Offset, _width, actualShape, _scale);
+      bool isEmpty = true;
+      foreach (byte b in _data)
+      {
+        if (b > 0)
+        {
+          isEmpty = false;
+          break;
+        }
+      }
+      if (isEmpty)
+        throw new Exception("NE RADI");
+      UpdateImage();
+    }
+
+    public PSShape DeepCopyShape(PSShape _in)
+    {
+      PSShape shape = new PSShape();
+      shape._moves = _in._moves.Select(x => x).ToList();
+      shape._shapePoints = _in._shapePoints.Select(x => x).ToList();
+      if (_in._windings != null)
+        shape._windings = _in._windings.Select(x => x).ToList();
+      shape._width = _in._width;
+      shape._actualLast = _in._actualLast;
+      shape._windingCount = _in._windingCount;
+      shape._windingLengths = _in._windingLengths;
+      shape._xMin = _in._xMin;
+      shape._yMin = _in._yMin;
+      return shape;
     }
     private void UpdateImage()
     {

@@ -60,6 +60,8 @@
       lbl_literalNumber = new Label();
       btn_Log = new Button();
       cb_PathPaint = new CheckBox();
+      btn_RasterFromLog = new Button();
+      btn_SaveShape = new Button();
       ((System.ComponentModel.ISupportInitialize)pb_mainImage).BeginInit();
       panel1.SuspendLayout();
       panel2.SuspendLayout();
@@ -396,11 +398,35 @@
       cb_PathPaint.CheckedChanged += cb_PathPaint_CheckedChanged;
       cb_PathPaint.MouseHover += cb_PathPaint_MouseHover;
       // 
+      // btn_RasterFromLog
+      // 
+      btn_RasterFromLog.Anchor = AnchorStyles.Top | AnchorStyles.Right;
+      btn_RasterFromLog.Location = new Point(106, 38);
+      btn_RasterFromLog.Name = "btn_RasterFromLog";
+      btn_RasterFromLog.Size = new Size(111, 23);
+      btn_RasterFromLog.TabIndex = 27;
+      btn_RasterFromLog.Text = "Raster From Log";
+      btn_RasterFromLog.UseVisualStyleBackColor = true;
+      btn_RasterFromLog.Click += btn_RasterFromLog_Click;
+      // 
+      // btn_SaveShape
+      // 
+      btn_SaveShape.Anchor = AnchorStyles.Top | AnchorStyles.Right;
+      btn_SaveShape.Location = new Point(223, 38);
+      btn_SaveShape.Name = "btn_SaveShape";
+      btn_SaveShape.Size = new Size(83, 23);
+      btn_SaveShape.TabIndex = 28;
+      btn_SaveShape.Text = "Save Shape";
+      btn_SaveShape.UseVisualStyleBackColor = true;
+      btn_SaveShape.Click += btn_SaveShape_Click;
+      // 
       // form_main
       // 
       AutoScaleDimensions = new SizeF(7F, 15F);
       AutoScaleMode = AutoScaleMode.Font;
       ClientSize = new Size(1012, 675);
+      Controls.Add(btn_SaveShape);
+      Controls.Add(btn_RasterFromLog);
       Controls.Add(cb_PathPaint);
       Controls.Add(btn_Log);
       Controls.Add(lbl_literalNumber);
@@ -466,5 +492,7 @@
     private Label lbl_literalNumber;
     private Button btn_Log;
     private CheckBox cb_PathPaint;
+    private Button btn_RasterFromLog;
+    private Button btn_SaveShape;
   }
 }

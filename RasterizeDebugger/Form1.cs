@@ -7,6 +7,7 @@ using Converter.Parsers.PDF;
 using Converter.Rasterizers;
 using Converter.Writers.TIFF;
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using System.Drawing.Drawing2D;
 using System.Globalization;
 using System.Text;
@@ -150,7 +151,7 @@ namespace RasterizeDebugger
         lbl_glyphName.Text = "NULL";
         lbl_currentChar.Text = "NULL";
 
-        
+
       }
     }
 
@@ -389,7 +390,7 @@ namespace RasterizeDebugger
           _lastFontRef = _interpreter._debugState.FontRef;
         }
       }
-   
+
 
 
       if (_interpreter._debugState.isPath)
@@ -765,7 +766,31 @@ namespace RasterizeDebugger
 
     private void cb_PathPaint_MouseHover(object sender, EventArgs e)
     {
-      
+
+    }
+
+    private void btn_RasterFromLog_Click(object sender, EventArgs e)
+    {
+      if (_interpreter == null || _interpreter.currentPC.Shape._moves.Count == 0)
+      {
+        MessageBox.Show("No shape available!");
+        return;
+      }
+
+      Playground p = new Playground(_interpreter.currentPC.Shape);
+      p.Show();
+    }
+
+    private void btn_SaveShape_Click(object sender, EventArgs e)
+    {
+      SaveFileDialog sfd = new SaveFileDialog();
+      sfd.Filter = "Shape (*.shape)|*.shape";
+      sfd.RestoreDirectory = true;
+      if (sfd.ShowDialog() == DialogResult.OK)
+      {
+        FileStream fs = (FileStream)sfd.OpenFile();
+        _interpreter.currentPC.Shape.SaveAbsolute(fs);
+      }
     }
   }
 }
