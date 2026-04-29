@@ -13,7 +13,7 @@ namespace Converter.Rasterizers
   {
     private PDF_FontInfo _fontInfo;
     private PDF_FontEncodingData _encodingData;
-    private TTF_Table_POST _ttfTablePOST;
+    public TTF_Table_POST _ttfTablePOST;
     private TTF_Table_CMAP _ttfTableCMAP;
     private float _unitsPerEm = 1024f; // used to covnert from glyph to text space, for ttf its 1/1000 default value
     private bool _CFF;// flag to know that TTF font program is not standalone but part of composite font

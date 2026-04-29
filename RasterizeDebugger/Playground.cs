@@ -135,8 +135,31 @@ namespace RasterizeDebugger
       }
       else if (_currFont.FontInfo.SubType == PDF_FontType.TrueType)
       {
-        cb_glyph.EndUpdate();
+        // very stupid 'trick' we will take all non zero entries in widths array and consider it being a limiteation if i miss some
+        TTFRasterizer r = (TTFRasterizer)_currFont.Rasterizer;
+        // for some reason it can happen that fontfile is not embdded and for now we set rasterizer as null
+        if (r != null)
+        {
+          GlyphInfo glyphInfo = new GlyphInfo();
+          double[] widths = _currFont.FontInfo.Widths;
+          char c = ' ';
+          for (int i = 0; i < widths.Length; i++)
+          {
+            if (widths[i] == 0)
+              continue;
+            c = (char)(_currFont.FontInfo.FirstChar + i);
+            Debug.Assert(c < 256); // pdf ttf limit
+            r.GetGlyphInfo(c, ref glyphInfo);
+            if (glyphInfo.Index == 0 && glyphInfo.Name == string.Empty)
+              continue;
+            // we set i so that we can search it with normal raster function order
+            cb_glyph.Items.Add($"{(int)c} - {glyphInfo.Name}");
+          }
+        }
+        
 
+        cb_glyph.EndUpdate();
+        cb_glyph.SelectedIndex = 0;
       }
       else
       {
@@ -307,7 +330,9 @@ namespace RasterizeDebugger
       }
       else if (_currFont.FontInfo.SubType == PDF_FontType.TrueType)
       {
-        throw new NotImplementedException();
+        int i = Convert.ToInt32(cbValue.Split("-")[0].TrimEnd());
+        Debug.Assert(i < 256);
+        c = (char)i;
       }
       else
       {
