@@ -163,9 +163,9 @@
       // btn_processAll
       // 
       btn_processAll.Anchor = AnchorStyles.Top | AnchorStyles.Right;
-      btn_processAll.Location = new Point(937, 10);
+      btn_processAll.Location = new Point(937, 9);
       btn_processAll.Name = "btn_processAll";
-      btn_processAll.Size = new Size(63, 51);
+      btn_processAll.Size = new Size(63, 52);
       btn_processAll.TabIndex = 9;
       btn_processAll.Text = "Process All";
       btn_processAll.UseVisualStyleBackColor = true;

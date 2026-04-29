@@ -23,7 +23,7 @@ namespace RasterizeDebugger
     byte[] _imageData;
     OpenFileDialog _dialog;
     PSShape _shape;
-
+    PDF_PageInfo _currPage;
     public Playground()
     {
       InitializeComponent();
@@ -56,25 +56,17 @@ namespace RasterizeDebugger
       // bad workaround
       List<string> seen = new List<string>();
 
-      if (_pdfFile != null) 
+      if (_pdfFile != null)
       {
-        foreach (PDF_PageInfo pInfo in _pdfFile.PageInformation)
+        for (int i = 0; i < _pdfFile.PageInformation.Count; i++)
         {
-          foreach (PDF_FontData font in pInfo.ResourceDict.Font)
-          {
-            if (seen.Contains(font.FontInfo.BaseFont))
-              continue;
-            cb_font.Items.Add(font.FontInfo.BaseFont);
-            seen.Add(font.FontInfo.BaseFont);
-          }
+          cb_page.Items.Add($"Page {i + 1}");
+          cb_page.SelectedIndex = 0;
         }
-        cb_font.SelectedIndex = 0;
       }
-      
 
-      
+      _scale = 0.5f;
       txb_Scale.Text = _scale.ToString();
-      _scale = 1f;
       _data = new byte[_height * _width];
       pb_main.Size = new Size(_width, _height);
       MemoryStream memoryStream = new MemoryStream();
@@ -95,30 +87,25 @@ namespace RasterizeDebugger
 
     private void cb_font_SelectedIndexChanged(object sender, EventArgs e)
     {
-      string name = cb_font.SelectedItem.ToString();
-      bool found = false;
-      foreach (PDF_PageInfo pInfo in _pdfFile.PageInformation)
-      {
-        foreach (PDF_FontData fontData in pInfo.ResourceDict.Font)
-        {
-          if (fontData.FontInfo.BaseFont == name)
-          {
-            _currFont = fontData;
-            found = true;
-            break;
-          }
-        }
-        if (found)
-          break;
-      }
+      string key = cb_font.SelectedItem.ToString().Split('-')[0].TrimEnd();
       
+      foreach (PDF_FontData fontData in _currPage.ResourceDict.Font)
+      {
+        if (fontData.Key == key)
+        {
+          _currFont = fontData;
+          break;
+        }
+      }
+
+      lbl_fontType.Text = _currFont.FontInfo.SubType.ToString();
+      cb_glyph.BeginUpdate();
+      cb_glyph.Items.Clear();
       if (_currFont.FontInfo.SubType == PDF_FontType.Type0)
       {
         PDF_CID_CMAP cmap = _currFont.FontInfo.DescendantFontsInfo[0].Cmap;
         if (cmap != null)
         {
-          cb_glyph.BeginUpdate();
-          cb_glyph.Items.Clear();
           foreach (KeyValuePair<char, char> kvp in cmap.Cmap)
           {
             cb_glyph.Items.Add($"{(int)kvp.Key}-{(int)kvp.Value}-{kvp.Value}"); // CID-Actual-Char
@@ -128,8 +115,11 @@ namespace RasterizeDebugger
             cb_glyph.Items.Add($"{(int)kvp.Key}-Ligature"); // CID-Actual-Char
           }
           cb_glyph.EndUpdate();
-        } else
+          cb_glyph.SelectedIndex = 0;
+        }
+        else
         {
+          cb_glyph.EndUpdate();
           throw new NotImplementedException("CMAP EMPTY!");
         }
       }
@@ -139,19 +129,22 @@ namespace RasterizeDebugger
         // we ignore first char becuase string starts with /
         string[] chars = _currFont.FontInfo.FontDescriptor.CharSet.AsSpan().Slice(1).ToString().Split('/');
         Debug.Assert(chars.Length > 0);
-        cb_glyph.Items.Clear();
-        cb_glyph.BeginUpdate();
         cb_glyph.Items.AddRange(chars);
         cb_glyph.EndUpdate();
         cb_glyph.SelectedIndex = 0;
       }
       else if (_currFont.FontInfo.SubType == PDF_FontType.TrueType)
       {
+        cb_glyph.EndUpdate();
+
       }
       else
       {
+        cb_glyph.EndUpdate();
         throw new NotImplementedException("s");
       }
+
+      
     }
 
     private void label3_Click(object sender, EventArgs e)
@@ -460,12 +453,25 @@ namespace RasterizeDebugger
       {
         foreach (PDF_FontData font in pInfo.ResourceDict.Font)
         {
-            if (font.Key == searchKey)
-              return font;
+          if (font.Key == searchKey)
+            return font;
         }
       }
 
       return new PDF_FontData();
+    }
+
+    private void cb_page_SelectedIndexChanged(object sender, EventArgs e)
+    {
+      int idx = cb_page.SelectedIndex;
+      _currPage =  _pdfFile.PageInformation[idx];
+      cb_font.Items.Clear();
+      _currFont = _currPage.ResourceDict.Font[0];
+      foreach (PDF_FontData font in _currPage.ResourceDict.Font)
+      {
+        cb_font.Items.Add($"{font.Key} - {font.FontInfo.BaseFont}");
+      }
+      cb_font.SelectedIndex = 0;
     }
   }
 }
