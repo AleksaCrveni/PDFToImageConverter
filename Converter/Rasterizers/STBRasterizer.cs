@@ -1709,7 +1709,7 @@ namespace Converter.Rasterizers
     /// <param name="y0"></param>
     /// <param name="x1"></param>
     /// <param name="y1"></param>
-    public virtual void MY_DrawLine(byte[] bitmapArr, int byteOffset, int bitmapWidth, double x0, double y0, double x1, double y1)
+    public virtual void MY_DrawLine(byte[] bitmapArr, int byteOffset, int bitmapWidth, int bitmapHeight, double x0, double y0, double x1, double y1)
     {
       bool steep = Math.Abs(y1 - y0) > Math.Abs(x1 - x0);
       if (steep)
@@ -1750,6 +1750,10 @@ namespace Converter.Rasterizers
         int xEnd = (int)Math.Floor(x0);
       double yEnd = y0 + gradient * ((double)xEnd - x0);
       double xGap = 1 - (x0 - (double)xEnd);
+      
+      // I am not sure if this is right or i should always do -1 for yEnd
+      if (yEnd >= bitmapHeight)
+        yEnd = bitmapHeight - 2; 
 
       int xPxl1 = xEnd;
       int yPxl1 = (int)Math.Floor(yEnd);
@@ -1770,6 +1774,11 @@ namespace Converter.Rasterizers
       // second end point
       xEnd = (int)Math.Ceiling(x1);
       yEnd = y1 + gradient * ((double)xEnd - x1);
+
+      // I am not sure if this is right or i should always do -1 for yEnd
+      if (yEnd >= bitmapHeight)
+        yEnd = bitmapHeight - 2;
+
       xGap = 1 - ((double)xEnd - x1);
 
       int xPxl2 = xEnd;

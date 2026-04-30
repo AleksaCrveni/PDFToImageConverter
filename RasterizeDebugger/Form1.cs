@@ -312,7 +312,8 @@ namespace RasterizeDebugger
       else if (_interpreter._debugState.isPath == false && _localState.currentText != null)
       {
         lbl_currentText.Text = _localState.currentText;
-        lbl_currentChar.Text = _localState.currentText[_localState.charIndex].ToString();
+        if (_localState.charIndex < _localState.currentText.Length)
+          lbl_currentChar.Text = _localState.currentText[_localState.charIndex].ToString();
       }
 
     }

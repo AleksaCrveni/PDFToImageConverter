@@ -437,7 +437,7 @@ namespace RasterizeDebugger
       //shapeRasterizer.STB_InternalRasterize(ref result, ref windings, ref windingLengths, windingCount, _scale, _scale, 0, 0, 0, 0, false);
       // copy shape so we dont modify original shape since we may want to raster it at different sizes
       PSShape actualShape = DeepCopyShape(_shape);
-      shapeRasterizer.RasterizeShape(_data, result.Offset, _width, actualShape, _scale);
+      shapeRasterizer.RasterizeShape(_data, result.Offset, _width, _height, actualShape, _scale);
       bool isEmpty = true;
       foreach (byte b in _data)
       {

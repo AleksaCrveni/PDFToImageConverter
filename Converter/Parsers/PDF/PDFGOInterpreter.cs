@@ -179,12 +179,12 @@ namespace Converter.Parsers.PDF
           #region pathConstruction
           case 0x6d: // m
             // this is relavive to current point
-            double y = _targetSize.Height - GetNextStackValAsDouble();
+            double y = GetNextStackValAsDouble();
             double x = GetNextStackValAsDouble();
             m(x, y);
             break;
           case 0x6c: // l
-            y = _targetSize.Height - GetNextStackValAsDouble();
+            y = GetNextStackValAsDouble();
             x = GetNextStackValAsDouble();
             l(x, y);
             break;
@@ -222,7 +222,7 @@ namespace Converter.Parsers.PDF
 
             double height = -GetNextStackValAsDouble();
             double width = GetNextStackValAsDouble();
-            y = _targetSize.Height - GetNextStackValAsDouble();
+            y = GetNextStackValAsDouble();
             x = GetNextStackValAsDouble();
             _pathLogger.Log(" re ");
             m(x, y);
@@ -957,21 +957,21 @@ namespace Converter.Parsers.PDF
     /// </summary>
     public void PDF_RasterShape()
     {
-      ////currentPC.Shape.SaveAbsolute("shapeExport");
-      //// rounding makes it look a bit better?
-      //int X = (int)MathF.Round((float)currentGS.CTM[2, 0]);
-      //// because origin is bottom-left we have do bitmapHeight - , to get position on the top
-      //int Y = _targetSize.Height - (int)(currentGS.CTM[2, 1]);
+      //currentPC.Shape.SaveAbsolute("shapeExport");
+      // rounding makes it look a bit better?
+      int X = (int)MathF.Round((float)currentGS.CTM[2, 0]);
+      // because origin is bottom-left we have do bitmapHeight - , to get position on the top
+      int Y = _targetSize.Height - (int)(currentGS.CTM[2, 1]);
 
-      //float scaleX = (float)currentGS.CTM[0, 0];
-      //float scaleY = (float)currentGS.CTM[1, 1];
+      float scaleX = (float)currentGS.CTM[0, 0];
+      float scaleY = (float)currentGS.CTM[1, 1];
 
-      //// do one scale for now
-      //float scale = scaleX > scaleY ? scaleX : scaleY;
+      // do one scale for now
+      float scale = scaleX > scaleY ? scaleX : scaleY;
 
-      //int y = Y;
-      //int byteOffset = X + (y * _targetSize.Width);
-      _shapeRasterizer.RasterizeShape(_outputBuffer, 0, 1, currentPC.Shape, 1);
+      int y = Y;
+      int byteOffset = X + (y * _targetSize.Width);
+      _shapeRasterizer.RasterizeShape(_outputBuffer, byteOffset, _targetSize.Width, _targetSize.Height, currentPC.Shape, scale);
     }
 
     public void PDF_DrawText(string textToWrite, int positionAdjustment = 0)

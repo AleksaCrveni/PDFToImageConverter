@@ -34,7 +34,7 @@ namespace Converter.Rasterizers
      
     }
 
-    public void RasterizeShape(byte[] bitmapArr, int byteOffset, int stride, PSShape shape, double scale)
+    public void RasterizeShape(byte[] bitmapArr, int byteOffset, int stride, int height, PSShape shape, double scale)
     {
       if (scale != 1)
         shape.ScaleAll(scale);
@@ -56,7 +56,7 @@ namespace Converter.Rasterizers
           case PS_COMMAND.LINE_TO:
             x = shape._shapePoints[i++];
             y = shape._shapePoints[i++];
-            MY_DrawLine(bitmapArr, byteOffset, stride, currX, currY, x, y);
+            MY_DrawLine(bitmapArr, byteOffset, stride, height, currX, currY, x, y);
             currX = x;
             currY = y;
             break;
