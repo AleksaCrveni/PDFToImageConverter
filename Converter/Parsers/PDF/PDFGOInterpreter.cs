@@ -55,6 +55,10 @@ namespace Converter.Parsers.PDF
     public int _byteSize = 2; // Used only for type0 fonts
     public PDF_FontData _currentFont; // not part of GS, but maybe should be part of currentTextObject
     public PDFLogger _pathLogger;
+    // this variable is used in specific case where cm is seen yet and we want to draw shape
+    // because then it will move start at the end of the byte array instead of start because we use thin our origin TOP-LEFT and PDF does it BOTTOM-LEFT
+    public bool _cmExecuted = false; 
+
 
     // TODO: maybe NULL check is redundant if we let it throw to end?
     public PDFGOInterpreter(byte[] contentBuffer, PDF_ResourceDict resourceDict, IConverter converter, bool debug = false)
@@ -85,7 +89,7 @@ namespace Converter.Parsers.PDF
       _currentFont = new PDF_FontData();
       InitGS();
     }
-    public void InitGS()
+    public void InitGS(int pageHeight = 0)
     {
       currentGS = new GraphicsState();
       currentGS.CTM = MyMath.RealIdentityMatrix3x3();
@@ -166,7 +170,6 @@ namespace Converter.Parsers.PDF
             currentGS = GSS.Pop().DeepCopy();
             break;
           case 0x6d63: // cm
-            // a b c e d f - real numbers but can be saved as ints
             double f = GetNextStackValAsDouble();
             double d = GetNextStackValAsDouble();
             double e = GetNextStackValAsDouble();
@@ -174,6 +177,7 @@ namespace Converter.Parsers.PDF
             double b = GetNextStackValAsDouble();
             double a = GetNextStackValAsDouble();
             UpdateCTM(a, b, c, e, d, f);
+            _cmExecuted = true;
             break;
           #endregion gss&sgs
           #region pathConstruction
@@ -220,7 +224,7 @@ namespace Converter.Parsers.PDF
           case 0x6572: // re
             mp = new PDFGI_Point();
 
-            double height = -GetNextStackValAsDouble();
+            double height = GetNextStackValAsDouble();
             double width = GetNextStackValAsDouble();
             y = GetNextStackValAsDouble();
             x = GetNextStackValAsDouble();
@@ -961,7 +965,12 @@ namespace Converter.Parsers.PDF
       // rounding makes it look a bit better?
       int X = (int)MathF.Round((float)currentGS.CTM[2, 0]);
       // because origin is bottom-left we have do bitmapHeight - , to get position on the top
-      int Y = _targetSize.Height - (int)(currentGS.CTM[2, 1]);
+      int Y;
+
+      if (_cmExecuted)
+        Y = _targetSize.Height - (int)(currentGS.CTM[2, 1]);
+      else
+        Y = 0;
 
       float scaleX = (float)currentGS.CTM[0, 0];
       float scaleY = (float)currentGS.CTM[1, 1];
@@ -1084,6 +1093,8 @@ namespace Converter.Parsers.PDF
     {
       // just copy ref since lines can get too long
       PDF_FontData fd = _currentFont;
+      if (_currentFont.Rasterizer == null)
+        return;
       _currentFont.Rasterizer.SetDefaultGlyphInfoValues(ref glyphInfo);
       // TODO: use this instead of c, FIX 
       _currentFont.Rasterizer.GetGlyphInfo(c, ref glyphInfo);
@@ -1112,7 +1123,7 @@ namespace Converter.Parsers.PDF
         else
           width = fd.FontInfo.FontDescriptor.MissingWidth / 1000f;
       }
-      Debug.Assert(width != 0);
+      //Debug.Assert(width != 0);
       #endregion
 
       (float scaleX, float scaleY) s = _currentFont.Rasterizer.GetScale(glyphInfo.Index, textRenderingMatrix, width);
