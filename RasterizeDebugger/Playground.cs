@@ -6,6 +6,7 @@ using Converter.Rasterizers;
 using Converter.Utils;
 using Converter.Writers.TIFF;
 using System.Diagnostics;
+using System.Drawing.Drawing2D;
 using System.Text;
 
 
@@ -16,14 +17,25 @@ namespace RasterizeDebugger
     PDFFile _pdfFile;
     PDF_FontData _currFont;
     float _scale = 0.5f;
-    int _width = 800;
-    int _height = 800;
+    int _width = 1000;
+    int _height = 1000;
     byte[] _data;
     int _imageDataStartPos = 0;
     byte[] _imageData;
     OpenFileDialog _dialog;
     PSShape _shape;
     PDF_PageInfo _currPage;
+    bool _zoomChanged = false;
+    float _zoomScale = 1.0f;
+    readonly float _scrollValue = 0.1f;
+    TextureBrush _imageBrush;
+    ZOOM _zoomMode = ZOOM.IN;
+    readonly float MAX_ZOOM = 5f;
+    readonly float MIN_ZOOM = 1f;
+    Matrix _transform = new Matrix();
+    MemoryStream memoryStream;
+    TIFFGrayscaleWriter writer;
+    enum ZOOM { IN, OUT }
     public Playground()
     {
       InitializeComponent();
@@ -69,8 +81,9 @@ namespace RasterizeDebugger
       txb_Scale.Text = _scale.ToString();
       _data = new byte[_height * _width];
       pb_main.Size = new Size(_width, _height);
-      MemoryStream memoryStream = new MemoryStream();
-      TIFFGrayscaleWriter writer = new TIFFGrayscaleWriter(memoryStream);
+
+      memoryStream = new MemoryStream();
+      writer = new TIFFGrayscaleWriter(memoryStream);
       TIFFWriterOptions options = new TIFFWriterOptions()
       {
         Height = _height,
@@ -80,6 +93,14 @@ namespace RasterizeDebugger
       _imageDataStartPos = writer.data.InitialImageDataOffset;
       _imageData = memoryStream.ToArray();
       pb_main.Image = Image.FromStream(new MemoryStream(_imageData));
+      _imageBrush = new TextureBrush(pb_main.Image);
+
+      //_shape = new PSShape();
+      //_shape.MoveTo(0, 842);
+      //_shape.LineTo(595, 842);
+      //_shape.LineTo(595, 0);
+      //_shape.LineTo(0, 8);
+      //_shape.CloseShape();
       if (_shape != null)
         RasterShape(_shape);
 
@@ -88,7 +109,7 @@ namespace RasterizeDebugger
     private void cb_font_SelectedIndexChanged(object sender, EventArgs e)
     {
       string key = cb_font.SelectedItem.ToString().Split('-')[0].TrimEnd();
-      
+
       foreach (PDF_FontData fontData in _currPage.ResourceDict.Font)
       {
         if (fontData.Key == key)
@@ -156,7 +177,7 @@ namespace RasterizeDebugger
             cb_glyph.Items.Add($"{(int)c} - {glyphInfo.Name}");
           }
         }
-        
+
 
         cb_glyph.EndUpdate();
         cb_glyph.SelectedIndex = 0;
@@ -167,7 +188,7 @@ namespace RasterizeDebugger
         throw new NotImplementedException("s");
       }
 
-      
+
     }
 
     private void label3_Click(object sender, EventArgs e)
@@ -431,13 +452,14 @@ namespace RasterizeDebugger
       BmpS result = new BmpS();
       result.H = glyphHeight;
       result.W = (int)(glyphWidth);
-      result.Offset = 20 * _height + 20; // draw at 20,20
+      //result.Offset = 20 * _height + 20; // draw at 20,20
+      result.Offset = 0;
       result.Pixels = _data;
       result.Stride = _width;
       //shapeRasterizer.STB_InternalRasterize(ref result, ref windings, ref windingLengths, windingCount, _scale, _scale, 0, 0, 0, 0, false);
       // copy shape so we dont modify original shape since we may want to raster it at different sizes
       PSShape actualShape = DeepCopyShape(_shape);
-      shapeRasterizer.RasterizeShape(_data, result.Offset, _width, _height, actualShape, _scale);
+      shapeRasterizer.RasterizeShape(_data, result.Offset, _width, _height, actualShape, 1);
       bool isEmpty = true;
       foreach (byte b in _data)
       {
@@ -471,6 +493,7 @@ namespace RasterizeDebugger
     {
       Array.ConstrainedCopy(_data, 0, _imageData, _imageDataStartPos, _data.Length);
       pb_main.Image = Image.FromStream(new MemoryStream(_imageData));
+      _imageBrush = new TextureBrush(pb_main.Image);
     }
     public PDF_FontData GetFontDataFromKey(string searchKey)
     {
@@ -489,7 +512,7 @@ namespace RasterizeDebugger
     private void cb_page_SelectedIndexChanged(object sender, EventArgs e)
     {
       int idx = cb_page.SelectedIndex;
-      _currPage =  _pdfFile.PageInformation[idx];
+      _currPage = _pdfFile.PageInformation[idx];
       cb_font.Items.Clear();
       _currFont = _currPage.ResourceDict.Font[0];
       foreach (PDF_FontData font in _currPage.ResourceDict.Font)
@@ -497,6 +520,88 @@ namespace RasterizeDebugger
         cb_font.Items.Add($"{font.Key} - {font.FontInfo.BaseFont}");
       }
       cb_font.SelectedIndex = 0;
+    }
+
+    protected override void OnMouseWheel(MouseEventArgs e)
+    {
+      pb_main.Focus();
+      if (pb_main.Focused == true && e.Delta != 0)
+      {
+        // Map the Form-centric mouse location to the PictureBox client coordinate system
+        Point pictureBoxPoint = pb_main.PointToClient(this.PointToScreen(e.Location));
+        ZoomScroll(pictureBoxPoint, e.Delta > 0);
+        _zoomChanged = true;
+      }
+    }
+
+    private void ZoomScroll(Point location, bool zoomIn)
+    {
+      // Figure out what the new scale will be. Ensure the scale factor remains between
+      // 1% and 200%
+      float newScale = Math.Min(Math.Max(_zoomScale + (zoomIn ? _scrollValue : -_scrollValue), MIN_ZOOM), MAX_ZOOM);
+
+      if (newScale != _zoomScale)
+      {
+        float adjust = newScale / _zoomScale;
+        _zoomMode = newScale < _zoomScale ? ZOOM.OUT : ZOOM.IN;
+
+        _zoomScale = newScale;
+        _transform.Translate(-location.X, -location.Y, MatrixOrder.Append);
+
+        // Scale view
+        _transform.Scale(adjust, adjust, MatrixOrder.Append);
+
+        // Translate origin back to original mouse point.
+        _transform.Translate(location.X, location.Y, MatrixOrder.Append);
+
+        Debug.WriteLine($"{_zoomMode.ToString()} scale: {_zoomScale}");
+
+        pb_main.Invalidate();
+      }
+    }
+
+    private void pb_main_Paint(object sender, PaintEventArgs e)
+    {
+      if (pb_main.Image == null)
+        return;
+      Graphics g = e.Graphics;
+      g.Transform = _transform;
+      Rectangle c = e.ClipRectangle;
+      int x = 0;
+      int y = 0;
+      var w = (int)Math.Round(c.Width / _zoomScale);
+      var h = (int)Math.Round(c.Height / _zoomScale);
+      x = (int)Math.Round(c.X / _zoomScale - _transform.OffsetX / _zoomScale);
+      y = (int)Math.Round(c.Y / _zoomScale - _transform.OffsetY / _zoomScale);
+      // This is garbage workaorund to deal with non centered unzoom........
+      if (_zoomChanged && _zoomScale == MIN_ZOOM)
+      {
+        x = 0;
+        y = 0;
+        _imageBrush = new TextureBrush(pb_main.Image);
+        pb_main.Image = Image.FromStream(new MemoryStream(_imageData));
+        _transform = new Matrix();
+        pb_main.Invalidate();
+        _zoomChanged = false;
+        return;
+      }
+      e.Graphics.FillRectangle(_imageBrush, x, y, w - 1, h - 1);
+    }
+
+    private void btn_SaveImageClick(object sender, EventArgs e)
+    {
+      SaveFileDialog sfd = new SaveFileDialog();
+      sfd.Filter = "Tiff (*.tiff)|*.tiff";
+      sfd.RestoreDirectory = true;
+      if (sfd.ShowDialog() == DialogResult.OK)
+      {
+        using (FileStream fs = (FileStream)sfd.OpenFile())
+        {
+          fs.Write(_imageData.AsSpan());
+          fs.Flush();
+          fs.Close();
+        }
+      }
     }
   }
 }

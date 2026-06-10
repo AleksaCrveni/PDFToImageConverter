@@ -43,11 +43,7 @@ namespace RasterizeDebugger
 
     enum ZOOM { IN, OUT }
     string _fileFullPath;
-    class ZoomStatePosition
-    {
-      public PointF p;
-      public float zoomScale;
-    }
+
     class LocalState
     {
       public string currentText;
@@ -326,6 +322,11 @@ namespace RasterizeDebugger
 
     private void btn_processAll_Click(object sender, EventArgs e)
     {
+      if (_file == null)
+      {
+        MessageBox.Show("PDFFile not loaded!");
+        return;
+      }
       // shorcut here just so we can create glyphinfo once if needed 
       if (_end)
       {
@@ -344,7 +345,7 @@ namespace RasterizeDebugger
       }
       catch (Exception ex)
       {
-
+        MessageBox.Show($"{ex.Message}");
       }
       finally
       {
@@ -373,7 +374,7 @@ namespace RasterizeDebugger
 
       if (_interpreter._debugState.isPath)
       {
-        PaintPath(true);
+        PaintPath(updateUI);
       }
       else
       {
@@ -396,13 +397,13 @@ namespace RasterizeDebugger
 
       if (_interpreter._debugState.isPath)
       {
-        ReadNextData(true);
+        ReadNextData(updateUI);
       }
       else
       {
         if (_localState.currentText == null)
         {
-          ReadNextData(true);
+          ReadNextData(updateUI);
           return;
         }
 
@@ -410,11 +411,11 @@ namespace RasterizeDebugger
         if (_localState.textIndex >= _interpreter._debugState.Literals.Count)
         {
           // Load next from interpreer
-          ReadNextData(true);
+          ReadNextData(updateUI);
         }
         else
         {
-          SetNextTextAndUpdateState(true);
+          SetNextTextAndUpdateState(updateUI);
         }
       }
 
@@ -745,7 +746,7 @@ namespace RasterizeDebugger
       }
       catch (Exception ex)
       {
-        if (updateUI)
+        if (updateUI || cb_ProcessAllError.Checked)
           MessageBox.Show(ex.Message);
       }
       _interpreter.currentPC.Shape = new PSShape();

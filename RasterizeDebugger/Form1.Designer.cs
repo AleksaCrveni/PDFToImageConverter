@@ -62,6 +62,7 @@
       cb_PathPaint = new CheckBox();
       btn_RasterFromLog = new Button();
       btn_SaveShape = new Button();
+      cb_ProcessAllError = new CheckBox();
       ((System.ComponentModel.ISupportInitialize)pb_mainImage).BeginInit();
       panel1.SuspendLayout();
       panel2.SuspendLayout();
@@ -420,11 +421,24 @@
       btn_SaveShape.UseVisualStyleBackColor = true;
       btn_SaveShape.Click += btn_SaveShape_Click;
       // 
+      // cb_ProcessAllError
+      // 
+      cb_ProcessAllError.AutoSize = true;
+      cb_ProcessAllError.Checked = true;
+      cb_ProcessAllError.CheckState = CheckState.Checked;
+      cb_ProcessAllError.Location = new Point(435, 12);
+      cb_ProcessAllError.Name = "cb_ProcessAllError";
+      cb_ProcessAllError.Size = new Size(148, 19);
+      cb_ProcessAllError.TabIndex = 29;
+      cb_ProcessAllError.Text = "Show Process All Errors";
+      cb_ProcessAllError.UseVisualStyleBackColor = true;
+      // 
       // form_main
       // 
       AutoScaleDimensions = new SizeF(7F, 15F);
       AutoScaleMode = AutoScaleMode.Font;
       ClientSize = new Size(1012, 675);
+      Controls.Add(cb_ProcessAllError);
       Controls.Add(btn_SaveShape);
       Controls.Add(btn_RasterFromLog);
       Controls.Add(cb_PathPaint);
@@ -494,5 +508,6 @@
     private CheckBox cb_PathPaint;
     private Button btn_RasterFromLog;
     private Button btn_SaveShape;
+    private CheckBox cb_ProcessAllError;
   }
 }

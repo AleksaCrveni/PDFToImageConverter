@@ -41,6 +41,7 @@
       cb_page = new ComboBox();
       label5 = new Label();
       lbl_fontType = new Label();
+      btn_saveImg = new Button();
       ((System.ComponentModel.ISupportInitialize)pb_main).BeginInit();
       SuspendLayout();
       // 
@@ -114,6 +115,7 @@
       pb_main.Size = new Size(927, 591);
       pb_main.TabIndex = 8;
       pb_main.TabStop = false;
+      pb_main.Paint += pb_main_Paint;
       // 
       // btn_loadShape
       // 
@@ -160,11 +162,22 @@
       lbl_fontType.Size = new Size(0, 15);
       lbl_fontType.TabIndex = 13;
       // 
+      // btn_saveImg
+      // 
+      btn_saveImg.Location = new Point(819, 12);
+      btn_saveImg.Name = "btn_saveImg";
+      btn_saveImg.Size = new Size(120, 23);
+      btn_saveImg.TabIndex = 14;
+      btn_saveImg.Text = "Save Image";
+      btn_saveImg.UseVisualStyleBackColor = true;
+      btn_saveImg.Click += btn_SaveImageClick;
+      // 
       // Playground
       // 
       AutoScaleDimensions = new SizeF(7F, 15F);
       AutoScaleMode = AutoScaleMode.Font;
       ClientSize = new Size(951, 671);
+      Controls.Add(btn_saveImg);
       Controls.Add(lbl_fontType);
       Controls.Add(label5);
       Controls.Add(label4);
@@ -201,5 +214,6 @@
     private ComboBox cb_page;
     private Label label5;
     private Label lbl_fontType;
+    private Button btn_saveImg;
   }
 }
