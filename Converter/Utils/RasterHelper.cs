@@ -1,6 +1,7 @@
 ﻿using Converter.FileStructures.PDF;
 using Converter.FileStructures.PostScript;
 using Converter.FileStructures.TTF;
+using Converter.FileStructures.Geometry;
 using Converter.Rasterizers;
 using System.Diagnostics;
 using System.Globalization;

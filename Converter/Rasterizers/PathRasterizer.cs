@@ -1,8 +1,8 @@
 ﻿
 using Converter.FileStructures.PDF.GraphicsInterpreter;
 using Converter.FileStructures.PostScript;
-using System.Reflection.Metadata.Ecma335;
-using System.Runtime.CompilerServices;
+using Converter.FileStructures.Geometry;
+
 namespace Converter.Rasterizers
 {
   /// <summary>

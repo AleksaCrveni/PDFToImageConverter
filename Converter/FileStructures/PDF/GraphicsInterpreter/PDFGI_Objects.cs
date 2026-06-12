@@ -1,6 +1,4 @@
-﻿using System.Drawing;
-
-namespace Converter.FileStructures.PDF.GraphicsInterpreter
+﻿namespace Converter.FileStructures.PDF.GraphicsInterpreter
 {
   public class PDFGI_TextObject
   {

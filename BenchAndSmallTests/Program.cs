@@ -19,6 +19,12 @@ using System.Buffers.Binary;
 using System.IO.Compression;
 using System.Security.Cryptography.X509Certificates;
 using System.Text;
+using System.Drawing.Drawing2D;
+using System.Drawing;
+using Microsoft.Diagnostics.Tracing.Parsers.AspNet;
+using BenchmarkDotNet.Loggers;
+using BenchmarkDotNet.Attributes;
+using Microsoft.Diagnostics.Tracing.Parsers.Kernel;
 //int count1 = 0b_0000_0001;
 //int count2 = 0b_1110_0010;
 
@@ -241,9 +247,9 @@ using System.Text;
 //string s = "020";
 //int codePoint = Char.ConvertToUtf32(s, 0);
 
-PdfParser parser = new PdfParser();
-PDF_Options options = new PDF_Options();
-parser.Parse(Files.Report, ref options);
+//PdfParser parser = new PdfParser();
+//PDF_Options options = new PDF_Options();
+//parser.Parse(Files.Greek, ref options);
 
 //BMPParser p = new BMPParser();
 //p.Parse(@$"W:\PDFToImageConverter\Files\testBmpMono.bmp");
@@ -257,3 +263,45 @@ parser.Parse(Files.Report, ref options);
 
 //PNGFile file = PNGParser.Parse(Files.PNGInternlancedSample);
 ////PNGWriter.Write("test.png", file);
+
+GraphicsPath gp1 = new GraphicsPath();
+RectangleF r1 = new RectangleF(0, 0, 10, 20);
+gp1.AddRectangle(r1);
+GraphicsPath gp2 = new GraphicsPath();
+RectangleF r2 = new RectangleF(5, 5, 10, 20);
+gp2.AddRectangle(r2);
+Region region1 = new Region(gp1);
+
+RegionData regionData = region1.GetRegionData();
+File.WriteAllBytes("regionData.bin", regionData.Data);
+Log(regionData);
+LogPath(gp1.PathData);
+LogPath(gp2.PathData);
+region1.Intersect(gp2);
+Console.WriteLine("----------------------------");
+Log(region1.GetRegionData());
+LogPath(gp1.PathData);
+LogPath(gp2.PathData);
+void Log(RegionData r)
+{
+  StringBuilder sb = new StringBuilder();
+  foreach (byte b in r.Data)
+  {
+    sb.Append((int)b);
+    sb.Append(' ');
+  }
+  Console.WriteLine(sb.ToString());
+}
+
+void LogPath(PathData p)
+{
+  StringBuilder sb = new StringBuilder();
+  foreach (PointF b in p.Points)
+  {
+    sb.Append(b.X);
+    sb.Append(' ');
+    sb.Append(b.Y);
+    sb.Append(' ');
+  }
+  Console.WriteLine(sb.ToString());
+}

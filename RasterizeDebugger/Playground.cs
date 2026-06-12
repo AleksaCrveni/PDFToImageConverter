@@ -2,6 +2,8 @@
 using Converter.FileStructures.PDF.GraphicsInterpreter;
 using Converter.FileStructures.PostScript;
 using Converter.FileStructures.TTF;
+using Converter.FileStructures.Geometry;
+using System.Drawing;
 using Converter.Rasterizers;
 using Converter.Utils;
 using Converter.Writers.TIFF;
@@ -94,13 +96,7 @@ namespace RasterizeDebugger
       _imageData = memoryStream.ToArray();
       pb_main.Image = Image.FromStream(new MemoryStream(_imageData));
       _imageBrush = new TextureBrush(pb_main.Image);
-
-      //_shape = new PSShape();
-      //_shape.MoveTo(0, 842);
-      //_shape.LineTo(595, 842);
-      //_shape.LineTo(595, 0);
-      //_shape.LineTo(0, 8);
-      //_shape.CloseShape();
+           
       if (_shape != null)
         RasterShape(_shape);
 
@@ -425,7 +421,7 @@ namespace RasterizeDebugger
       List<int> windingLengths = new List<int>();
       int windingCount = 0;
 
-      List<Converter.FileStructures.TTF.PointF> windings = shapeRasterizer.STB_FlattenCurves(ref vertices, vertices.Count, 0.35f / _scale, ref windingLengths, ref windingCount);
+      List<Converter.FileStructures.Geometry.PointF> windings = shapeRasterizer.STB_FlattenCurves(ref vertices, vertices.Count, 0.35f / _scale, ref windingLengths, ref windingCount);
       int c_x0 = 0;
       int c_y0 = 0;
       int c_x1 = 0;
@@ -566,7 +562,7 @@ namespace RasterizeDebugger
         return;
       Graphics g = e.Graphics;
       g.Transform = _transform;
-      Rectangle c = e.ClipRectangle;
+      System.Drawing.Rectangle c = e.ClipRectangle;
       int x = 0;
       int y = 0;
       var w = (int)Math.Round(c.Width / _zoomScale);

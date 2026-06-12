@@ -1,7 +1,6 @@
 ﻿
 using Converter.FileStructures.PDF;
 using Converter.FileStructures.PDF.GraphicsInterpreter;
-using System.Text;
 
 namespace Converter.Rasterizers
 {

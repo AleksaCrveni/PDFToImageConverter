@@ -5,11 +5,11 @@ using Converter.FileStructures.TTF;
 using Converter.FileStructures.Type1;
 using Converter.Rasterizers;
 using Converter.Utils;
-using Converter.Writers.TIFF;
 using RasterPlayground;
 using System.Diagnostics;
-using System.Security.Cryptography;
 using System.Text;
+using Converter.FileStructures.Geometry;
+
 int WIDTH =  800;
 int HEIGHT = 800;
 float objspaceFlatnessSquared = 0.0000000035f;
@@ -56,7 +56,7 @@ for (int i = 0; i < shape._moves.Count; i++)
     sb.Append($"{vertices[i].x} {vertices[i].y} ");
     sb.Append("LINE_TO ");
   }
-  else if (v == PS_COMMAND.CURVE_TO)
+  else if (v == PS_COMMAND.CUBIC_CURVE_TO)
   {
     sb.Append($"{vertices[i].cx} {vertices[i].cy} {vertices[i].cx1} {vertices[i].cy1} {vertices[i].x} {vertices[i].y} ");
     sb.Append("CURVE_TO ");

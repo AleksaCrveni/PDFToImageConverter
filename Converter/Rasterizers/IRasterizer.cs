@@ -1,6 +1,6 @@
 ﻿using Converter.FileStructures.PDF.GraphicsInterpreter;
 using Converter.FileStructures.TTF;
-using System.Text;
+using Converter.FileStructures.Geometry;
 
 namespace Converter.Rasterizers
 {

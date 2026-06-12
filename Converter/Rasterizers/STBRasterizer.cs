@@ -2,6 +2,7 @@
 using Converter.FileStructures.PDF;
 using Converter.FileStructures.PDF.GraphicsInterpreter;
 using Converter.FileStructures.TTF;
+using Converter.FileStructures.Geometry;
 using Converter.StaticData;
 using System.Buffers.Binary;
 using System.Diagnostics;

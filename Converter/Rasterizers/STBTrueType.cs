@@ -1,7 +1,7 @@
 ﻿using Converter.FileStructures.General;
 using Converter.FileStructures.TTF;
+using Converter.FileStructures.Geometry;
 using System.Buffers.Binary;
-using System.ComponentModel.Design;
 using System.Diagnostics;
 
 namespace Converter.Rasterizers

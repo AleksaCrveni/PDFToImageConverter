@@ -1,8 +1,7 @@
 ﻿using Converter.FileStructures.PostScript;
-using Converter.FileStructures.TTF;
+using Converter.FileStructures.Geometry;
 using Converter.FileStructures.Type1;
 using Converter.Utils;
-using System.Buffers.Binary;
 
 namespace Converter.Rasterizers
 {
