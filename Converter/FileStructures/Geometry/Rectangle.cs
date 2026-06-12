@@ -8,17 +8,18 @@ namespace Converter.FileStructures.Geometry
   /// </summary>
   public struct Rectangle
   {
-    public PointF UpperLeft;
-    public PointF UpperRight;
     public PointF LowerLeft;
-    public PointF LowerRight;
+    public PointF UpperRight;
+    // these 2 fields might be redundant
+    public float Height;
+    public float Width;
 
-    public Rectangle(float llX, float llY, float height, float width)
+    public Rectangle(float llX, float llY, float width, float height)
     {
       LowerLeft = new PointF(llX, llY);
-      LowerRight = new PointF(llX + width, llY);
       UpperRight = new PointF(llX + width, llY - height);
-      UpperLeft = new PointF(llX, llY - height);
+      Height = height;
+      Width = width;
     }
     
   }
