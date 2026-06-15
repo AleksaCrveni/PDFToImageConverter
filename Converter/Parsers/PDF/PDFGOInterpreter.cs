@@ -961,6 +961,8 @@ namespace Converter.Parsers.PDF
     /// </summary>
     public void PDF_RasterShape()
     {
+      // TODO: still cant figure out winding rules stuff so ignore for now and get all fonts in order
+      return;
       //currentPC.Shape.SaveAbsolute("shapeExport");
       // rounding makes it look a bit better?
       int X = (int)MathF.Round((float)currentGS.CTM[2, 0]);
