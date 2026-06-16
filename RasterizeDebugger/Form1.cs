@@ -12,6 +12,7 @@ using System.Drawing.Drawing2D;
 using System.Globalization;
 using System.Net.Http.Headers;
 using System.Text;
+using System.Windows.Forms.VisualStyles;
 
 namespace RasterizeDebugger
 {
@@ -118,7 +119,7 @@ namespace RasterizeDebugger
         _interpreter._debugState.SkipPath = cb_PathPaint.Checked;
         if (contentViewer != null)
           contentViewer.Close();
-        contentViewer = new DataViewer(Encoding.Default.GetString(_interpreter._buffer).Split('\n'));
+        contentViewer = new DataViewer(GetContentLines());
         ReadNextData(true);
         UpdateLabels();
         MemoryStream memoryStream = new MemoryStream();
@@ -809,6 +810,17 @@ namespace RasterizeDebugger
     private void lbl_currPosition_Click(object sender, EventArgs e)
     {
 
+    }
+
+    public string[] GetContentLines()
+    {
+      string content = Encoding.Default.GetString(_interpreter._buffer);
+      string[] lines = content.Split("\r\n");
+      if (lines.Length == 1)
+        lines = content.Split("\n");
+      else if (lines.Length == 1)
+        lines = content.Split('\r');
+      return lines;
     }
   }
 }
