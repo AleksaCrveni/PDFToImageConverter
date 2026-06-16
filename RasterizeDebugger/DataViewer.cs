@@ -30,7 +30,7 @@ namespace RasterizeDebugger
 
     private void DataViewer_Load(object sender, EventArgs e)
     {
-
+      cb_wordWrap.Checked = txb_Data.WordWrap;
     }
 
     private void btn_Copy_Click(object sender, EventArgs e)
@@ -40,7 +40,7 @@ namespace RasterizeDebugger
 
     private void btn_refreshLog_Click(object sender, EventArgs e)
     {
-      txb_Data.Text = _interpreter._pathLogger.ToString();
+      txb_Data.Text = _interpreter?._pathLogger?.ToString();
     }
 
     public void HighlightPos(int pos)
@@ -49,6 +49,11 @@ namespace RasterizeDebugger
       txb_Data.DeselectAll();
       txb_Data.Select(pos, 1);
       txb_Data.SelectionBackColor = Color.Red;
+    }
+
+    private void cb_wordWrap_CheckedChanged(object sender, EventArgs e)
+    {
+      txb_Data.WordWrap = cb_wordWrap.Checked;
     }
   }
 }
