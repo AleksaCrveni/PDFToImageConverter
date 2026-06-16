@@ -24,7 +24,7 @@ namespace Converter.Parsers.PDF
   /// </summary>
   public class PDFGOInterpreter
   {
-    private byte[] _buffer;
+    public byte[] _buffer;
     public int _pos = 0;
     public int _readPos = 0;
     private byte _char = PDFConstants.SP; // current char, init it to non null val

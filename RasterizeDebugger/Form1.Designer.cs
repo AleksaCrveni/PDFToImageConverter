@@ -63,6 +63,7 @@
       btn_RasterFromLog = new Button();
       btn_SaveShape = new Button();
       cb_ProcessAllError = new CheckBox();
+      btn_showContent = new Button();
       ((System.ComponentModel.ISupportInitialize)pb_mainImage).BeginInit();
       panel1.SuspendLayout();
       panel2.SuspendLayout();
@@ -210,6 +211,7 @@
       lbl_currPosition.Size = new Size(13, 15);
       lbl_currPosition.TabIndex = 14;
       lbl_currPosition.Text = "0";
+      lbl_currPosition.Click += lbl_currPosition_Click;
       // 
       // label_5
       // 
@@ -433,11 +435,23 @@
       cb_ProcessAllError.Text = "Show Process All Errors";
       cb_ProcessAllError.UseVisualStyleBackColor = true;
       // 
+      // btn_showContent
+      // 
+      btn_showContent.Anchor = AnchorStyles.Top | AnchorStyles.Right;
+      btn_showContent.Location = new Point(582, 34);
+      btn_showContent.Name = "btn_showContent";
+      btn_showContent.Size = new Size(95, 23);
+      btn_showContent.TabIndex = 30;
+      btn_showContent.Text = "Show Content";
+      btn_showContent.UseVisualStyleBackColor = true;
+      btn_showContent.Click += btn_showContent_Click;
+      // 
       // form_main
       // 
       AutoScaleDimensions = new SizeF(7F, 15F);
       AutoScaleMode = AutoScaleMode.Font;
       ClientSize = new Size(1012, 675);
+      Controls.Add(btn_showContent);
       Controls.Add(cb_ProcessAllError);
       Controls.Add(btn_SaveShape);
       Controls.Add(btn_RasterFromLog);
@@ -509,5 +523,6 @@
     private Button btn_RasterFromLog;
     private Button btn_SaveShape;
     private CheckBox cb_ProcessAllError;
+    private Button btn_showContent;
   }
 }

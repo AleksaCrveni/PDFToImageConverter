@@ -1,4 +1,5 @@
 ﻿using Converter.Parsers.PDF;
+using System.Text;
 
 namespace RasterizeDebugger
 {
@@ -21,6 +22,12 @@ namespace RasterizeDebugger
       InitializeComponent();
       txb_Data.Text = data;
     }
+    public DataViewer(string[] lines)
+    {
+      InitializeComponent();
+      txb_Data.Lines = lines;
+    }
+
     private void DataViewer_Load(object sender, EventArgs e)
     {
 
@@ -34,6 +41,14 @@ namespace RasterizeDebugger
     private void btn_refreshLog_Click(object sender, EventArgs e)
     {
       txb_Data.Text = _interpreter._pathLogger.ToString();
+    }
+
+    public void HighlightPos(int pos)
+    {
+      txb_Data.SelectionBackColor = txb_Data.BackColor;
+      txb_Data.DeselectAll();
+      txb_Data.Select(pos, 1);
+      txb_Data.SelectionBackColor = Color.Red;
     }
   }
 }

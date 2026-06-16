@@ -10,6 +10,7 @@ using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Drawing.Drawing2D;
 using System.Globalization;
+using System.Net.Http.Headers;
 using System.Text;
 
 namespace RasterizeDebugger
@@ -40,7 +41,7 @@ namespace RasterizeDebugger
     readonly float MIN_ZOOM = 1f;
     string _lastFontRef;
     uint _totalStringLiteralCount;
-
+    DataViewer contentViewer;
     enum ZOOM { IN, OUT }
     string _fileFullPath;
 
@@ -115,6 +116,9 @@ namespace RasterizeDebugger
         lbl_contentLength.Text = rawContent.Length.ToString();
         _localState = new LocalState();
         _interpreter._debugState.SkipPath = cb_PathPaint.Checked;
+        if (contentViewer != null)
+          contentViewer.Close();
+        contentViewer = new DataViewer(Encoding.Default.GetString(_interpreter._buffer).Split('\n'));
         ReadNextData(true);
         UpdateLabels();
         MemoryStream memoryStream = new MemoryStream();
@@ -146,7 +150,7 @@ namespace RasterizeDebugger
         lbl_glyphIndex.Text = "NULL";
         lbl_glyphName.Text = "NULL";
         lbl_currentChar.Text = "NULL";
-
+      
 
       }
     }
@@ -261,6 +265,7 @@ namespace RasterizeDebugger
     }
     public void UpdateLabels()
     {
+      contentViewer.HighlightPos(_interpreter._pos);
       lbl_currPosition.Text = _interpreter._pos.ToString();
       lbl_readPos.Text = _interpreter._readPos.ToString();
       if (_currFontData?.FontInfo?.SubType == PDF_FontType.Type0)
@@ -793,6 +798,17 @@ namespace RasterizeDebugger
         FileStream fs = (FileStream)sfd.OpenFile();
         _interpreter.currentPC.Shape.SaveAbsolute(fs);
       }
+    }
+
+    private void btn_showContent_Click(object sender, EventArgs e)
+    {
+      contentViewer.Show();
+      contentViewer.HighlightPos(_interpreter._pos);
+    }
+
+    private void lbl_currPosition_Click(object sender, EventArgs e)
+    {
+
     }
   }
 }
