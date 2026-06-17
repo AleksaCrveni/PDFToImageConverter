@@ -26,11 +26,14 @@ namespace RasterizeDebugger
     {
       InitializeComponent();
       txb_Data.Lines = lines;
+
     }
 
     private void DataViewer_Load(object sender, EventArgs e)
     {
       cb_wordWrap.Checked = txb_Data.WordWrap;
+      txb_Data.Select(8, 1);
+      txb_Data.SelectionBackColor = Color.Red;
     }
 
     private void btn_Copy_Click(object sender, EventArgs e)
@@ -43,11 +46,11 @@ namespace RasterizeDebugger
       txb_Data.Text = _interpreter?._pathLogger?.ToString();
     }
 
-    public void HighlightPos(int pos)
+    public void HighlightPos((int pos, int len) data)
     {
       txb_Data.SelectionBackColor = txb_Data.BackColor;
       txb_Data.DeselectAll();
-      txb_Data.Select(pos, 1);
+      txb_Data.Select(data.pos, data.len);
       txb_Data.SelectionBackColor = Color.Red;
     }
 

@@ -119,7 +119,7 @@ namespace RasterizeDebugger
         _interpreter._debugState.SkipPath = cb_PathPaint.Checked;
         if (contentViewer != null)
           contentViewer.Close();
-        contentViewer = new DataViewer(GetContentLines());
+        contentViewer = new DataViewer(new string[1] { GetContentAsSingleLine() });
         ReadNextData(true);
         UpdateLabels();
         MemoryStream memoryStream = new MemoryStream();
@@ -266,7 +266,7 @@ namespace RasterizeDebugger
     }
     public void UpdateLabels()
     {
-      contentViewer.HighlightPos(_interpreter._pos);
+      contentViewer.HighlightPos(CalculateOpStartPosAndLen(_interpreter._pos));
       lbl_currPosition.Text = _interpreter._pos.ToString();
       lbl_readPos.Text = _interpreter._readPos.ToString();
       if (_currFontData?.FontInfo?.SubType == PDF_FontType.Type0)
@@ -804,23 +804,64 @@ namespace RasterizeDebugger
     private void btn_showContent_Click(object sender, EventArgs e)
     {
       contentViewer.Show();
-      contentViewer.HighlightPos(_interpreter._pos);
+      contentViewer.HighlightPos(CalculateOpStartPosAndLen(_interpreter._pos));
     }
 
+    public (int pos, int len) CalculateOpStartPosAndLen(int endPos)
+    {
+      int i;
+      for (i = endPos -1; i >= 0; i--)
+      {
+        if (_interpreter._delimiters.Contains(_interpreter._buffer[i]))
+          break;
+      }
+      i++;
+      return (i , endPos - i);
+    }
     private void lbl_currPosition_Click(object sender, EventArgs e)
     {
 
     }
-
-    public string[] GetContentLines()
+    /// <summary>
+    /// delimiter size is require to know how many pos to skip when counting position in dataviewer
+    /// because lenght of lines content is not the same becuase delimiters get removed, so result is always shifted in data viewer
+    /// </summary>
+    /// <note>
+    /// This would work okay BUT, if you use textbox as multiline and pass line, it will also siletly contain newline characters, which when selected
+    /// will NOT be highlighted and it would appear that tracker was gone and it just adds another cases to deal with
+    /// So instead we are just going to replace all '\r' and '\n' character with whitespaces respectivly to keep length the same and pass it as 1 length list
+    /// </note>
+    /// <reference>
+    /// GetContentAsSingeLine
+    /// </reference>
+    public (string[] strings, int deliSize) GetContentLines()
     {
       string content = Encoding.Default.GetString(_interpreter._buffer);
+
+      int size = 2;
       string[] lines = content.Split("\r\n");
       if (lines.Length == 1)
+      {
         lines = content.Split("\n");
+        size = 1;
+      }
       else if (lines.Length == 1)
-        lines = content.Split('\r');
-      return lines;
+      {
+          lines = content.Split('\r');
+      }
+      return (lines, size);
+    }
+
+    /// <summary>
+    /// We are just doing to do 
+    /// </summary>
+    /// <returns></returns>
+    public string GetContentAsSingleLine()
+    {
+      string content = Encoding.Default.GetString(_interpreter._buffer);
+      content = content.Replace('\r', ' ');
+      content = content.Replace('\n', ' ');
+      return content;
     }
   }
 }
