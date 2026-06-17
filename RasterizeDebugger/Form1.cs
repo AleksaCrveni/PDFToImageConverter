@@ -266,7 +266,7 @@ namespace RasterizeDebugger
     }
     public void UpdateLabels()
     {
-      contentViewer.HighlightPos(CalculateOpStartPosAndLen(_interpreter._pos));
+      contentViewer.HighlightPos(CalculateOperatorAndOperandStartPosAndLen(_interpreter._pos));
       lbl_currPosition.Text = _interpreter._pos.ToString();
       lbl_readPos.Text = _interpreter._readPos.ToString();
       if (_currFontData?.FontInfo?.SubType == PDF_FontType.Type0)
@@ -803,20 +803,80 @@ namespace RasterizeDebugger
 
     private void btn_showContent_Click(object sender, EventArgs e)
     {
+      if (_file == null)
+        return;
       contentViewer.Show();
-      contentViewer.HighlightPos(CalculateOpStartPosAndLen(_interpreter._pos));
+      contentViewer.HighlightPos(CalculateOperatorAndOperandStartPosAndLen(_interpreter._pos));
     }
 
-    public (int pos, int len) CalculateOpStartPosAndLen(int endPos)
+    public (int pos, int len, int operandPos, int operandLen) CalculateOperatorAndOperandStartPosAndLen(int endPos)
     {
+
       int i;
       for (i = endPos -1; i >= 0; i--)
       {
-        if (_interpreter._delimiters.Contains(_interpreter._buffer[i]))
+        if (_interpreter._delimiters.Contains(_interpreter._buffer[i])
+          || _interpreter._buffer[i] == ' '
+          || _interpreter._buffer[i] == '\r'
+          || _interpreter._buffer[i] == '\n')
           break;
       }
       i++;
-      return (i , endPos - i);
+      string op = Encoding.Default.GetString(_interpreter._buffer.AsSpan(i, endPos - i));
+      (int pos, int len, int operandPos, int operandLen) res = (i, endPos - i, 0, 0);
+      endPos = i;
+
+      // this could probably all be fit in one if and use end start correctly
+      if (op == "TJ")
+      {
+        int count = 0;
+        char c = '\0';
+        for (i = endPos -1; i >= 0; i--)
+        {
+          c = (char)_interpreter._buffer[i];
+          if (c == ' ')
+            continue;
+          if (c == ']')
+            count++;
+          else if (c == '[')
+            count--;
+
+          if (count == 0)
+            break;
+        }
+        res.operandPos = i;
+        res.operandLen = endPos - i;
+      } 
+      else if (op == "Tj")
+      {
+        char end = ')';
+        char start = '(';
+        int count = 0;
+        if (_interpreter._currentFont.FontInfo.SubType == PDF_FontType.Type0)
+        {
+          end = '>';
+          start = '<';
+        }
+
+        char c = '\0';
+        for (i = endPos - 1; i >= 0; i--)
+        {
+          c = (char)_interpreter._buffer[i];
+          if (c == ' ')
+            continue;
+          if (c == end)
+            count++;
+          else if (c == start)
+            count--;
+
+          if (count == 0)
+            break;
+        }
+        res.operandPos = i;
+        res.operandLen = endPos - i;
+      }
+
+      return res;
     }
     private void lbl_currPosition_Click(object sender, EventArgs e)
     {

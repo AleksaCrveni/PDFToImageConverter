@@ -67,6 +67,8 @@
       // cb_wordWrap
       // 
       cb_wordWrap.AutoSize = true;
+      cb_wordWrap.Checked = true;
+      cb_wordWrap.CheckState = CheckState.Checked;
       cb_wordWrap.Location = new Point(592, 4);
       cb_wordWrap.Name = "cb_wordWrap";
       cb_wordWrap.Size = new Size(83, 19);

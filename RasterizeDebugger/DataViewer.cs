@@ -6,6 +6,7 @@ namespace RasterizeDebugger
   public partial class DataViewer : Form
   {
     private PDFGOInterpreter _interpreter;
+    private (int pos, int len, int operandPos, int operandLen) _last;
     public DataViewer()
     {
       InitializeComponent();
@@ -46,12 +47,20 @@ namespace RasterizeDebugger
       txb_Data.Text = _interpreter?._pathLogger?.ToString();
     }
 
-    public void HighlightPos((int pos, int len) data)
-    {
+    public void HighlightPos((int pos, int len, int operandPos, int operandLen) data)
+    { 
+      txb_Data.SelectionBackColor = txb_Data.BackColor;
+      txb_Data.Select(_last.pos, _last.len);
       txb_Data.SelectionBackColor = txb_Data.BackColor;
       txb_Data.DeselectAll();
       txb_Data.Select(data.pos, data.len);
       txb_Data.SelectionBackColor = Color.Red;
+      if (data.operandLen != 0)
+      {
+        txb_Data.Select(data.operandPos, data.operandLen);
+        txb_Data.SelectionBackColor = Color.Yellow;
+      }
+      _last = data;
     }
 
     private void cb_wordWrap_CheckedChanged(object sender, EventArgs e)
