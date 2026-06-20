@@ -96,7 +96,7 @@ namespace RasterizeDebugger
       _imageData = memoryStream.ToArray();
       pb_main.Image = Image.FromStream(new MemoryStream(_imageData));
       _imageBrush = new TextureBrush(pb_main.Image);
-           
+
       if (_shape != null)
         RasterShape(_shape);
 
@@ -598,6 +598,12 @@ namespace RasterizeDebugger
           fs.Close();
         }
       }
+    }
+
+    private void btn_fontInfo_Click(object sender, EventArgs e)
+    {
+      TreeViewForm tvf = new TreeViewForm(_currFont);
+      tvf.Show();
     }
   }
 }

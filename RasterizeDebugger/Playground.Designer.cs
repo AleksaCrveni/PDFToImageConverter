@@ -42,6 +42,7 @@
       label5 = new Label();
       lbl_fontType = new Label();
       btn_saveImg = new Button();
+      btn_fontInfo = new Button();
       ((System.ComponentModel.ISupportInitialize)pb_main).BeginInit();
       SuspendLayout();
       // 
@@ -172,11 +173,22 @@
       btn_saveImg.UseVisualStyleBackColor = true;
       btn_saveImg.Click += btn_SaveImageClick;
       // 
+      // btn_fontInfo
+      // 
+      btn_fontInfo.Location = new Point(713, 12);
+      btn_fontInfo.Name = "btn_fontInfo";
+      btn_fontInfo.Size = new Size(100, 23);
+      btn_fontInfo.TabIndex = 15;
+      btn_fontInfo.Text = "Font Info";
+      btn_fontInfo.UseVisualStyleBackColor = true;
+      btn_fontInfo.Click += btn_fontInfo_Click;
+      // 
       // Playground
       // 
       AutoScaleDimensions = new SizeF(7F, 15F);
       AutoScaleMode = AutoScaleMode.Font;
       ClientSize = new Size(951, 671);
+      Controls.Add(btn_fontInfo);
       Controls.Add(btn_saveImg);
       Controls.Add(lbl_fontType);
       Controls.Add(label5);
@@ -215,5 +227,6 @@
     private Label label5;
     private Label lbl_fontType;
     private Button btn_saveImg;
+    private Button btn_fontInfo;
   }
 }

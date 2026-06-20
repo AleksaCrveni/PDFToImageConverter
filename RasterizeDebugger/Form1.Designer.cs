@@ -49,6 +49,7 @@
       lbl_charValue = new Label();
       label7 = new Label();
       panel1 = new Panel();
+      cb_fonts = new ComboBox();
       btn_upTo = new Button();
       txb_literalNumber = new TextBox();
       tview_fontInfo = new TreeView();
@@ -64,6 +65,7 @@
       btn_SaveShape = new Button();
       cb_ProcessAllError = new CheckBox();
       btn_showContent = new Button();
+      btn_setCurrFont = new Button();
       ((System.ComponentModel.ISupportInitialize)pb_mainImage).BeginInit();
       panel1.SuspendLayout();
       panel2.SuspendLayout();
@@ -276,6 +278,8 @@
       // panel1
       // 
       panel1.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Right;
+      panel1.Controls.Add(btn_setCurrFont);
+      panel1.Controls.Add(cb_fonts);
       panel1.Controls.Add(btn_upTo);
       panel1.Controls.Add(txb_literalNumber);
       panel1.Controls.Add(tview_fontInfo);
@@ -292,6 +296,15 @@
       panel1.Size = new Size(304, 580);
       panel1.TabIndex = 21;
       panel1.Paint += panel1_Paint;
+      // 
+      // cb_fonts
+      // 
+      cb_fonts.FormattingEnabled = true;
+      cb_fonts.Location = new Point(3, 96);
+      cb_fonts.Name = "cb_fonts";
+      cb_fonts.Size = new Size(121, 23);
+      cb_fonts.TabIndex = 24;
+      cb_fonts.SelectedIndexChanged += cb_fonts_SelectedIndexChanged;
       // 
       // btn_upTo
       // 
@@ -315,9 +328,9 @@
       // tview_fontInfo
       // 
       tview_fontInfo.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left;
-      tview_fontInfo.Location = new Point(3, 96);
+      tview_fontInfo.Location = new Point(3, 125);
       tview_fontInfo.Name = "tview_fontInfo";
-      tview_fontInfo.Size = new Size(294, 481);
+      tview_fontInfo.Size = new Size(294, 452);
       tview_fontInfo.TabIndex = 23;
       // 
       // lbl_glyphIndex
@@ -446,6 +459,17 @@
       btn_showContent.UseVisualStyleBackColor = true;
       btn_showContent.Click += btn_showContent_Click;
       // 
+      // btn_setCurrFont
+      // 
+      btn_setCurrFont.Anchor = AnchorStyles.Top | AnchorStyles.Right;
+      btn_setCurrFont.Location = new Point(127, 96);
+      btn_setCurrFont.Name = "btn_setCurrFont";
+      btn_setCurrFont.Size = new Size(73, 23);
+      btn_setCurrFont.TabIndex = 25;
+      btn_setCurrFont.Text = "Curr Font";
+      btn_setCurrFont.UseVisualStyleBackColor = true;
+      btn_setCurrFont.Click += btn_setCurrFont_Click;
+      // 
       // form_main
       // 
       AutoScaleDimensions = new SizeF(7F, 15F);
@@ -524,5 +548,7 @@
     private Button btn_SaveShape;
     private CheckBox cb_ProcessAllError;
     private Button btn_showContent;
+    private ComboBox cb_fonts;
+    private Button btn_setCurrFont;
   }
 }
