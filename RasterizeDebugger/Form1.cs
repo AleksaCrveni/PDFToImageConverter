@@ -143,7 +143,9 @@ namespace RasterizeDebugger
         _transform = new Matrix();
         _zoomScale = 1.0f;
         _lastFontRef = _interpreter._debugState.FontRef;
-        _currFontData = _interpreter._currentFont;
+        _currFontData = _interpreter.GS.TextState.Font;
+        if (_currFontData == null)
+          _currFontData = new PDF_FontData();
         UpdateFontInfoTreeView();
         _totalStringLiteralCount = 0;
         lbl_literalNumber.Text = _totalStringLiteralCount.ToString();
@@ -199,7 +201,7 @@ namespace RasterizeDebugger
       }
       else
       {
-        _currFontData = _interpreter._currentFont;
+        _currFontData = _interpreter.GS.TextState.Font;
         if (_currFontData.FontInfo.SubType == PDF_FontType.Type0)
         {
           ProcessText();
@@ -399,7 +401,7 @@ namespace RasterizeDebugger
       }
       else
       {
-        _currFontData = _interpreter._currentFont;
+        _currFontData = _interpreter.GS.TextState.Font;
         _interpreter.PDF_DrawText(_localState.currentText);
       }
 
@@ -445,7 +447,7 @@ namespace RasterizeDebugger
 
       //GlyphInfo gInfo = new GlyphInfo();
 
-      //_currFontData = _interpreter._currentFont;
+      //_currFontData = _interpreter.GS.TextState.Font;
 
       //_currRasterizer = _currFontData.Rasterizer;
       //double[] widths = _currFontData.FontInfo.Widths;
@@ -484,10 +486,10 @@ namespace RasterizeDebugger
       _totalStringLiteralCount++;
       if (updateUI)
         lbl_literalNumber.Text = _totalStringLiteralCount.ToString();
-      _interpreter.currentTextObject.TextMatrix[2, 0] -=
+      _interpreter.GS.TextState.TextMatrix[2, 0] -=
         (_interpreter._debugState.Literals[_localState.textIndex].PositionAdjustment / 1000f) *
-        _interpreter.currentTextObject.TextMatrix[0, 0]
-        * _interpreter.currentTextObject.FontScaleFactor;
+        _interpreter.GS.TextState.TextMatrix[0, 0]
+        * _interpreter.GS.TextState.FontScaleFactor;
     }
 
     public void DrawGlyphAndUpdateGlyphInfo(char c, ref GlyphInfo glyphInfo, string literal, int index, bool updateUI)
@@ -770,7 +772,7 @@ namespace RasterizeDebugger
         char end = ')';
         char start = '(';
         int count = 0;
-        if (_interpreter._currentFont.FontInfo.SubType == PDF_FontType.Type0)
+        if (_interpreter.GS.TextState.Font.FontInfo.SubType == PDF_FontType.Type0)
         {
           end = '>';
           start = '<';
