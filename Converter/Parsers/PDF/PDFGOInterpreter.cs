@@ -37,9 +37,8 @@ namespace Converter.Parsers.PDF
     // this is more memory efficient I think
     private Stack<int> arrayLengths;
     private Stack<GraphicsState> GSS;
-    public GraphicsState currentGS;
+    public GraphicsState GS;
     public PDFGI_PathConstruction currentPC;
-    public PDFGI_TextObject currentTextObject;
     public PDF_ResourceDict _resourceDict;
     private long tokensParsed = 0; // for debugging
     private double[,] textRenderingMatrix;
@@ -53,7 +52,6 @@ namespace Converter.Parsers.PDF
     private PathRasterizer _shapeRasterizer;
     public byte[] _delimiters = [(byte)'(', (byte)')', (byte)'/', (byte)'[', (byte)']', (byte)'<', (byte)'>'];
     public int _byteSize = 2; // Used only for type0 fonts
-    public PDF_FontData _currentFont; // not part of GS, but maybe should be part of currentTextObject
     public PDFLogger _pathLogger;
     // this variable is used in specific case where cm is seen yet and we want to draw shape
     // because then it will move start at the end of the byte array instead of start because we use thin our origin TOP-LEFT and PDF does it BOTTOM-LEFT
@@ -69,9 +67,9 @@ namespace Converter.Parsers.PDF
       operandTypes = new Stack<OperandType>();
       arrayLengths = new Stack<int>();
       stringOperands = new Stack<string>();
-      currentTextObject = new PDFGI_TextObject();
+      GS.TextState = new PDFGI_TextObject();
       GSS = new Stack<GraphicsState>();
-      currentGS = new GraphicsState();
+      GS = new GraphicsState();
       currentPC = new PDFGI_PathConstruction();
       _resourceDict = resourceDict;
       textRenderingMatrix = new double[3, 3];
@@ -86,13 +84,13 @@ namespace Converter.Parsers.PDF
       if (debug)
         _debugState = new PDFGO_DEBUG_STATE();
 
-      _currentFont = new PDF_FontData();
+
       InitGS();
     }
     public void InitGS(int pageHeight = 0)
     {
-      currentGS = new GraphicsState();
-      currentGS.CTM = MyMath.RealIdentityMatrix3x3();
+      GS = new GraphicsState();
+      GS.CTM = MyMath.RealIdentityMatrix3x3();
     }
     public void ConvertToPixelData()
     {
@@ -117,18 +115,18 @@ namespace Converter.Parsers.PDF
         {
           #region gss&sgs
           case 0x77: // w
-            currentGS.LineWidth = GetNextStackValAsDouble();
+            GS.LineWidth = GetNextStackValAsDouble();
             break;
           case 0x4a: // J
                      // valid values 0, 1, 2
-            currentGS.LineCap = GetNextStackValAsInt();
+            GS.LineCap = GetNextStackValAsInt();
             break;
           case 0x6a: // j
                      // valid values 0, 1, 2
-            currentGS.LineJoin = GetNextStackValAsInt();
+            GS.LineJoin = GetNextStackValAsInt();
             break;
           case 0x4d: // M
-            currentGS.MiterLimit = GetNextStackValAsDouble();
+            GS.MiterLimit = GetNextStackValAsDouble();
             break;
           case 0x64: // d
             PDFGI_DashPattern dashPattern = new PDFGI_DashPattern();
@@ -139,7 +137,7 @@ namespace Converter.Parsers.PDF
               dashArr[dpIndex] = GetNextStackValAsInt();
             }
             Debug.Assert(arrayLengths.Count == 0, "currently only support solid line");
-            currentGS.DashPattern = dashPattern;
+            GS.DashPattern = dashPattern;
             break;
           case 0x6972: // ri
             operandTypes.Pop();
@@ -149,10 +147,10 @@ namespace Converter.Parsers.PDF
             if (!valid)
               ri = PDFGI_RenderingIntent.Null;
 
-            currentGS.RenderingIntent = ri;
+            GS.RenderingIntent = ri;
             break;
           case 0x69: // i
-            currentGS.Flatness = GetNextStackValAsDouble();
+            GS.Flatness = GetNextStackValAsDouble();
             break;
           case 0x7371: // qs
                        // Name of gs paramter dict that is in ExtGState subdict in current resorouceDict
@@ -164,10 +162,10 @@ namespace Converter.Parsers.PDF
           // NOTE: This may not work with multiple cm, they may need to be stored and calculated at TJ
           // because of order between different types of transformations
           case 0x71: // q
-            GSS.Push(currentGS.DeepCopy());
+            GSS.Push(GS.DeepCopy());
             break;
           case 0x51: // Q
-            currentGS = GSS.Pop().DeepCopy();
+            GS = GSS.Pop().DeepCopy();
             break;
           case 0x6d63: // cm
             double f = GetNextStackValAsDouble();
@@ -314,37 +312,37 @@ namespace Converter.Parsers.PDF
           #endregion clippingPath
           #region textObjects
           case 0x5442: // BT
-            currentTextObject.Active = true;
-            currentTextObject.InitMatrixes();
+            GS.TextState.Active = true;
+            GS.TextState.InitMatrixes();
             break;
           case 0x5445: // ET
-            currentTextObject.Active = false;
+            GS.TextState.Active = false;
             break;
           #endregion textObjects
           #region textState
           case 0x6354: // Tc
-            currentTextObject.Tc = GetNextStackValAsDouble();
+            GS.TextState.Tc = GetNextStackValAsDouble();
             break;
           case 0x7754: // Tw
-            currentTextObject.Tw = GetNextStackValAsDouble();
+            GS.TextState.Tw = GetNextStackValAsDouble();
             break;
           case 0x7a54: // Tz
-            currentTextObject.Th = GetNextStackValAsDouble() / 100;
+            GS.TextState.Th = GetNextStackValAsDouble() / 100;
             break;
           case 0x4c54: // TL
-            currentTextObject.Tl = GetNextStackValAsDouble();
+            GS.TextState.Tl = GetNextStackValAsDouble();
             break;
           case 0x6654: // Tf
-            currentTextObject.FontScaleFactor = GetNextStackValAsDouble();
-            currentTextObject.FontRef = GetNextStackValAsString();
-            if (currentTextObject.FontRef != _currentFont.Key)
+            GS.TextState.FontScaleFactor = GetNextStackValAsDouble();
+            GS.TextState.FontRef = GetNextStackValAsString();
+            if (GS.TextState.Font == null || GS.TextState.FontRef != GS.TextState.Font.Key)
               SetupFont();
             break;
           case 0x7254: // Tr
-            currentTextObject.TMode = GetNextStackValAsInt();
+            GS.TextState.TMode = GetNextStackValAsInt();
             break;
           case 0x7354: // Ts
-            currentTextObject.TRise = GetNextStackValAsDouble();
+            GS.TextState.TRise = GetNextStackValAsDouble();
             break;
           #endregion textState
           #region textPositioning;
@@ -364,13 +362,13 @@ namespace Converter.Parsers.PDF
             reUsableMatrix1[2, 1] = ty;
             reUsableMatrix1[2, 2] = 1;
 
-            MyMath.MultiplyMatrixes3x3(reUsableMatrix1, currentTextObject.TextLineMatrix, currentTextObject.TextMatrix);
-            MyMath.CopyMatrix3x3Data(currentTextObject.TextLineMatrix, currentTextObject.TextMatrix);
+            MyMath.MultiplyMatrixes3x3(reUsableMatrix1, GS.TextState.TextLineMatrix, GS.TextState.TextMatrix);
+            MyMath.CopyMatrix3x3Data(GS.TextState.TextLineMatrix, GS.TextState.TextMatrix);
             break;
           case 0x4454: // TD
             ty = GetNextStackValAsDouble();
             tx = GetNextStackValAsDouble();
-            currentTextObject.TL = -ty;
+            GS.TextState.TL = -ty;
 
             reUsableMatrix1[0, 0] = 1;
             reUsableMatrix1[0, 1] = 0;
@@ -384,33 +382,33 @@ namespace Converter.Parsers.PDF
             reUsableMatrix1[2, 1] = ty;
             reUsableMatrix1[2, 2] = 1;
 
-            MyMath.MultiplyMatrixes3x3(reUsableMatrix1, currentTextObject.TextLineMatrix, currentTextObject.TextMatrix);
-            MyMath.CopyMatrix3x3Data(currentTextObject.TextLineMatrix, currentTextObject.TextMatrix);
+            MyMath.MultiplyMatrixes3x3(reUsableMatrix1, GS.TextState.TextLineMatrix, GS.TextState.TextMatrix);
+            MyMath.CopyMatrix3x3Data(GS.TextState.TextLineMatrix, GS.TextState.TextMatrix);
             break;
           case 0x6d54: // Tm
             double tmOp = GetNextStackValAsDouble();
-            currentTextObject.TextMatrix[2, 1] = tmOp;
-            currentTextObject.TextLineMatrix[2, 1] = tmOp;
+            GS.TextState.TextMatrix[2, 1] = tmOp;
+            GS.TextState.TextLineMatrix[2, 1] = tmOp;
             // e
             tmOp = GetNextStackValAsDouble();
-            currentTextObject.TextMatrix[2, 0] = tmOp;
-            currentTextObject.TextLineMatrix[2, 0] = tmOp;
+            GS.TextState.TextMatrix[2, 0] = tmOp;
+            GS.TextState.TextLineMatrix[2, 0] = tmOp;
             // d
             tmOp = GetNextStackValAsDouble();
-            currentTextObject.TextMatrix[1, 1] = tmOp;
-            currentTextObject.TextLineMatrix[1, 1] = tmOp;
+            GS.TextState.TextMatrix[1, 1] = tmOp;
+            GS.TextState.TextLineMatrix[1, 1] = tmOp;
             // c
             tmOp = GetNextStackValAsDouble();
-            currentTextObject.TextMatrix[1, 0] = tmOp;
-            currentTextObject.TextLineMatrix[1, 0] = tmOp;
+            GS.TextState.TextMatrix[1, 0] = tmOp;
+            GS.TextState.TextLineMatrix[1, 0] = tmOp;
             // b
             tmOp = GetNextStackValAsDouble();
-            currentTextObject.TextMatrix[0, 1] = tmOp;
-            currentTextObject.TextLineMatrix[0, 1] = tmOp;
+            GS.TextState.TextMatrix[0, 1] = tmOp;
+            GS.TextState.TextLineMatrix[0, 1] = tmOp;
             // a
             tmOp = GetNextStackValAsDouble();
-            currentTextObject.TextMatrix[0, 0] = tmOp;
-            currentTextObject.TextLineMatrix[0, 0] = tmOp;
+            GS.TextState.TextMatrix[0, 0] = tmOp;
+            GS.TextState.TextLineMatrix[0, 0] = tmOp;
             break;
           case 0x2a54: // T*
                        // text positioning
@@ -428,7 +426,7 @@ namespace Converter.Parsers.PDF
             // we could also impelment semaphoreslim to stop processing but this is simpler/dumber version
             if (_debug)
             {
-              _debugState.FontRef = currentTextObject.FontRef;
+              _debugState.FontRef = GS.TextState.FontRef;
               LiteralToDrawState lState = new LiteralToDrawState(literal, 0);
               _debugState.Literals.Add(lState);
               return;
@@ -469,7 +467,7 @@ namespace Converter.Parsers.PDF
               // we could also impelment semaphoreslim to stop processing but this is simpler/dumber version
               if (_debug)
               {
-                _debugState.FontRef = currentTextObject.FontRef;
+                _debugState.FontRef = GS.TextState.FontRef;
 
                 for (int i = literalsList.Count - 1; i >= 0; i--)
                 {
@@ -502,22 +500,22 @@ namespace Converter.Parsers.PDF
             // type 3 fonts
             break;
           case 0x5343: // CS
-            currentGS.StrokingColorSpace = InitCurrentColorSpace();
+            GS.StrokingColorSpace = InitCurrentColorSpace();
             break;
           case 0x7363: // cs
-            currentGS.NonStrokingColorSpace = InitCurrentColorSpace();
+            GS.NonStrokingColorSpace = InitCurrentColorSpace();
             break;
           case 0x4353: // SC
-            SetColor(currentGS.StrokingColorSpace);
+            SetColor(GS.StrokingColorSpace);
             break;
           case 0x4e4353: // SCN
-            SetColorAndName(currentGS.StrokingColorSpace);
+            SetColorAndName(GS.StrokingColorSpace);
             break;
           case 0x6373: // sc
-            SetColor(currentGS.NonStrokingColorSpace);
+            SetColor(GS.NonStrokingColorSpace);
             break;
           case 0x6e6373: // scn
-            SetColorAndName(currentGS.NonStrokingColorSpace);
+            SetColorAndName(GS.NonStrokingColorSpace);
             break;
           case 0x47: // G
             GetNextStackValAsDouble();
@@ -922,8 +920,8 @@ namespace Converter.Parsers.PDF
     // Should this be removed?
     public void UpdateTextMatrixAfterGlyphRender(int charWidth, int charHeight, int posAdjustment)
     {
-      double tx = ((charWidth - posAdjustment / 1000) * currentTextObject.FontScaleFactor + currentTextObject.Tc + currentTextObject.Tw) * (currentTextObject.Th);
-      double ty = (charHeight - posAdjustment / 1000) * currentTextObject.FontScaleFactor + currentTextObject.Tc + currentTextObject.Tw;
+      double tx = ((charWidth - posAdjustment / 1000) * GS.TextState.FontScaleFactor + GS.TextState.Tc + GS.TextState.Tw) * (GS.TextState.Th);
+      double ty = (charHeight - posAdjustment / 1000) * GS.TextState.FontScaleFactor + GS.TextState.Tc + GS.TextState.Tw;
       // init first matrix
       reUsableMatrix1[0, 0] = 1;
       reUsableMatrix1[0, 1] = 0;
@@ -937,20 +935,20 @@ namespace Converter.Parsers.PDF
       reUsableMatrix1[2, 1] = ty;
       reUsableMatrix1[2, 2] = 1;
       // multiply
-      MyMath.MultiplyMatrixes3x3(reUsableMatrix1, currentTextObject.TextMatrix, reUsableMatrix2);
+      MyMath.MultiplyMatrixes3x3(reUsableMatrix1, GS.TextState.TextMatrix, reUsableMatrix2);
 
       // asign value to textMatrix
-      currentTextObject.TextMatrix[0, 0] = reUsableMatrix2[0, 0];
-      currentTextObject.TextMatrix[0, 1] = reUsableMatrix2[0, 1];
-      currentTextObject.TextMatrix[0, 2] = reUsableMatrix2[0, 2];
+      GS.TextState.TextMatrix[0, 0] = reUsableMatrix2[0, 0];
+      GS.TextState.TextMatrix[0, 1] = reUsableMatrix2[0, 1];
+      GS.TextState.TextMatrix[0, 2] = reUsableMatrix2[0, 2];
 
-      currentTextObject.TextMatrix[1, 0] = reUsableMatrix2[1, 0];
-      currentTextObject.TextMatrix[1, 1] = reUsableMatrix2[1, 1];
-      currentTextObject.TextMatrix[1, 2] = reUsableMatrix2[1, 2];
+      GS.TextState.TextMatrix[1, 0] = reUsableMatrix2[1, 0];
+      GS.TextState.TextMatrix[1, 1] = reUsableMatrix2[1, 1];
+      GS.TextState.TextMatrix[1, 2] = reUsableMatrix2[1, 2];
 
-      currentTextObject.TextMatrix[2, 0] = reUsableMatrix2[2, 0];
-      currentTextObject.TextMatrix[2, 1] = reUsableMatrix2[2, 1];
-      currentTextObject.TextMatrix[2, 2] = reUsableMatrix2[2, 2];
+      GS.TextState.TextMatrix[2, 0] = reUsableMatrix2[2, 0];
+      GS.TextState.TextMatrix[2, 1] = reUsableMatrix2[2, 1];
+      GS.TextState.TextMatrix[2, 2] = reUsableMatrix2[2, 2];
 
     }
 
@@ -965,17 +963,17 @@ namespace Converter.Parsers.PDF
       return;
       //currentPC.Shape.SaveAbsolute("shapeExport");
       // rounding makes it look a bit better?
-      int X = (int)MathF.Round((float)currentGS.CTM[2, 0]);
+      int X = (int)MathF.Round((float)GS.CTM[2, 0]);
       // because origin is bottom-left we have do bitmapHeight - , to get position on the top
       int Y;
 
       if (_cmExecuted)
-        Y = _targetSize.Height - (int)(currentGS.CTM[2, 1]);
+        Y = _targetSize.Height - (int)(GS.CTM[2, 1]);
       else
         Y = 0;
 
-      float scaleX = (float)currentGS.CTM[0, 0];
-      float scaleY = (float)currentGS.CTM[1, 1];
+      float scaleX = (float)GS.CTM[0, 0];
+      float scaleY = (float)GS.CTM[1, 1];
 
       // do one scale for now
       float scale = scaleX > scaleY ? scaleX : scaleY;
@@ -990,11 +988,11 @@ namespace Converter.Parsers.PDF
       
       GlyphInfo glyphInfo = new GlyphInfo(); // make global??
       // Account for position adjustment
-      currentTextObject.TextMatrix[2, 0] -= (positionAdjustment / 1000f) * currentTextObject.TextMatrix[0, 0] * currentTextObject.FontScaleFactor;
+      GS.TextState.TextMatrix[2, 0] -= (positionAdjustment / 1000f) * GS.TextState.TextMatrix[0, 0] * GS.TextState.FontScaleFactor;
       // Type0 encodes characters in special way and CID can map to either ligature (multiple characters) or single char
       // So not to make PDF_DrawGlyph weird and those set of interfaces really weird, we will check CID here specifically for Type0 font
       // since afaik this is the only font that does this
-      if (_currentFont.FontInfo.SubType == PDF_FontType.Type0)
+      if (GS.TextState.Font.FontInfo.SubType == PDF_FontType.Type0)
       {
         PDF_DrawTextMultiByte(textToWrite, ref glyphInfo);
       }
@@ -1025,68 +1023,57 @@ namespace Converter.Parsers.PDF
         PDF_DrawGlyph(' ', ref glyphInfo, textToWrite, 0, ' ');
         return;
       }
-      // For some reason string literals can be in ocal <XX> form or just plain letter but still be used with Type0 Font.
-      if (textToWrite.Length == 1)
+
+      // support only 2 or 4 bytes for now
+      for (int i = 1; i < textToWrite.Length - 1; i += (_byteSize * 2))
       {
-        CID = textToWrite[0];
-        c = _currentFont.Rasterizer.FindCharFromCID(CID);
-        PDF_DrawGlyph((char)c, ref glyphInfo, textToWrite, CID);
-      }
-      else
-      {
-        // support only 2 or 4 bytes for now
-        for (int i = 1; i < textToWrite.Length - 1; i += (_byteSize * 2))
+        // this doesnt work i think...?
+        if (_byteSize == 4)
         {
-          // this doesnt work i think...?
-          if (_byteSize == 4)
-          {
-            CID = (char)UInt32.Parse(textToWrite.AsSpan().Slice(i, _byteSize * 2), NumberStyles.HexNumber);
-          }
-          else if (_byteSize == 2)
-          {
-            CID = (char)UInt16.Parse(textToWrite.AsSpan().Slice(i, _byteSize * 2), NumberStyles.HexNumber);
-          }
-          else
-          {
-            throw new NotSupportedException("Other byte size not supported yet!");
-          }
+          CID = (char)UInt32.Parse(textToWrite.AsSpan().Slice(i, _byteSize * 2), NumberStyles.HexNumber);
+        }
+        else if (_byteSize == 2)
+        {
+          CID = (char)UInt16.Parse(textToWrite.AsSpan().Slice(i, _byteSize * 2), NumberStyles.HexNumber);
+        }
+        else
+        {
+          throw new NotSupportedException("Other byte size not supported yet!");
+        }
 
-          c = _currentFont.Rasterizer.FindCharFromCID(CID);
+        c = GS.TextState.Font.Rasterizer.FindCharFromCID(CID);
 
-          // Page 271 -> Even though the CIDs are not used to select glyphs in a Type 2 CIDFont, they shall always be used to determine the glyph metrics, as described in the next sub-clause.
-          // not sure fi this is right....
-          if (_currentFont.FontInfo.DescendantFontsInfo[0].DescendantDict.Subtype == PDF_FontType.CIDFontType2)
-            c = CID;
+        // Page 271 -> Even though the CIDs are not used to select glyphs in a Type 2 CIDFont, they shall always be used to determine the glyph metrics, as described in the next sub-clause.
+        // not sure fi this is right....
+        if (GS.TextState.Font.FontInfo.DescendantFontsInfo[0].DescendantDict.Subtype == PDF_FontType.CIDFontType2)
+          c = CID;
 
-          if (c != null)
-          {
-            PDF_DrawGlyph((char)c, ref glyphInfo, textToWrite, 0, CID);
-            continue;
-          }
+        if (c != null)
+        {
+          PDF_DrawGlyph((char)c, ref glyphInfo, textToWrite, 0, CID);
+          continue;
+        }
 
-          // Not sure if ligatures should be printed separatetly or I should advance manually for each char
-          // just do this for now and see how it works
-          List<char> ligature = _currentFont.Rasterizer.FindLigatureFromCID(CID);
-          if (ligature.Count == 0)
+        // Not sure if ligatures should be printed separatetly or I should advance manually for each char
+        // just do this for now and see how it works
+        List<char> ligature = GS.TextState.Font.Rasterizer.FindLigatureFromCID(CID);
+        if (ligature.Count == 0)
+        {
+          char character = '0';
+          PDF_DrawGlyph((char)0, ref glyphInfo, textToWrite, 0, CID);
+          continue;
+        }
+        else
+        {
+          for (int j = 0; j < ligature.Count; j++)
           {
-            char character = '0';
-            PDF_DrawGlyph((char)0, ref glyphInfo, textToWrite, 0, CID);
-            continue;
-          }
-          else
-          {
-            for (int j = 0; j < ligature.Count; j++)
-            {
-              // NOTE:
-              // Not sure if i should pass CID of ligature of current glyph in ligature
-              // Because we will get width based on CID and then chars in ligature may appear to wide/sparse
-              PDF_DrawGlyph(ligature[j], ref glyphInfo, textToWrite, j, CID);
-            }
+            // NOTE:
+            // Not sure if i should pass CID of ligature of current glyph in ligature
+            // Because we will get width based on CID and then chars in ligature may appear to wide/sparse
+            PDF_DrawGlyph(ligature[j], ref glyphInfo, textToWrite, j, CID);
           }
         }
-      
       }
-     
     }
 
     /// <summary>
@@ -1104,12 +1091,12 @@ namespace Converter.Parsers.PDF
     public void PDF_DrawGlyph(char c, ref GlyphInfo glyphInfo, string literal, int index, char CID = ' ')
     {
       // just copy ref since lines can get too long
-      PDF_FontData fd = _currentFont;
-      if (_currentFont.Rasterizer == null)
+      PDF_FontData fd = GS.TextState.Font;
+      if (GS.TextState.Font.Rasterizer == null)
         return;
-      _currentFont.Rasterizer.SetDefaultGlyphInfoValues(ref glyphInfo);
+      GS.TextState.Font.Rasterizer.SetDefaultGlyphInfoValues(ref glyphInfo);
       // TODO: use this instead of c, FIX 
-      _currentFont.Rasterizer.GetGlyphInfo(c, ref glyphInfo);
+      GS.TextState.Font.Rasterizer.GetGlyphInfo(c, ref glyphInfo);
 
       ComputeTextRenderingMatrix();
 
@@ -1138,7 +1125,7 @@ namespace Converter.Parsers.PDF
       //Debug.Assert(width != 0);
       #endregion
 
-      (float scaleX, float scaleY) s = _currentFont.Rasterizer.GetScale(glyphInfo.Index, textRenderingMatrix, width);
+      (float scaleX, float scaleY) s = GS.TextState.Font.Rasterizer.GetScale(glyphInfo.Index, textRenderingMatrix, width);
 
       #region asserts
       Debug.Assert(X > 0, $"X is negative at index {index}. Lit: {literal}");
@@ -1168,7 +1155,7 @@ namespace Converter.Parsers.PDF
       int c_y0 = 0;
       int c_x1 = 0;
       int c_y1 = 0;
-      _currentFont.Rasterizer.GetGlyphBoundingBox(ref glyphInfo, s.scaleX, s.scaleY, ref c_x0, ref c_y0, ref c_x1, ref c_y1);
+      GS.TextState.Font.Rasterizer.GetGlyphBoundingBox(ref glyphInfo, s.scaleX, s.scaleY, ref c_x0, ref c_y0, ref c_x1, ref c_y1);
 
       Debug.Assert(c_x0 != int.MaxValue && c_x0 != int.MinValue);
       Debug.Assert(c_y0 != int.MaxValue && c_y0 != int.MinValue);
@@ -1188,7 +1175,7 @@ namespace Converter.Parsers.PDF
       int shiftX = 0;
       int shiftY = 0;
 
-      _currentFont.Rasterizer.RasterizeGlyph(_outputBuffer, byteOffset, glyphWidth, glyphHeight, _targetSize.Width, s.scaleX, s.scaleY, shiftX, shiftY, ref glyphInfo);
+      GS.TextState.Font.Rasterizer.RasterizeGlyph(_outputBuffer, byteOffset, glyphWidth, glyphHeight, _targetSize.Width, s.scaleX, s.scaleY, shiftX, shiftY, ref glyphInfo);
 
       AdvanceDrawPos(c, width);
     }
@@ -1207,19 +1194,19 @@ namespace Converter.Parsers.PDF
       reUsableMatrix1[2, 1] = f;
       reUsableMatrix1[2, 2] = 1;
 
-      MyMath.MultiplyMatrixes3x3(reUsableMatrix1, currentGS.CTM, reUsableMatrix2);
+      MyMath.MultiplyMatrixes3x3(reUsableMatrix1, GS.CTM, reUsableMatrix2);
 
-      currentGS.CTM[0, 0] = reUsableMatrix2[0, 0];
-      currentGS.CTM[0, 1] = reUsableMatrix2[0, 1];
-      currentGS.CTM[0, 2] = reUsableMatrix2[0, 2];
+      GS.CTM[0, 0] = reUsableMatrix2[0, 0];
+      GS.CTM[0, 1] = reUsableMatrix2[0, 1];
+      GS.CTM[0, 2] = reUsableMatrix2[0, 2];
 
-      currentGS.CTM[1, 0] = reUsableMatrix2[1, 0];
-      currentGS.CTM[1, 1] = reUsableMatrix2[1, 1];
-      currentGS.CTM[1, 2] = reUsableMatrix2[1, 2];
+      GS.CTM[1, 0] = reUsableMatrix2[1, 0];
+      GS.CTM[1, 1] = reUsableMatrix2[1, 1];
+      GS.CTM[1, 2] = reUsableMatrix2[1, 2];
 
-      currentGS.CTM[2, 0] = reUsableMatrix2[2, 0];
-      currentGS.CTM[2, 1] = reUsableMatrix2[2, 1];
-      currentGS.CTM[2, 2] = reUsableMatrix2[2, 2];
+      GS.CTM[2, 0] = reUsableMatrix2[2, 0];
+      GS.CTM[2, 1] = reUsableMatrix2[2, 1];
+      GS.CTM[2, 2] = reUsableMatrix2[2, 2];
     }
 
     // TODO: optimize
@@ -1227,19 +1214,19 @@ namespace Converter.Parsers.PDF
     {
       // Set initial value to first matrix
       double[,] identity = new double[3, 3];
-      identity[0, 0] = currentTextObject.FontScaleFactor * currentTextObject.Th;
+      identity[0, 0] = GS.TextState.FontScaleFactor * GS.TextState.Th;
       identity[0, 1] = 0;
       identity[0, 2] = 0;
       identity[1, 0] = 0;
-      identity[1, 1] = currentTextObject.FontScaleFactor;
+      identity[1, 1] = GS.TextState.FontScaleFactor;
       identity[1, 2] = 0;
       identity[2, 0] = 0;
-      identity[2, 1] = currentTextObject.TRise;
+      identity[2, 1] = GS.TextState.TRise;
       identity[2, 2] = 1;
 
       double[,] mid = new double[3, 3];
-      MyMath.MultiplyMatrixes3x3(identity, currentTextObject.TextMatrix, mid);
-      MyMath.MultiplyMatrixes3x3(mid, currentGS.CTM, textRenderingMatrix);
+      MyMath.MultiplyMatrixes3x3(identity, GS.TextState.TextMatrix, mid);
+      MyMath.MultiplyMatrixes3x3(mid, GS.CTM, textRenderingMatrix);
     }
 
     public void AdvanceDrawPos(char c, double width)
@@ -1247,34 +1234,34 @@ namespace Converter.Parsers.PDF
       #region Advance
       // double advanceX = width * state.TextObject.FontScaleFactor + state.TextObject.Tc;
       // double advanceY = 0 + state.TextObject.FontScaleFactor; // This wont work for vertical fonts
-      double advanceX = width + currentTextObject.Tc;
+      double advanceX = width + GS.TextState.Tc;
       double advanceY = 0; // This wont work for vertical fonts
 
       if (c == ' ')
-        advanceX += currentTextObject.Tw;
-      advanceX *= currentTextObject.Th;
+        advanceX += GS.TextState.Tw;
+      advanceX *= GS.TextState.Th;
 
       // TODO: this really depends on what type of CTM it is. i.e is there shear, transaltion, rotation etc
       // I should detect this and save state somewhere
       // for now just support translate and scale
       // NOTE: actually I think I can just multiply matrix, and this is done to avoid matrix multiplciation
-      currentTextObject.TextMatrix[2, 0] = advanceX * textRenderingMatrix[0, 0] + currentTextObject.TextMatrix[2, 0];
-      currentTextObject.TextMatrix[2, 1] = 0 * textRenderingMatrix[1, 1] + currentTextObject.TextMatrix[2, 1];
+      GS.TextState.TextMatrix[2, 0] = advanceX * textRenderingMatrix[0, 0] + GS.TextState.TextMatrix[2, 0];
+      GS.TextState.TextMatrix[2, 1] = 0 * textRenderingMatrix[1, 1] + GS.TextState.TextMatrix[2, 1];
       #endregion
     }
 
     public void SetupFont()
     {
       foreach (PDF_FontData fd in _resourceDict.Font)
-        if (fd.Key == currentTextObject.FontRef)
+        if (fd.Key == GS.TextState.FontRef)
         {
           if (fd.FontInfo.SubType == PDF_FontType.Type0)
             SetEncByteSize(fd.FontInfo.EncodingData.BaseEncoding);
-          _currentFont = fd;
+          GS.TextState.Font = fd;
           return;
         }
 
-      _currentFont = new PDF_FontData();
+      GS.TextState.Font = new PDF_FontData();
     }
 
     public void SetEncByteSize(string encoding)

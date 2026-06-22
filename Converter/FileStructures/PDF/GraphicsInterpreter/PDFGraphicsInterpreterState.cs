@@ -1,4 +1,5 @@
 ﻿using Converter.Rasterizers;
+using Converter.Utils;
 
 namespace Converter.FileStructures.PDF.GraphicsInterpreter
 {
@@ -11,14 +12,16 @@ namespace Converter.FileStructures.PDF.GraphicsInterpreter
       // double assignedmnet, fix later
       CTM = new double[3,3];
       BlendMode = new object[1];
+      TextState = new PDFGI_TextObject();
     }
     // Device Independent
     public double[,] CTM;
     public object ClippingPath;
     public PDFGI_ColorState StrokingColorSpace;
     public PDFGI_ColorState NonStrokingColorSpace;
-    public object Color;
-    public object TextState;
+    public PDFGI_TextObject TextState;
+
+    // TODO(@Aleksa): I am pretty sure these are part of TextObject an not used, check if we will use them and if not remove them!
     public double LineWidth;
     public int LineCap;
     public int LineJoin;
@@ -45,21 +48,12 @@ namespace Converter.FileStructures.PDF.GraphicsInterpreter
     public GraphicsState DeepCopy()
     {
       GraphicsState newGS = new GraphicsState();
-      newGS.CTM[0, 0] = this.CTM[0, 0];
-      newGS.CTM[0, 1] = this.CTM[0, 1];
-      newGS.CTM[0, 2] = this.CTM[0, 2];
-      newGS.CTM[1, 0] = this.CTM[1, 0];
-      newGS.CTM[1, 1] = this.CTM[1, 1];
-      newGS.CTM[1, 2] = this.CTM[1, 2];
-      newGS.CTM[2, 0] = this.CTM[2, 0];
-      newGS.CTM[2, 1] = this.CTM[2, 1];
-      newGS.CTM[2, 2] = this.CTM[2, 2];
+      Copy.Matrix3x3(newGS.CTM, this.CTM);
 
       // TODO: make sure these are coppied propely
       newGS.ClippingPath = this.ClippingPath;
       newGS.StrokingColorSpace = this.StrokingColorSpace;
       newGS.NonStrokingColorSpace = this.NonStrokingColorSpace;
-      newGS.Color = this.Color;
       newGS.TextState = this.TextState;
       newGS.LineWidth = this.LineWidth;
       newGS.LineCap = this.LineCap;
@@ -73,6 +67,8 @@ namespace Converter.FileStructures.PDF.GraphicsInterpreter
       newGS.AlphaConstant = this.AlphaConstant;
       newGS.AlphaSource = this.AlphaSource;
 
+      // NOTE(@Aleksa) This MAYBE doens't have to be a deep copy, think about it
+      newGS.TextState = this.TextState.DeepCopy();
       return newGS;
     }
   }

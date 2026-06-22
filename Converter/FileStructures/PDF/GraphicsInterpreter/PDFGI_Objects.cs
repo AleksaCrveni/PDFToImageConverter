@@ -1,4 +1,6 @@
-﻿namespace Converter.FileStructures.PDF.GraphicsInterpreter
+﻿using Converter.Utils;
+
+namespace Converter.FileStructures.PDF.GraphicsInterpreter
 {
   public class PDFGI_TextObject
   {
@@ -23,12 +25,31 @@
     public int TMode = 0; // Render mode
     public double TRise = 0; // Rise
     public bool Active;
+    public PDF_FontData Font;
     public void InitMatrixes()
     {
       TextMatrix = MyMath.RealIdentityMatrix3x3();
       TextLineMatrix = MyMath.RealIdentityMatrix3x3();
     }
 
+    public PDFGI_TextObject DeepCopy()
+    {
+      PDFGI_TextObject newTO = new PDFGI_TextObject();
+      Copy.Matrix3x3(newTO.TextMatrix, this.TextMatrix);
+      Copy.Matrix3x3(newTO.TextLineMatrix, this.TextLineMatrix);
+      newTO.FontRef = this.FontRef;
+      newTO.FontScaleFactor = this.FontScaleFactor;
+      newTO.Th = this.Th;
+      newTO.Tl = this.Tl;
+      newTO.Tw = this.Tw;
+      newTO.Tc = this.Tc;
+      newTO.TL = this.TL;
+      newTO.TMode = this.TMode;
+      newTO.TRise = this.TRise;
+      newTO.Active = this.Active;
+      newTO.Font = this.Font;
+      return newTO;
+    }
   }
   public class PDFGI_PathObject
   { }
