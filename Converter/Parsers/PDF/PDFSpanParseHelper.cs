@@ -817,6 +817,35 @@ namespace Converter.Parsers.PDF
       ReadChar();
       return sb.ToString();
     }
+
+    /// <summary>
+    /// This API doesn't return but takes matrix as a parameter,
+    /// because matrixes usually have default values so array is already created before hand
+    /// </summary>
+    /// <param name="m"></param>
+    /// <exception cref="InvalidDataException"></exception>
+    public void FillMatrixFromNextArray(double[,] m)
+    {
+      ReadUntilNonWhiteSpaceDelimiter();
+      if (_char != '[')
+        throw new InvalidDataException("Matrix Array error expected [");
+      m[0, 0] = GetNextDouble();
+      m[0, 1] = GetNextDouble();
+      m[0, 2] = 0;
+
+      m[1, 0] = GetNextDouble();
+      m[1, 1] = GetNextDouble();
+      m[1, 2] = 0;
+
+      m[2, 0] = GetNextDouble();
+      m[2, 1] = GetNextDouble();
+      m[2, 2] = 1; // identity 
+      ReadUntilNonWhiteSpaceDelimiter();
+      if (_char != ']')
+        throw new InvalidDataException("Matrix Array error expected ]");
+      ReadChar();
+    }
+
     public void SkipNextToken()
     {
       SkipWhiteSpaceAndDelimiters();
