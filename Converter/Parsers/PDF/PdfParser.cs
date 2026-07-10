@@ -9,12 +9,9 @@ using Converter.StaticData;
 using Converter.Utils;
 using Converter.Writers.TIFF;
 using System.Buffers;
-using System.Buffers.Binary;
-using System.ComponentModel;
 using System.Diagnostics;
 using System.Globalization;
 using System.Numerics;
-using System.Runtime.InteropServices;
 using System.Text;
 namespace Converter.Parsers.PDF
 {
@@ -181,7 +178,7 @@ namespace Converter.Parsers.PDF
       string tokenString = helper.GetNextToken();
       while (tokenString != string.Empty)
       {
-        ParseCommonStreamDictAsExtension(file, ref helper, tokenString, ref dict);
+        ParseCommonStreamDictAsExtension(file, ref helper, tokenString, dict);
         helper.ReadUntilNonWhiteSpaceDelimiter();
         if (helper.IsEndOfDict())
           break;
@@ -230,7 +227,7 @@ namespace Converter.Parsers.PDF
             // IR, has XMP syntax, 
             break;
           default:
-            ParseCommonStreamDictAsExtension(file, ref helper, tokenString, ref commonStreamDict);
+            ParseCommonStreamDictAsExtension(file, ref helper, tokenString, commonStreamDict);
             break;
         }
         helper.ReadUntilNonWhiteSpaceDelimiter();
@@ -256,7 +253,7 @@ namespace Converter.Parsers.PDF
       FreeAllocator(allocator);
     }
 
-    private void ParseCommonStreamDictAsExtension(PDFFile file, ref PDFSpanParseHelper helper, string tokenString, ref PDF_CommonStreamDict dict)
+    private void ParseCommonStreamDictAsExtension(PDFFile file, ref PDFSpanParseHelper helper, string tokenString, PDF_CommonStreamDict dict)
     {
       switch (tokenString)
       {
@@ -358,7 +355,27 @@ namespace Converter.Parsers.PDF
             resourceDict.Shading = helper.GetNextDict();
             break;
           case "XObject":
-            resourceDict.XObject = helper.GetNextDict();
+            Dictionary<string, PDF_XObject> dict = new();
+            helper.SkipWhiteSpace();
+            if (helper.IsCurrentByteDigit())
+            {
+              #region memAllocAndHelper
+              (int objIndex, int generation) objPosition = helper.GetNextIndirectReference();
+              SharedAllocator allocator = GetObjBuffer(file, objPosition);
+              ReadOnlySpan<byte> xObjSpan = allocator.Buffer.AsSpan(allocator.Range);
+              PDFSpanParseHelper irHelper = new PDFSpanParseHelper(ref xObjSpan);
+              #endregion memAllocAndHelper
+              irHelper.SkipObjHeader();
+              ParseXObjects(file, ref irHelper, dict);
+              #region freeMem
+              FreeAllocator(allocator);
+              #endregion freeMem  
+            }
+            else
+            {
+              ParseXObjects(file, ref helper, dict);
+            }
+            resourceDict.XObjects = dict;
             break;
           case "Font":
             List<PDF_FontData> fontData = new List<PDF_FontData>();
@@ -396,6 +413,274 @@ namespace Converter.Parsers.PDF
       if (tokenString == "")
         throw new InvalidDataException("Invalid dictionary");
       helper.ReadChar(); // needs to be done so if its embedded so outside dict isnt dettected
+    }
+
+    private void ParseXObjects(PDFFile file, ref PDFSpanParseHelper helper, Dictionary<string, PDF_XObject> dict)
+    {
+      if (!helper.GoToStartOfDict())
+        throw new InvalidDataException("Invalid XObjects dictionary!");
+      string tokenString = helper.GetNextToken();
+      while (tokenString != "")
+      {
+        PDF_XObject xObject = new PDF_XObject();
+
+        helper.SkipWhiteSpace();
+
+        if (helper.IsCurrentByteDigit())
+        {
+          #region memAllocAndHelper
+          (int objIndex, int generation) objPosition = helper.GetNextIndirectReference();
+          SharedAllocator allocator = GetObjBuffer(file, objPosition);
+          ReadOnlySpan<byte> irSpan = allocator.Buffer.AsSpan(allocator.Range);
+          PDFSpanParseHelper irHelper = new PDFSpanParseHelper(ref irSpan);
+          #endregion memAllocAndHelper
+          irHelper.SkipObjHeader();
+          ParseXObject(file, ref irHelper, xObject);
+          #region freeMem
+          FreeAllocator(allocator);
+          #endregion freeMem
+        }
+        else
+        {
+          ParseXObject(file, ref helper, xObject);
+        }
+
+        dict.Add(tokenString, xObject);
+        helper.ReadUntilNonWhiteSpaceDelimiter();
+        if (helper._char == '>' && helper.IsCurrentCharacterSameAsNext())
+          break;
+
+        tokenString = helper.GetNextToken();
+      }
+      helper.ReadChar();
+      helper.ReadChar();
+    }
+    /// <summary>
+    /// special handling in case subtype isn't second type
+    /// </summary>
+    /// <param name="file"></param>
+    /// <param name="helper"></param>
+    /// <param name="xObject"></param>
+    private void ParseXObject(PDFFile file, ref PDFSpanParseHelper helper, PDF_XObject xObject)
+    {
+      helper.GoToStartOfDict();
+      int readPos = helper._readPosition;
+      int pos = helper._position;
+      helper.GoToNextStringMatch("/Subtype");
+      helper.SkipNextToken();
+      // have to do some manual stuff because we can't convert /3D because we cant start enum entry with number
+      helper.ReadUntilNonWhiteSpaceDelimiter();
+
+      xObject.Type = helper.GetNextName<PDF_XObjectType>();
+
+      if (xObject.Type == PDF_XObjectType.NULL)
+        throw new InvalidDataException("Invalid XObject SubType");
+
+      helper._readPosition = readPos;
+      helper._position = pos;
+
+      IPDF_XObjectData data;
+      if (xObject.Type == PDF_XObjectType.Image)
+      {
+        data = new PDF_XObjectImageData();
+        ParseXObjectImage(file, ref helper, data);
+      }
+      else if (xObject.Type == PDF_XObjectType.Form)
+      {
+        data = new PDF_XObjectFormData();
+        ParseXObjectForm(file, ref helper, data);
+      }
+      else
+      {
+        data = new PDF_XObjectPSData();
+        ParseXObjectPS(file, ref helper, data);
+      }
+
+      xObject.Data = data!;
+    }
+
+    private void ParseXObjectImage(PDFFile file, ref PDFSpanParseHelper helper, IPDF_XObjectData iData)
+    {
+      PDF_XObjectImageData data = (PDF_XObjectImageData)iData;
+      data.CommonStreamData = new PDF_CommonStreamDict();
+      string tokenString = helper.GetNextToken();
+      while (tokenString != "")
+      {
+        switch (tokenString)
+        {
+          case "Width":
+            data.Width = helper.GetNextInt32();
+            break;
+          case "Height":
+            data.Height = helper.GetNextInt32();
+            break;
+          case "ColorSpace":
+            data.ColorSpace = helper.GetListOfNames<PDF_ColorSpaceFamily>();
+            break;
+          case "BitsPerComponent":
+            data.BitsPerComponent = helper.GetNextInt32();
+            break;
+          case "Intent":
+            data.Intent = helper.GetNextName<PDF_RenderingIntent>();
+            break;
+          case "ImageMask":
+            data.ImageMask = helper.GetNextBool();
+            break;
+          case "Mask":
+            // not sure how this looks so i will just throw now
+            throw new NotImplementedException("Image mask not implemented yet!");
+            break;
+          case "Decode":
+            data.DecodeArray = helper.GetNextInt32Array();
+            break;
+          case "Interpolate":
+            data.Interpolate = helper.GetNextBool();
+            break;
+          case "Alternates":
+            // 8.9.5.4 Page 221
+            throw new NotImplementedException("Alternates not implemented yet");
+            break;
+          case "SMask":
+            throw new NotImplementedException("Alternates not implemented yet");
+            break;
+          case "SmaskInData":
+            throw new NotImplementedException("SmaskInData not implemented yet");
+            break;
+          case "Name":
+            helper.SkipNextToken();
+            break;
+          case "StructParent":
+            data.StructParent = helper.GetNextInt32();
+            break;
+          case "ID":
+            data.ID = helper.GetNextByteString();
+            break;
+          case "OPI":
+            helper.SkipNextDictOrIR();
+            break;
+          case "Metadata":
+            helper.SkipNextDictOrIR();
+            break;
+          case "OC":
+            helper.SkipNextDictOrIR();
+            break;
+          default:
+            ParseCommonStreamDictAsExtension(file, ref helper, tokenString, data.CommonStreamData);
+            break;
+        }
+
+        helper.ReadUntilNonWhiteSpaceDelimiter();
+        if (helper._char == '>' && helper.IsCurrentCharacterSameAsNext())
+          break;
+
+        tokenString = helper.GetNextToken();
+      }
+      if (data.DecodeArray != null)
+      {
+        if (data.ImageMask == true)
+        {
+          if (data.DecodeArray.Count != 2)
+            throw new InvalidDataException("Invalid DecodeArray values!");
+        }
+        else if (data.CommonStreamData.Filters.Contains(ENCODING_FILTER.JPXDecode) == false)
+        {
+          // TODO(@Aleksa) Make this better
+          int colorsRequired = ColorHelper.GetPDFColorCountInSpace(data.ColorSpace[0]);
+          if (data.DecodeArray.Count != colorsRequired * 2)
+            throw new InvalidDataException("Invalid DecodeArray values!");
+        }
+        else
+        {
+          data.DecodeArray = null;
+        }
+      }
+      
+      helper.SkipWhiteSpaceAndDelimiters();
+      helper.SkipNextToken(); // streeam
+
+      ReadOnlySpan<byte> encodedSpan = helper._buffer.Slice(helper._position, (int)data.CommonStreamData.Length);
+      data.CommonStreamData.RawStreamData = DecompressionHelper.DecodeFilters(ref encodedSpan, data.CommonStreamData.Filters);
+
+    }
+
+    private void ParseXObjectForm(PDFFile file, ref PDFSpanParseHelper helper, IPDF_XObjectData iData)
+    {
+      PDF_XObjectFormData data = (PDF_XObjectFormData)iData;
+      data.CommonStreamData = new PDF_CommonStreamDict();
+      string tokenString = helper.GetNextToken();
+      while (tokenString != "")
+      {
+        switch (tokenString)
+        {
+          case "BBox":
+            data.BBox = helper.GetNextRectangle();
+            break;
+          case "Matrix":
+            helper.FillMatrixFromNextArray(data.Matrix);
+            break;
+          case "Resources":
+            PDF_ResourceDict rDict = new PDF_ResourceDict();
+            helper.SkipWhiteSpace();
+            if (helper.IsCurrentByteDigit())
+            {
+              ParseResourceDictionary(file, helper.GetNextIndirectReference(), rDict);
+            }
+            else
+            {
+              ParseResourceDictionary(file, ref helper, false, rDict);
+            }
+            data.ResourceDict = rDict;
+            break;
+          case "Group":
+            helper.SkipNextDictOrIR();
+            break;
+          case "Ref":
+            helper.SkipNextDictOrIR();
+            break;
+          case "Metadata":
+            helper.SkipNextDictOrIR();
+            break;
+          case "PieceInfo":
+            helper.SkipNextDictOrIR();
+            break;
+          case "LastModified":
+            helper.SkipNextToken();
+            break;
+          case "StructParent":
+            data.StructParent = helper.GetNextInt32();
+            break;
+          case "StructParents":
+            data.StructParents= helper.GetNextInt32();
+            break;
+          case "OPI":
+            helper.SkipNextDictOrIR();
+            break;
+          case "OC":
+            helper.SkipNextDictOrIR();
+            break;
+          case "Name":
+            data.Name = helper.GetNextToken();
+            break;
+          default:
+            ParseCommonStreamDictAsExtension(file, ref helper, tokenString, data.CommonStreamData);
+            break;
+        }
+
+        helper.ReadUntilNonWhiteSpaceDelimiter();
+        if (helper._char == '>' && helper.IsCurrentCharacterSameAsNext())
+          break;
+
+        tokenString = helper.GetNextToken();
+      }
+      helper.SkipWhiteSpaceAndDelimiters();
+      helper.SkipNextToken(); // skip stream
+
+      ReadOnlySpan<byte> encodedSpan = helper._buffer.Slice(helper._position, (int)data.CommonStreamData.Length);
+      data.CommonStreamData.RawStreamData = DecompressionHelper.DecodeFilters(ref encodedSpan, data.CommonStreamData.Filters);
+    }
+    private void ParseXObjectPS(PDFFile file, ref PDFSpanParseHelper helper, IPDF_XObjectData? data)
+    {
+      throw new NotImplementedException();
     }
 
     private void ParseColorSpaceDict(PDFFile file, ref PDFSpanParseHelper helper, List<PDF_ColorSpace> list)
@@ -540,7 +825,7 @@ namespace Converter.Parsers.PDF
             throw new NotImplementedException();
             break;
           default:
-            ParseCommonStreamDictAsExtension(file, ref helper, tokenString, ref commonStreamDict);
+            ParseCommonStreamDictAsExtension(file, ref helper, tokenString, commonStreamDict);
             break;
         }
 
@@ -753,7 +1038,7 @@ namespace Converter.Parsers.PDF
           case "Widths":
             helper.SkipWhiteSpace();
             // can be direct array or IR
-            
+
             if (helper._char == '[')
             {
               widthsArr = new double[fontInfo.LastChar - fontInfo.FirstChar + 1];
@@ -767,7 +1052,8 @@ namespace Converter.Parsers.PDF
                 throw new InvalidDataException("Invalid end of widths array!");
               helper.ReadChar();
               fontInfo.Widths = widthsArr;
-            } else if (char.IsDigit((char)helper._char))
+            }
+            else if (char.IsDigit((char)helper._char))
             {
               widthIR = helper.GetNextIndirectReference();
             }
@@ -776,7 +1062,6 @@ namespace Converter.Parsers.PDF
               throw new InvalidDataException("Invalid Widths value in Font Dictionary!");
             }
 
-            
             break;
           case "FontDescriptor":
             (int objectIndex, int _) ir = helper.GetNextIndirectReference();
@@ -2509,7 +2794,7 @@ namespace Converter.Parsers.PDF
               throw new InvalidDataException("Invalid W array!");
             break;
           default:
-            ParseCommonStreamDictAsExtension(file, ref helper, tokenString, ref commonStreamDict);
+            ParseCommonStreamDictAsExtension(file, ref helper, tokenString, commonStreamDict);
             break;
         }
 
@@ -2764,7 +3049,7 @@ namespace Converter.Parsers.PDF
             objStreamInfo.ExtendsIR = helper.GetNextIndirectReference();
             break;
           default:
-            ParseCommonStreamDictAsExtension(file, ref helper, tokenString, ref commonStreamDict);
+            ParseCommonStreamDictAsExtension(file, ref helper, tokenString, commonStreamDict);
             break;
         }
 

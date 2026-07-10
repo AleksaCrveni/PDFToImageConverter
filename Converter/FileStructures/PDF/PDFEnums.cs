@@ -228,9 +228,22 @@
     GoTo3DView
   }
 
-  public enum PDF_CMAP_ENCODING
+  // 8.8 External objects
+  public enum PDF_XObjectType
   {
-    
+    NULL,
+    Image,
+    Form,
+    PS
+  }
+
+  public enum PDF_RenderingIntent
+  {
+    NULL,
+    AbsoluteColorimetric,
+    RelativeColorimetric,
+    Saturation,
+    Perceptual
   }
 
 }

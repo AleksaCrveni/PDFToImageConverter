@@ -2,8 +2,6 @@
 using Converter.FileStructures.General;
 using Converter.Rasterizers;
 using System.Numerics;
-using System.Security.Cryptography.X509Certificates;
-using System.Text;
 
 namespace Converter.FileStructures.PDF
 {
@@ -184,17 +182,20 @@ namespace Converter.FileStructures.PDF
   }
 
   // Table 33
+  /// <summary>
+  /// These can ALSO be parts of independent XObjects and have fields that are used by XObjects so make fields nullable!
+  /// </summary>
   public class PDF_ResourceDict()
   {
-    public Dictionary<object, object> ExtGState;
-    public List<PDF_ColorSpace> ColorSpace;
-    public Dictionary<object, object> Pattern;
-    public Dictionary<object, object> Shading;
-    public Dictionary<object, object> XObject;
+    public Dictionary<object, object>? ExtGState;
+    public List<PDF_ColorSpace>? ColorSpace;
+    public Dictionary<object, object>? Pattern;
+    public Dictionary<object, object>? Shading;
+    public Dictionary<string, PDF_XObject>? XObjects;
     // key is arbitary so it has to be a string and its used to reference this fonts
-    public List<PDF_FontData> Font;
-    public List<PDF_ProcedureSet> ProcSets;
-    public Dictionary<object, object> Properties;
+    public List<PDF_FontData>? Font;
+    public List<PDF_ProcedureSet>? ProcSets;
+    public Dictionary<object, object>? Properties;
   }
   /// <summary>
   /// We fit key in here as well so we dont have to have another class and another pointer its just making it more complicated
@@ -566,5 +567,79 @@ namespace Converter.FileStructures.PDF
   public class PDF_AnnotRenditionAction : IPDF_AnnotActionData { }
   public class PDF_AnnotTransAction : IPDF_AnnotActionData { }
   public class PDF_AnnotGoTo3DViewAction : IPDF_AnnotActionData { }
+
+  public interface IPDF_XObjectData;
+  public class PDF_XObject
+  {
+    public PDF_XObjectType Type;
+    public IPDF_XObjectData Data;
+  }
+
+  // Table 95
+  /// <summary>
+  /// According to spec this is Type1 form type dict, but since spec only supports single type we wont 
+  /// complicate and wont separate types in the code
+  /// </summary>
+  public class PDF_XObjectFormData : IPDF_XObjectData
+  {
+    public string Name;
+    public PDF_Rect BBox;
+    public double[,] Matrix = new double[,] { { 1, 0, 0 }, { 0, 1, 0 }, { 0, 0, 1 } };
+    public PDF_ResourceDict? ResourceDict;
+    public Dictionary<object, object>? Group;
+    public Dictionary<object, object>? Ref;
+    public byte[]? Metadata;
+    public Dictionary<object, object>? PieceInfo;
+    public DateTime? LastModified;
+    public int? StructParent;
+    public int? StructParents;
+    public Dictionary<object, object>? OPI;
+    public Dictionary<object, object>? OC;
+    public PDF_CommonStreamDict CommonStreamData;
+
+  }
+
+  public class PDF_XObjectPSData : IPDF_XObjectData
+  {
+
+  }
   
+  // Table 89
+  public class PDF_XObjectImageData : IPDF_XObjectData
+  {
+    public int Width;
+    public int Height;
+    public List<PDF_ColorSpaceFamily>? ColorSpace;
+    public int? BitsPerComponent;
+    public PDF_RenderingIntent Intent = PDF_RenderingIntent.NULL;
+    public bool ImageMask = false;
+    public PDF_ImageMaskData? Mask;
+    public List<int>? DecodeArray;
+    public bool Interpolate;
+    public List<PDF_AlternateImageDictionary>? AlternateImages;
+    public byte[]? SMask;
+    public int SMaskInData;
+    // skip Name
+    public int StructParent;
+    public string ID;
+    public Dictionary<object, object>? OPI;
+    public byte[] Metadata;
+    public Dictionary<object, object>? OC;
+    public PDF_CommonStreamDict CommonStreamData;
+  }
+
+  public class PDF_ImageMaskData
+  {
+    public byte[]? Explicit;
+    public List<object>? ColourKey;
+  }
+
+  public class PDF_AlternateImageDictionary
+  {
+    public byte[] ImageData;
+    public bool DefaultForPrinting;
+    public Dictionary<object, object>? OC;
+  }
+
+
 }

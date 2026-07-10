@@ -150,7 +150,7 @@ namespace Converter.Parsers.PDF
       SkipWhiteSpaceAndDelimiters();
       int starter = _position;
       // don't have to check if _char is 0 if we reach end of the buffer becaseu its cheked in IsCurrentCharPdfWhiteSpace
-      while (!IsCurrentCharPdfWhiteSpace())
+      while (!IsCurrentCharPdfWhiteSpace() && !delimiters.Contains(_char))
       {
         ReadChar();
       }
@@ -437,6 +437,26 @@ namespace Converter.Parsers.PDF
       while (_char != PDFConstants.NULL && _char != ']')
       {
         array.Add(GetNextDouble());
+        SkipWhiteSpace();
+      }
+
+      if (_char != ']')
+        throw new InvalidDataException("Invalid array data. Expected end of Array");
+      ReadChar();
+      return array;
+    }
+    public List<int> GetNextInt32Array()
+    {
+      List<int> array = new List<int>();
+      ReadUntilNonWhiteSpaceDelimiter();
+      if (_char != '[')
+        throw new InvalidDataException("Invalid array data. Expected Array");
+      ReadChar();
+
+      SkipWhiteSpace();
+      while (_char != PDFConstants.NULL && _char != ']')
+      {
+        array.Add(GetNextInt32());
         SkipWhiteSpace();
       }
 
@@ -849,7 +869,7 @@ namespace Converter.Parsers.PDF
     public void SkipNextToken()
     {
       SkipWhiteSpaceAndDelimiters();
-      while (!IsCurrentCharPdfWhiteSpace())
+      while (!IsCurrentCharPdfWhiteSpace() && !delimiters.Contains(_char))
       {
         ReadChar();
       }
