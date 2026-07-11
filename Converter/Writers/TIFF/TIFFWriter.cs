@@ -502,6 +502,7 @@ namespace Converter.Writers.TIFF
     /// Allow writer buffer to be allocated on the stack. Buffer size is 8192 bytes. If false, buffer will be allocated on heap. Default is false.
     /// </summary>
     public bool AllowStackAlloct = false;
+    public int BitsPerSample = 8;
 
     public TIFF_Compression Compression = TIFF_Compression.NoCompression;
   }
