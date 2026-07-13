@@ -355,6 +355,9 @@ namespace Converter.Parsers.PDF
             resourceDict.Shading = helper.GetNextDict();
             break;
           case "XObject":
+            //NOTE(@Aleksa): TEMP UNTIL COLORS ARE IMPLEMENTED
+            helper.SkipNextDictOrIR();
+            break;
             Dictionary<string, PDF_XObject> dict = new();
             helper.SkipWhiteSpace();
             if (helper.IsCurrentByteDigit())
@@ -2303,7 +2306,7 @@ namespace Converter.Parsers.PDF
             catalog.Version = ParsePdfVersionFromCatalog(ref helper);
             break;
           case "Extensions":
-            catalog.Extensions = helper.GetNextDict();
+            catalog.Extensions = helper.SkipNextDictOrIR();
             break;
           case "Pages":
             catalog.PagesIR = helper.GetNextIndirectReference();
@@ -2312,13 +2315,13 @@ namespace Converter.Parsers.PDF
             catalog.PageLabels = helper.GetNextNumberTree();
             break;
           case "Names":
-            catalog.Names = helper.GetNextDict();
+            catalog.Names = helper.SkipNextDictOrIR();
             break;
           case "Dests":
             catalog.DestsIR = helper.GetNextIndirectReference();
             break;
           case "ViewerPreferences":
-            catalog.ViewerPreferences = helper.GetNextDict();
+            catalog.ViewerPreferences = helper.SkipNextDictOrIR();
             break;
           case "PageLayout":
             catalog.PageLayout = helper.GetNextName<PDF_PageLayout>();
