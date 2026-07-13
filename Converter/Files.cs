@@ -1,4 +1,6 @@
-﻿namespace Converter
+﻿using Converter.FileStructures.PDF.GraphicsInterpreter;
+
+namespace Converter
 {
   public static class Files
   {
@@ -20,6 +22,7 @@
     public static string PNGInternlancedSample { get; set; }
     public static string Prijemni1 { get; set; }
     public static string Greek { get; set; }
+    public static string BasicColor { get; set; }
     static Files()
     { 
       RootFolder = Path.Combine(Directory.GetParent(Directory.GetCurrentDirectory()).Parent.Parent.Parent.FullName, "Files");
@@ -40,6 +43,7 @@
       PNGInternlancedSample = Path.Combine(RootFolder, "interlancedPngSample.png");
       Prijemni1 = Path.Combine(RootFolder, "Prijemni-1.pdf");
       Greek = Path.Combine(RootFolder, "greek.pdf");
+      BasicColor = Path.Combine(RootFolder, "BasicColors.pdf");
     }
   }
 }

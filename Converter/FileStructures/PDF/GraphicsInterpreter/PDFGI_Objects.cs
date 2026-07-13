@@ -89,34 +89,22 @@ namespace Converter.FileStructures.PDF.GraphicsInterpreter
 
   }
   /// <summary>
-  /// Used to hold 4 color values
-  /// For RGB/A:
-  ///   Val1 -> R;
-  ///   Val2 -> G;
-  ///   Val3 -> B;
-  ///   Val4 -> A;
-  /// for CMYK:
-  ///   val1 -> Cyan
-  ///   val2 -> Magenta
-  ///   val3 -> Yellow
-  ///   val4 -> Black
-  /// for Gray:
-  ///   val1 -> Gray
-  ///   val1 = val2 = val3
-  ///   val4 -> 0
+  /// It hold intesities of each color component between 0.0 and 1.0
+  /// This allows us calculate correct color range based on bits per component  in whatever image format we are converting to
   /// </summary>
   public class MyColor
   {
-    public double Val1;
-    public double Val2;
-    public double Val3;
-    public double Val4;
-    public void SetColor(double v1, double v2, double v3, double v4)
+    // here should be tag to know which color it is
+    public double R;
+    public double G;
+    public double B;
+    public double A = 1;
+    public void SetColor(double r, double g, double b, double a)
     {
-      Val1 = v1;
-      Val2 = v2;
-      Val3 = v3;
-      Val4 = v4;
+      R = r;
+      G = g;
+      B = b;
+      A = a;
     }
   }
 

@@ -1,4 +1,5 @@
 ﻿using Converter.FileStructures.PDF;
+using Converter.FileStructures.PDF.GraphicsInterpreter;
 
 namespace Converter.Utils
 {
@@ -21,7 +22,12 @@ namespace Converter.Utils
       PDF_ColorSpaceFamily.DeviceN => throw new NotImplementedException(),
     };
 
-
+    public static void ConvertCMYKtoRGBbyIntensity(double C, double M, double Y, double K, MyColor rgb)
+    {
+      rgb.R = (1 - C) * (1 - K);
+      rgb.G = (1 - M) * (1 - K);
+      rgb.B = (1 - Y) * (1 - K);
+    }
 
   }
 }

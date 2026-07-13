@@ -1383,20 +1383,20 @@ namespace Converter.Parsers.PDF
         case PDF_ColorSpaceFamily.DeviceGray:
           // values between 0.0 and 1.0 that will somehow need to be normalized
           double gray = GetNextStackValAsDouble();
-          state.Color.SetColor(gray, gray, gray, 0);
+          state.Color.SetColor(gray, gray, gray, 1);
           break;
         case PDF_ColorSpaceFamily.DeviceRGB:
           double blue = GetNextStackValAsDouble();
           double green = GetNextStackValAsDouble();
           double red = GetNextStackValAsDouble();
-          state.Color.SetColor(red, green, blue, 0);
+          state.Color.SetColor(red, green, blue, 1);
           break;
         case PDF_ColorSpaceFamily.DeviceCMYK:
           double black = GetNextStackValAsDouble();
           double yellow = GetNextStackValAsDouble();
           double magenta = GetNextStackValAsDouble();
           double cyan = GetNextStackValAsDouble();
-          state.Color.SetColor(cyan, magenta, yellow, black);
+          ColorHelper.ConvertCMYKtoRGBbyIntensity(cyan, magenta, yellow, black, state.Color);
           break;
         case PDF_ColorSpaceFamily.CalGray:
           throw new NotImplementedException("Invalid ColorSpace!");
@@ -1429,7 +1429,7 @@ namespace Converter.Parsers.PDF
             yellow = GetNextStackValAsDouble();
             magenta = GetNextStackValAsDouble();
             cyan = GetNextStackValAsDouble();
-            state.Color.SetColor(cyan, magenta, yellow, black);
+            ColorHelper.ConvertCMYKtoRGBbyIntensity(cyan, magenta, yellow, black, state.Color);
           }
           else
           {
