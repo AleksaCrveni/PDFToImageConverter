@@ -719,7 +719,7 @@ namespace Converter.Rasterizers
       return aEdges;
     }
     // directly AA rasterize edges w/o supersampling
-    public virtual void STB_RasterizeSortedEdgesV2(ref BmpS result, List<TTFEdge> edges, int n, int vSubSample, int offX, int offY)
+    public virtual void STB_RasterizeSortedEdgesV2(ref BmpS result, List<TTFEdge> edges, int n, int vSubSample, int offX, int offY, ref GlyphInfo glyphInfo)
     {
       // List is just native implementation to get things going, its not most efficient because we are doing random removal of elements
       // TODO: fix later
@@ -808,7 +808,22 @@ namespace Converter.Rasterizers
               m = 255;
             // NOTE: this was added so we dont rewrite any other pixels from other glyphs that maybe in the bounding box of current glyph that is being printed
             if (m > 0)
-              result.Pixels[result.Offset + j * result.Stride + i] = (byte)m;
+            {
+              // result.Pixels[result.Offset + j * result.Stride + i] = (byte)m;
+              // antialiasing or stength of the color
+              float opacity = m / 255f;
+              // NOTE(@Aleksa): This really should come specifically from the converter because depending of the array it may be differently filled!!!!
+              // IDEA1: We just have 1 to 1 buffer that we will fill and use to rasterize and then converter would copy or w/e
+              // IDEA2: Have this be much sparter depending on the target but since this is 'hot loop' and rasterizer and should be target independent ideally
+              // I think that idea 1 might be better
+              opacity /= (float)glyphInfo.Color.A; // combine opacities
+              Debug.Assert(opacity >= 0 && opacity <= 1, $"Opacity out of range, got {opacity}. M is {m}. A is {glyphInfo.Color.A}");
+              result.Pixels[(result.Offset + j * result.Stride + i) * 3    ] = (byte)(255 - opacity * (255 -glyphInfo.Color.R * 255));
+              result.Pixels[(result.Offset + j * result.Stride + i) * 3 + 1] = (byte)(255 - opacity * (255 - glyphInfo.Color.G * 255));
+              result.Pixels[(result.Offset + j * result.Stride + i) * 3 + 2] = (byte)(255 - opacity * (255 - glyphInfo.Color.B * 255));
+              //glyphInfo.Color.B * 255 * glyphInfo.Color.A * aa
+            }
+
           }
         }
 
@@ -955,7 +970,7 @@ namespace Converter.Rasterizers
       edges = edgesArr.ToList();
     }
 
-    public virtual void STB_InternalRasterize(ref BmpS result, ref List<PointF> points, ref List<int> wCount, int windings, float scaleX, float scaleY, float shiftX, float shiftY, int offX, int offY, bool invert)
+    public virtual void STB_InternalRasterize(ref BmpS result, ref List<PointF> points, ref List<int> wCount, int windings, float scaleX, float scaleY, float shiftX, float shiftY, int offX, int offY, bool invert, ref GlyphInfo glyphInfo)
     {
       float yScaleInv = invert ? -scaleY : scaleY;
       List<TTFEdge> edges = new List<TTFEdge>();
@@ -1024,7 +1039,7 @@ namespace Converter.Rasterizers
       }
       else
       {
-        STB_RasterizeSortedEdgesV2(ref result, edges, n, vSubSample, offX, offY);
+        STB_RasterizeSortedEdgesV2(ref result, edges, n, vSubSample, offX, offY, ref glyphInfo);
       }
     }
 
@@ -1188,14 +1203,14 @@ namespace Converter.Rasterizers
       return points;
     }
 
-    public virtual void STB_Rasterize(ref BmpS result, float flatnessInPixels, ref List<TTFVertex> vertices, int numOfVerts, float scaleX, float scaleY, float shiftX, float shiftY, int xOff, int yOff, bool invert)
+    public virtual void STB_Rasterize(ref BmpS result, float flatnessInPixels, ref List<TTFVertex> vertices, int numOfVerts, float scaleX, float scaleY, float shiftX, float shiftY, int xOff, int yOff, bool invert, ref GlyphInfo glyphInfo)
     {
       float scale = scaleX > scaleY ? scaleY : scaleX;
       int windingCount = 0;
       List<int> windingLengths = new List<int>();
       List<PointF> windings = STB_FlattenCurves(ref vertices, numOfVerts, flatnessInPixels / scale, ref windingLengths, ref windingCount);
       if (windings.Count > 0)
-        STB_InternalRasterize(ref result, ref windings, ref windingLengths, windingCount, scaleX, scaleY, shiftX, shiftY, xOff, yOff, invert);
+        STB_InternalRasterize(ref result, ref windings, ref windingLengths, windingCount, scaleX, scaleY, shiftX, shiftY, xOff, yOff, invert, ref glyphInfo);
     }
 
     public virtual void STB_SetVertex(ref TTFVertex vertex, byte type, int x, int y, int cx, int cy)
@@ -1587,7 +1602,7 @@ namespace Converter.Rasterizers
       return STB_GetGlyphShapeTT(glyphIndex, ref vertices);
     }
 
-    public virtual void STB_MakeGlyphBitmapSubpixel(ref byte[] bitmapArr, int byteOffset, int glyphWidth, int glyphHeight, int glyphStride, float scaleX, float scaleY, float shiftX, float shiftY, int glyphIndex)
+    public virtual void STB_MakeGlyphBitmapSubpixel(ref byte[] bitmapArr, int byteOffset, int glyphWidth, int glyphHeight, int glyphStride, float scaleX, float scaleY, float shiftX, float shiftY, int glyphIndex, ref GlyphInfo glyphInfo)
     {
       int ix0 = 0;
       int iy0 = 0;
@@ -1605,17 +1620,17 @@ namespace Converter.Rasterizers
       gbm.Offset = byteOffset;
 
       if (gbm.W > 0 && gbm.H > 0)
-        STB_Rasterize(ref gbm, 0.35f, ref vertices, numOfVerts, scaleX, scaleY, shiftX, shiftY, ix0, iy0, true);
+        STB_Rasterize(ref gbm, 0.35f, ref vertices, numOfVerts, scaleX, scaleY, shiftX, shiftY, ix0, iy0, true, ref glyphInfo);
     }
-    public virtual void STB_MakeCodepointBitmapSubpixel(ref byte[] bitmapArr, int byteOffset, int glyphWidth, int glyphHeight, int glyphStride, float scaleX, float scaleY, float shiftX, float shiftY, int unicodeCodepoint)
+    public virtual void STB_MakeCodepointBitmapSubpixel(ref byte[] bitmapArr, int byteOffset, int glyphWidth, int glyphHeight, int glyphStride, float scaleX, float scaleY, float shiftX, float shiftY, int unicodeCodepoint, ref GlyphInfo glyphInfo)
     {
       int glyphIndex = STB_FindGlyphIndex(unicodeCodepoint);
-      STB_MakeGlyphBitmapSubpixel(ref bitmapArr, byteOffset, glyphWidth, glyphHeight, glyphStride, scaleX, scaleY, shiftX, shiftY, glyphIndex);
+      STB_MakeGlyphBitmapSubpixel(ref bitmapArr, byteOffset, glyphWidth, glyphHeight, glyphStride, scaleX, scaleY, shiftX, shiftY, glyphIndex, ref glyphInfo);
     }
 
-    public virtual void STB_MakeCodepointBitmap(ref byte[] bitmapArr, int byteOffset, int glyphWidth, int glyphHeight, int glyphStride, float scaleX, float scaleY, int unicodeCodepoint)
+    public virtual void STB_MakeCodepointBitmap(ref byte[] bitmapArr, int byteOffset, int glyphWidth, int glyphHeight, int glyphStride, float scaleX, float scaleY, int unicodeCodepoint, ref GlyphInfo glyphInfo)
     {
-      STB_MakeCodepointBitmapSubpixel(ref bitmapArr, byteOffset, glyphWidth, glyphHeight, glyphStride, scaleX, scaleY, 0, 0, unicodeCodepoint);
+      STB_MakeCodepointBitmapSubpixel(ref bitmapArr, byteOffset, glyphWidth, glyphHeight, glyphStride, scaleX, scaleY, 0, 0, unicodeCodepoint, ref glyphInfo);
     }
     #endregion rasterizer
     #region reader functions

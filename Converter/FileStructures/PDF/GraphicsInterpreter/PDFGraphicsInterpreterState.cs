@@ -114,6 +114,7 @@ namespace Converter.FileStructures.PDF.GraphicsInterpreter
     public string Name;
     public int Index;
     public PSShape? Shape;
+    public MyColor Color;
   }
 }
  

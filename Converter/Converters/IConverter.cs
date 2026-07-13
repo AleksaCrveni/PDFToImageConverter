@@ -9,5 +9,6 @@ namespace Converter.Converters
     public void Save(byte[] buffer);
     public int GetWidth();
     public int GetHeight();
+    public byte[] CreateBuffer();
   }
 }

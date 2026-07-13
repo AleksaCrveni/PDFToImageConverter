@@ -43,6 +43,8 @@ namespace Converter.Converters.Image.TIFF
       };
       _writer.WriteImageWithBuffer(ref tiffOptions, buffer);
     }
+
+    public override byte[] CreateBuffer() => new byte[__options.Width * __options.Height];
   }
 }
 

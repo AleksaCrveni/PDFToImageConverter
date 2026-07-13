@@ -136,7 +136,7 @@ namespace Converter.Rasterizers
       result.Offset = byteOffset;
       result.Pixels = bitmapArr;
       result.Stride = glyphStride;
-      STB_InternalRasterize(ref result, ref _currentShape._windings, ref _currentShape._windingLengths, _currentShape._windingCount, scaleX, scaleY, 0, 0, _currentShape._xMin, _currentShape._yMin, true);
+      STB_InternalRasterize(ref result, ref _currentShape._windings, ref _currentShape._windingLengths, _currentShape._windingCount, scaleX, scaleY, 0, 0, _currentShape._xMin, _currentShape._yMin, true, ref glyphInfo);
     }
   }
 }

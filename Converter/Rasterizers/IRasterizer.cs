@@ -35,14 +35,14 @@ namespace Converter.Rasterizers
     int STB_GetGlyphShape(int glyphIndex, ref List<TTFVertex> vertices);
     int STB_GetGlyphShapeTT(int glyphIndex, ref List<TTFVertex> vertices);
     void STB_HandleClippedEdgeV2(Span<float> scanline, int x, ref ActiveEdgeV2 edge, float x0, float y0, float x1, float y1);
-    void STB_InternalRasterize(ref BmpS result, ref List<PointF> points, ref List<int> wCount, int windings, float scaleX, float scaleY, float shiftX, float shiftY, int offX, int offY, bool invert);
-    void STB_MakeCodepointBitmap(ref byte[] bitmapArr, int byteOffset, int glyphWidth, int glyphHeight, int glyphStride, float scaleX, float scaleY, int unicodeCodepoint);
-    void STB_MakeCodepointBitmapSubpixel(ref byte[] bitmapArr, int byteOffset, int glyphWidth, int glyphHeight, int glyphStride, float scaleX, float scaleY, float shiftX, float shiftY, int unicodeCodepoint);
-    void STB_MakeGlyphBitmapSubpixel(ref byte[] bitmapArr, int byteOffset, int glyphWidth, int glyphHeight, int glyphStride, float scaleX, float scaleY, float shiftX, float shiftY, int glyphIndex);
+    void STB_InternalRasterize(ref BmpS result, ref List<PointF> points, ref List<int> wCount, int windings, float scaleX, float scaleY, float shiftX, float shiftY, int offX, int offY, bool invert, ref GlyphInfo glyphInfo);
+    void STB_MakeCodepointBitmap(ref byte[] bitmapArr, int byteOffset, int glyphWidth, int glyphHeight, int glyphStride, float scaleX, float scaleY, int unicodeCodepoint, ref GlyphInfo glyphInfo);
+    void STB_MakeCodepointBitmapSubpixel(ref byte[] bitmapArr, int byteOffset, int glyphWidth, int glyphHeight, int glyphStride, float scaleX, float scaleY, float shiftX, float shiftY, int unicodeCodepoint, ref GlyphInfo glyphInfo);
+    void STB_MakeGlyphBitmapSubpixel(ref byte[] bitmapArr, int byteOffset, int glyphWidth, int glyphHeight, int glyphStride, float scaleX, float scaleY, float shiftX, float shiftY, int glyphIndex, ref GlyphInfo glyphInfo);
     ActiveEdgeV2 STB_NewActiveEdgeV2(ref TTFEdge edge, int offX, float startPoint);
     float STB_PositionTrapezoidArea(float height, float tx0, float tx1, float bx0, float bx1);
-    void STB_Rasterize(ref BmpS result, float flatnessInPixels, ref List<TTFVertex> vertices, int numOfVerts, float scaleX, float scaleY, float shiftX, float shiftY, int xOff, int yOff, bool invert);
-    void STB_RasterizeSortedEdgesV2(ref BmpS result, List<TTFEdge> edges, int n, int vSubSample, int offX, int offY);
+    void STB_Rasterize(ref BmpS result, float flatnessInPixels, ref List<TTFVertex> vertices, int numOfVerts, float scaleX, float scaleY, float shiftX, float shiftY, int xOff, int yOff, bool invert, ref GlyphInfo glyphInfo);
+    void STB_RasterizeSortedEdgesV2(ref BmpS result, List<TTFEdge> edges, int n, int vSubSample, int offX, int offY, ref GlyphInfo glyphInfo);
     float STB_ScaleForPixelHeight(double size);
     float STB_ScaleForPixelHeight(float size);
     void STB_SetVertex(ref TTFVertex vertex, byte type, int x, int y, int cx, int cy);
@@ -55,5 +55,6 @@ namespace Converter.Rasterizers
     int STB_TesselateCurve(List<PointF> points, ref int numOfPoints, float x0, float y0, float x1, float y1, float x2, float y2, float objspaceFlatnessSquared, int n);
     char? FindCharFromCID(char CID);
     List<char> FindLigatureFromCID(char CID);
+
   }
 }

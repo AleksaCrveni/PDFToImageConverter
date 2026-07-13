@@ -1,4 +1,5 @@
 ﻿using Converter.Utils;
+using System.Diagnostics;
 
 namespace Converter.FileStructures.PDF.GraphicsInterpreter
 {
@@ -105,6 +106,7 @@ namespace Converter.FileStructures.PDF.GraphicsInterpreter
       G = g;
       B = b;
       A = a;
+      Debug.Assert(A > 0);
     }
   }
 

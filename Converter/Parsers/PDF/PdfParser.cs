@@ -115,7 +115,7 @@ namespace Converter.Parsers.PDF
         TargetConversion.TIFF_BILEVEL => throw new NotImplementedException(),
         TargetConversion.TIFF_GRAYSCALE => new TIFFGrayscaleConverter(rDict.Font, rDict, file.PageInformation[0], SourceConversion.PDF, new TIFFWriterOptions(), outStream),
         TargetConversion.TIFF_PALLETE => throw new NotImplementedException(),
-        TargetConversion.TIFF_RGB => throw new NotImplementedException(),
+        TargetConversion.TIFF_RGB =>  new TIFFRGBConverter(rDict.Font, rDict, file.PageInformation[0], SourceConversion.PDF, new TIFFWriterOptions(), outStream),
       };
     
       PDFGOInterpreter pdfGo = new PDFGOInterpreter(rawContent, rDict, converter);

@@ -1,10 +1,9 @@
 ﻿using Converter.FileStructures.General;
 using Converter.FileStructures.PDF;
-using Converter.FileStructures.PDF.GraphicsInterpreter;
-using Converter.Rasterizers;
 using Converter.Writers.TIFF;
 namespace Converter.Converters
 {
+  //NOTE(@Aleksa): I dont think we wil ened all of this PDF Specific data in ctor, so look into it later and remove unneeded stuff
   public abstract class AConverter : IConverter
   {
     protected TargetConversion __target;
@@ -28,6 +27,7 @@ namespace Converter.Converters
     public abstract void SetupConverter();
 
     public abstract void Save(byte[] buffer);
+    public abstract byte[] CreateBuffer();
 
     public virtual int GetHeight() => __options.Height;
     public virtual int GetWidth() => __options.Width;
