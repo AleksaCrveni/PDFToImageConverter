@@ -31,6 +31,8 @@ namespace Tester
       pdfParser.Parse(Files.Sample, ref options);
       pdfParser.Parse(Files.Prijemni1, ref options);
       pdfParser.Parse(Files.Report, ref options);
+      pdfParser.Parse(Files.Greek, ref options); // #SLOW
+      pdfParser.Parse(Files.BasicColor, ref options);
     }
 
   }

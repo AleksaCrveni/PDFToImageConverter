@@ -1,5 +1,7 @@
 ﻿using Converter;
+using Converter.FileStructures.Geometry;
 using Converter.FileStructures.PDF;
+using Converter.FileStructures.PDF.GraphicsInterpreter;
 using Converter.FileStructures.PostScript;
 using Converter.FileStructures.TTF;
 using Converter.FileStructures.Type1;
@@ -8,7 +10,6 @@ using Converter.Utils;
 using RasterPlayground;
 using System.Diagnostics;
 using System.Text;
-using Converter.FileStructures.Geometry;
 
 int WIDTH =  800;
 int HEIGHT = 800;
@@ -89,7 +90,13 @@ result.W = (int)(shape._width.X * scale);
 result.Offset = 20 * HEIGHT + 20; // draw at 20,20
 result.Pixels = bitmap;
 result.Stride = WIDTH;
-r.STB_InternalRasterize(ref result, ref windings, ref windingLengths, windingCount, scale, scale, 0, 0, ix0, iy0, true);
+GlyphInfo g = new GlyphInfo();
+g.Color = new MyColor();
+g.Color.R = 255;
+g.Color.G = 255;
+g.Color.B = 255;
+g.Color.A = 1;
+r.STB_InternalRasterize(ref result, ref windings, ref windingLengths, windingCount, scale, scale, 0, 0, ix0, iy0, true, ref g);
 
 byte[] buff = Utils.ConvertToWin32RGBBuffer(bitmap, HEIGHT, WIDTH);
 File.WriteAllBytes("Single\\data.txt", buff);
