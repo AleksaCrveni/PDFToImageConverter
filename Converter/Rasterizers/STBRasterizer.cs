@@ -816,7 +816,7 @@ namespace Converter.Rasterizers
               // IDEA1: We just have 1 to 1 buffer that we will fill and use to rasterize and then converter would copy or w/e
               // IDEA2: Have this be much sparter depending on the target but since this is 'hot loop' and rasterizer and should be target independent ideally
               // I think that idea 1 might be better
-              opacity /= (float)glyphInfo.Color.A; // combine opacities
+              opacity *= (float)glyphInfo.Color.A; // combine opacities
               Debug.Assert(opacity >= 0 && opacity <= 1, $"Opacity out of range, got {opacity}. M is {m}. A is {glyphInfo.Color.A}");
               result.Pixels[(result.Offset + j * result.Stride + i) * 3    ] = (byte)(255 - opacity * (255 -glyphInfo.Color.R * 255));
               result.Pixels[(result.Offset + j * result.Stride + i) * 3 + 1] = (byte)(255 - opacity * (255 - glyphInfo.Color.G * 255));
