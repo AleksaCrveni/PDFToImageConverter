@@ -6,7 +6,9 @@ using System.ComponentModel;
 using System.Diagnostics;
 using System.Net.Http.Headers;
 using System.Reflection.Metadata.Ecma335;
+using System.Security.Principal;
 using System.Text;
+using System.Transactions;
 
 namespace Converter.Parsers.Images.JPEG
 {
@@ -86,6 +88,7 @@ namespace Converter.Parsers.Images.JPEG
         file.QuantTables[i] = q;
       }
 
+      byte[] outputBuffer = Array.Empty<byte>();
 
       JPEG_FrameHeader currentFrameHeader = new JPEG_FrameHeader();
       int byteSizeOfMarkerSizeField;
@@ -109,6 +112,18 @@ namespace Converter.Parsers.Images.JPEG
             currentFrameHeader.Type = JPEG_MARKERS.SOF0;
             ParseBaselineDCTFrameHeaderData(ref r, currentFrameHeader);
             state = InitBaselineDecoderState(currentFrameHeader);
+            // we will also just support one frame per file
+            if (outputBuffer.Length > 0)
+            {
+              throw new InvalidDataException("One frame per file supported!");
+            }
+            else
+            {
+              
+              currentFrameHeader.Height = currentFrameHeader.NumOfLines;
+              currentFrameHeader.Width = currentFrameHeader.NumOfSamplesPerLine;
+              outputBuffer = new byte[currentFrameHeader.Height * currentFrameHeader.Width * currentFrameHeader.NumOfImageComponentsInFrame];
+            }
             break;
           case JPEG_MARKERS.SOF1:
             throw new NotSupportedException($"Marker {marker.ToString()} not supported!");
@@ -184,7 +199,7 @@ namespace Converter.Parsers.Images.JPEG
             break;
           case JPEG_MARKERS.SOS:
             JPEG_ScanHeader scanHeader = ParseScanHeader(ref r, size);
-            DecodeScan(ref r, state, scanHeader, currentFrameHeader, file, restartInterval);
+            DecodeScan(ref r, state, scanHeader, currentFrameHeader, file, restartInterval, outputBuffer);
             break;
           case JPEG_MARKERS.DQT:
             ParseDQT(ref r, file.QuantTables, size);
@@ -328,21 +343,21 @@ namespace Converter.Parsers.Images.JPEG
       return h;
     }
 
-    public static void DecodeScan(ref ByteReader r, JPEG_IDecoderState state, JPEG_ScanHeader scanHeader, JPEG_FrameHeader frameHeader, JPEGFile file, int restartInterval)
+    public static void DecodeScan(ref ByteReader r, JPEG_IDecoderState state, JPEG_ScanHeader scanHeader, JPEG_FrameHeader frameHeader, JPEGFile file, int restartInterval, byte[] outputBuffer)
     {
       switch (frameHeader.Type)
       {
         case JPEG_MARKERS.SOF0:
           JPEG_BaselineDecoderState baselineState = (JPEG_BaselineDecoderState)state;
           UpdateBaselineStateWithScanHeader(baselineState, frameHeader, scanHeader, file.HuffmanData, file.QuantTables);
-          DecodeBaselineDCT(ref r, baselineState, restartInterval);
+          DecodeBaselineDCT(ref r, baselineState, restartInterval, outputBuffer, frameHeader.Width, frameHeader.Height);
           break;
         default:
           throw new NotImplementedException("Frameheader of this type not supported!");
       }
     }
 
-    public static void DecodeBaselineDCT(ref ByteReader r, JPEG_BaselineDecoderState state, int restartInterval)
+    public static void DecodeBaselineDCT(ref ByteReader r, JPEG_BaselineDecoderState state, int restartInterval, byte[] outputBuffer, int width, int height)
     {
       JPEGBitReader bitReader = new JPEGBitReader(r);
       JPEG_Block8x8 outputBlock = new JPEG_Block8x8();
@@ -365,13 +380,14 @@ namespace Converter.Parsers.Images.JPEG
 
             for (int y = 0; y < v; y++)
             {
-              int blockOffset = (offsetY + y) * 8;
+              int blockOffsetY = (offsetY + y) * 8;
               for (int x = 0; x < h; x++)
               {
                 ReadBlockBaseline(ref bitReader, component, outputBlock);
                 JPEG_Block8x8F dequantedBlock = DequantizeBlockAndUnZigZag(component.QuantTable, outputBlock);
                 JPEG_Block8x8F IDCT = InverseDCTBlock8x8(dequantedBlock);
-                JPEG_Block8x8 orignal = ShiftBlockLevel(IDCT, state.LevelShift);
+                JPEG_Block8x8 original = ShiftBlockLevel(IDCT, state.LevelShift);
+                WriteBlock8Bit(outputBuffer, state.Components.Length, width, height, original, index, (offsetX + x) * 8, blockOffsetY, hs, vs);
               }
             }
           }
@@ -406,6 +422,68 @@ namespace Converter.Parsers.Images.JPEG
     }
     public static bool IsRestartMarker(JPEG_MARKERS m) => m >= JPEG_MARKERS.RST0 && m <= JPEG_MARKERS.RST7;
     
+    public static void WriteBlock8Bit(byte[] buffer, int componentCount, int width, int height, JPEG_Block8x8 block, int componentIndex, int x, int y, int horizontalSubsamplingFactor, int verticalSubsamplingFactor)
+    {
+      // data is sequentical, not veriten into blocks
+      if (horizontalSubsamplingFactor == 1 && verticalSubsamplingFactor == 1)
+      {
+        WriteBlock8BitFast(buffer, componentCount, width, height, componentIndex, block, x, y);
+      }
+      else
+      {
+        WriteBlock8BitSlow(buffer, componentCount, width, height, block, componentIndex, x, y, horizontalSubsamplingFactor, verticalSubsamplingFactor);
+      }
+
+    }
+    public static void WriteBlock8BitFast(byte[] buffer, int componentCount, int width, int height, int componentIndex, JPEG_Block8x8 block, int x, int y)
+    {
+      if (x > width || y > height)
+        return;
+
+      // this for like edge blocks that arent 8 byte aligned
+      int writeWidth = Math.Min(width - x, 8); 
+      int writeHeight = Math.Min(height - y, 8);
+
+      // offset to block
+      int offset = y * width * componentCount + x * componentCount + componentIndex; 
+      for (int destY = 0; destY < writeHeight; destY++)
+      {
+        int rowOffset = offset + destY * componentCount * componentCount;
+        for (int destX = 0; destX < writeWidth; destX++)
+        {
+          buffer[rowOffset + destX * componentCount] = MyMath.ClampTo8Bit(block.Data[destY * 8 + destX]);
+        }
+      }
+    }
+    public static void WriteBlock8BitSlow(byte[] buffer, int componentCount, int width, int height, JPEG_Block8x8 block, int componentIndex, int x, int y, int horizontalSubsamplingFactor, int verticalSubsamplingFactor)
+    {
+      int hShift = (int)Math.Floor(Math.Log2((uint)horizontalSubsamplingFactor)); // wtf is this
+      int vShift = (int)Math.Floor(Math.Log2((uint)verticalSubsamplingFactor)); // wtf is this
+
+      JPEG_Block8x8 tempBlock = new JPEG_Block8x8();
+      for (int v = 0; v < verticalSubsamplingFactor; v++)
+      {
+        for (int h = 0; h < horizontalSubsamplingFactor; h++)
+        {
+          int vBlock = 8 * v;
+          int hBlock = 8 * h;
+
+          // fill tempblock
+          for (int i = 0; i < 8; i++)
+          {
+            int tempRowOffset = i * 8;
+            int blockRowOffset = ((vBlock + i) >> vShift) * 8;
+            for (int j = 0; j < 8; j++)
+            {
+              tempBlock.Data[tempRowOffset] = block.Data[(blockRowOffset + ((hBlock + j) >> hShift))];
+            }
+          }
+
+          WriteBlock8BitFast(buffer, componentCount, width, height, componentIndex, tempBlock, x + 8 * h, y + 8 * v);
+        }
+      }
+    }
+
     public static JPEG_BaselineDecoderState InitBaselineDecoderState(JPEG_FrameHeader frameHeader)
     {
       JPEG_BaselineDecoderState state = new JPEG_BaselineDecoderState();

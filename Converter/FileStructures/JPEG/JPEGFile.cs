@@ -43,6 +43,8 @@ namespace Converter.FileStructures.JPEG
     public ushort NumOfSamplesPerLine; // X
     public byte NumOfImageComponentsInFrame; // Nf
     public JPEG_FrameComponentInfo[] ComponentInfo; // size Nf
+    public int Height; // same as num of lines but its just an alias since its less fucking confusing
+    public int Width; // same as numofsamplesperline
   }
 
   public class JPEG_FrameComponentInfo

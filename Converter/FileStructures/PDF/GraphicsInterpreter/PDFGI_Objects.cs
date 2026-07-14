@@ -92,6 +92,7 @@ namespace Converter.FileStructures.PDF.GraphicsInterpreter
   /// <summary>
   /// It hold intesities of each color component between 0.0 and 1.0
   /// This allows us calculate correct color range based on bits per component  in whatever image format we are converting to
+  /// NOTE(@Aleksa): I think above idea might not be that good and we should pre compute stuff here as much as possible
   /// </summary>
   public class MyColor
   {

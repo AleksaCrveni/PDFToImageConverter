@@ -60,5 +60,10 @@
     }
     public static double FPart(double x) => x - Math.Floor(x);
     public static double RFPart(double x) => 1 - FPart(x);
+
+    public static byte ClampTo8Bit(short input)
+    {
+      return (byte)Math.Clamp(input, (short)0, (short)255);
+    }
   }
 }
