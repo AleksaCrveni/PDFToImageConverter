@@ -78,8 +78,8 @@
   
   public enum JPEG_HUFFMAN_TABLE_TYPE : byte
   {
+    DC,
     AC,
-    DC
   }
 
 }

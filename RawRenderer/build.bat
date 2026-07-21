@@ -4,4 +4,5 @@ pushd builds
 cl -FC -Zi ..\main.cpp user32.lib Gdi32.lib /EHsc
 cl -FC -Zi ..\rasterizerVisualizer.cpp user32.lib Gdi32.lib /EHsc
 cl -FC -Zi ..\whatever.cpp user32.lib Gdi32.lib /EHsc
+cl -FC -Zi ..\IDCTTest.c /EHsc
 popd

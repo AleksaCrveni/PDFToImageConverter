@@ -6,6 +6,8 @@ using System.ComponentModel;
 using System.Diagnostics;
 using System.Net.Http.Headers;
 using System.Reflection.Metadata.Ecma335;
+using System.Runtime.ExceptionServices;
+using System.Runtime.InteropServices;
 using System.Security.Principal;
 using System.Text;
 using System.Transactions;
@@ -50,6 +52,17 @@ namespace Converter.Parsers.Images.JPEG
     /// </summary>
     /// <param name="filename"></param>
     /// <returns></returns>
+    public static List<int> Code16List = new List<int>();
+    public static double[] IDCT_TABLE = [
+      0.707107,  0.707107,  0.707107,  0.707107,  0.707107,  0.707107,  0.707107,  0.707107,
+      0.980785,  0.831470,  0.555570,  0.195090, -0.195090, -0.555570, -0.831470, -0.980785,
+      0.923880,  0.382683, -0.382683, -0.923880, -0.923880, -0.382683,  0.382683,  0.923880,
+      0.831470, -0.195090, -0.980785, -0.555570,  0.555570,  0.980785,  0.195090, -0.831470,
+      0.707107, -0.707107, -0.707107,  0.707107,  0.707107, -0.707107, -0.707107,  0.707107,
+      0.555570, -0.980785,  0.195090,  0.831470, -0.831470, -0.195090,  0.980785, -0.555570,
+      0.382683, -0.923880,  0.923880, -0.382683, -0.382683,  0.923880, -0.923880,  0.382683,
+      0.195090, -0.555570,  0.831470, -0.980785,  0.980785, -0.831470,  0.555570, -0.195090
+      ];
     public static JPEGFile Parse(string filename)
     {
       Stream stream = File.OpenRead(filename);
@@ -118,8 +131,7 @@ namespace Converter.Parsers.Images.JPEG
               throw new InvalidDataException("One frame per file supported!");
             }
             else
-            {
-              
+            { 
               currentFrameHeader.Height = currentFrameHeader.NumOfLines;
               currentFrameHeader.Width = currentFrameHeader.NumOfSamplesPerLine;
               outputBuffer = new byte[currentFrameHeader.Height * currentFrameHeader.Width * currentFrameHeader.NumOfImageComponentsInFrame];
@@ -313,6 +325,9 @@ namespace Converter.Parsers.Images.JPEG
 
       }
 
+      file.Height = currentFrameHeader.Height;
+      file.Width = currentFrameHeader.Width;
+      file.Buffer = outputBuffer;
       return file;
     }
 
@@ -357,11 +372,27 @@ namespace Converter.Parsers.Images.JPEG
       }
     }
 
+    /// <summary>
+    /// Just comment out loggs for now and remove them later when more images are tested accross different files
+    /// </summary>
+    /// <param name="r"></param>
+    /// <param name="state"></param>
+    /// <param name="restartInterval"></param>
+    /// <param name="outputBuffer"></param>
+    /// <param name="width"></param>
+    /// <param name="height"></param>
+    /// <exception cref="InvalidDataException"></exception>
     public static void DecodeBaselineDCT(ref ByteReader r, JPEG_BaselineDecoderState state, int restartInterval, byte[] outputBuffer, int width, int height)
     {
-      JPEGBitReader bitReader = new JPEGBitReader(r);
+      JPEGBitReader bitReader = new JPEGBitReader();
       JPEG_Block8x8 outputBlock = new JPEG_Block8x8();
       int MCUSBeforeRestart = restartInterval;
+      List<byte> decoded = new List<byte>();
+      List<float> floats = new List<float>();
+      List<float> idctfloats = new List<float>();
+      List<byte> orig = new List<byte>();
+
+      int mcuCounter = 0;
       for (int rowMCU = 0; rowMCU < state.MCUSPerColumn; rowMCU++)
       {
         int offsetY = rowMCU * state.MaxVerticalSampling;
@@ -376,17 +407,44 @@ namespace Converter.Parsers.Images.JPEG
             int h = component.HorizontalSamplingFactor;
             int v = component.VerticalSamplingFactor;
             int hs = component.HorizontalSubsamplingFactor;
-            int vs = component.VerticalSamplingFactor;
+            int vs = component.VerticalSubsamplingFactor;
 
             for (int y = 0; y < v; y++)
             {
               int blockOffsetY = (offsetY + y) * 8;
               for (int x = 0; x < h; x++)
               {
-                ReadBlockBaseline(ref bitReader, component, outputBlock);
+                Array.Clear(outputBlock.Data);
+                mcuCounter++;
+                ReadBlockBaseline(ref bitReader, ref r, component, outputBlock);
+                //for (int i =0; i < outputBlock.Data.Length; i++)
+                //{
+                //  short b = outputBlock.Data[i];
+                //  decoded.Add((byte)(b >> 8));
+                //  decoded.Add((byte)(b & 255));
+                //}
+                  
                 JPEG_Block8x8F dequantedBlock = DequantizeBlockAndUnZigZag(component.QuantTable, outputBlock);
-                JPEG_Block8x8F IDCT = InverseDCTBlock8x8(dequantedBlock);
+                for (int i = 0; i < 64; i++)
+                {
+                  floats.Add(dequantedBlock.Data[i]);
+                }
+                JPEG_Block8x8F IDCT = IDCTTable(dequantedBlock);
+                //for (int i = 0; i < 64; i++)
+                //{
+                //  idctfloats.Add(IDCT.Data[i]);
+                //}
+
+                
                 JPEG_Block8x8 original = ShiftBlockLevel(IDCT, state.LevelShift);
+                TransposeBlock(original);
+                //TransposeBlock(original);
+                //for (int i = 0; i < original.Data.Length; i++)
+                //{
+                //  short b = original.Data[i];
+                //  orig.Add((byte)(b >> 8));
+                //  orig.Add((byte)(b & 255));
+                //}
                 WriteBlock8Bit(outputBuffer, state.Components.Length, width, height, original, index, (offsetX + x) * 8, blockOffsetY, hs, vs);
               }
             }
@@ -395,7 +453,7 @@ namespace Converter.Parsers.Images.JPEG
           // This is done only if there is table before that defines restartInterval
           if (restartInterval > 0 && (--MCUSBeforeRestart) == 0)
           {
-            bitReader.AdvanceAlignByte();
+            bitReader.AdvanceAlignByte(ref r);
             JPEG_MARKERS marker = bitReader.ReadMarker();
             if (marker == JPEG_MARKERS.EOI)
             {
@@ -413,7 +471,31 @@ namespace Converter.Parsers.Images.JPEG
         }
       }
 
-      bitReader.AdvanceAlignByte();
+
+      //File.WriteAllBytes("decodedRawMy.bin", decoded.ToArray());
+      //StringBuilder sb = new StringBuilder();
+      //int blockCount = floats.Count / 64;
+      //for (int i = 0; i < blockCount; i++)
+      //{
+      //  for (int j = 0; j < 64; j++)
+      //    sb.Append(floats[i * 64 + j]);
+      //  sb.Append('\n');
+      //  sb.Append($"END OF BLOCK {i}");
+      //  sb.Append('\n');
+      //}
+      //File.WriteAllText("dequantRawMy.bin", sb.ToString());
+      //sb.Clear();
+      //for (int i = 0; i < blockCount; i++)
+      //{
+      //  for (int j = 0; j < 64; j++)
+      //    sb.Append(idctfloats[i * 64 + j]);
+      //  sb.Append('\n');
+      //  sb.Append($"END OF BLOCK {i}");
+      //  sb.Append('\n');
+      //}
+      //File.WriteAllText("idctRawMy.bin", sb.ToString());
+      //File.WriteAllBytes("origRawMy.bin", orig.ToArray());
+      bitReader.AdvanceAlignByte(ref r);
       JPEG_MARKERS m = bitReader.PeekMarker();
       if (!IsRestartMarker(m))
       {
@@ -448,13 +530,14 @@ namespace Converter.Parsers.Images.JPEG
       int offset = y * width * componentCount + x * componentCount + componentIndex; 
       for (int destY = 0; destY < writeHeight; destY++)
       {
-        int rowOffset = offset + destY * componentCount * componentCount;
+        int rowOffset = offset + destY * width * componentCount;
         for (int destX = 0; destX < writeWidth; destX++)
         {
           buffer[rowOffset + destX * componentCount] = MyMath.ClampTo8Bit(block.Data[destY * 8 + destX]);
         }
       }
     }
+    
     public static void WriteBlock8BitSlow(byte[] buffer, int componentCount, int width, int height, JPEG_Block8x8 block, int componentIndex, int x, int y, int horizontalSubsamplingFactor, int verticalSubsamplingFactor)
     {
       int hShift = (int)Math.Floor(Math.Log2((uint)horizontalSubsamplingFactor)); // wtf is this
@@ -475,7 +558,7 @@ namespace Converter.Parsers.Images.JPEG
             int blockRowOffset = ((vBlock + i) >> vShift) * 8;
             for (int j = 0; j < 8; j++)
             {
-              tempBlock.Data[tempRowOffset] = block.Data[(blockRowOffset + ((hBlock + j) >> hShift))];
+              tempBlock.Data[tempRowOffset + j] = block.Data[(blockRowOffset + ((hBlock + j) >> hShift))];
             }
           }
 
@@ -517,38 +600,33 @@ namespace Converter.Parsers.Images.JPEG
     {
       PrepareComponentsForDecoding(state.Components, frameHeader, scanHeader, huffmanData, quantTables);
     }
-    public static JPEG_Block8x8F InverseDCTBlock8x8(JPEG_Block8x8F DCT)
-    {
-      float PI = 3.14159265358979323846f;
-      JPEG_Block8x8F IDCT = new JPEG_Block8x8F();
-      for (int u = 0; u < 8; u++)
-      {
-        for (int v = 0; v < 8; v++)
-        {
-          int idctIndex = u * 8 + v;
-          IDCT.Data[idctIndex] = 1 / 4f * DCT.Data[0];
-          for (int i = 1; i < 8; i++)
-          {
-            IDCT.Data[idctIndex] += 1 / 2f * DCT.Data[i * 8];
-          }
-          for (int j = 1; j < 8; j++)
-          {
-            IDCT.Data[idctIndex] += 1 / 2f * DCT.Data[j];
-          }
 
-          for (int i = 1; i < 8; i++)
-          {
-            for (int j = 1; j < 8; j++)
-            {
-              IDCT.Data[idctIndex] += DCT.Data[i * 8 + j] * MathF.Cos(PI / (8f) * (u + 1f/ 2f) * i) * MathF.Cos(PI / (8f) * (v + 1f/ 2f) * j);
-             }
-          }
-          IDCT.Data[idctIndex] *= 2f/ (8f) * 2f/ (8f);
+    public static JPEG_Block8x8F IDCTTable(JPEG_Block8x8F DCT)
+    {
+      JPEG_Block8x8F IDCT = new JPEG_Block8x8F();
+      for (int x = 0; x < 8; x++)
+      {
+        for (int y = 0; y < 8; y++)
+        {
+          IDCT.Data[x * 8 + y] = (float)ShortIDCT(DCT, x, y);
         }
       }
       return IDCT;
     }
 
+    public static double ShortIDCT(JPEG_Block8x8F DCT, int x, int y)
+    {
+      double sum = 0;
+      for (int u = 0; u < 8; u++)
+      {
+        for (int v = 0; v < 8; v++)
+        {
+          sum += DCT.Data[v * 8 + u] * IDCT_TABLE[u * 8 + x] * IDCT_TABLE[v * 8 + y];
+        }
+      }
+      return sum / 4;
+    }
+ 
     public static JPEG_Block8x8 ShiftBlockLevel(JPEG_Block8x8F inputBlock, int levelShift)
     {
       JPEG_Block8x8 outputBlock = new JPEG_Block8x8();
@@ -568,31 +646,31 @@ namespace Converter.Parsers.Images.JPEG
       return outputBlock;
     }
 
-    public static void ReadBlockBaseline(ref JPEGBitReader reader, JPEG_DecodeComponentsData component, JPEG_Block8x8 destBlock)
+    public static void ReadBlockBaseline(ref JPEGBitReader reader, ref ByteReader br, JPEG_DecodeComponentsData component, JPEG_Block8x8 destBlock)
     {
       // F.2.2.1 Huffman decoding of DC coefficients
       // first element is always DC
-      int t = DecodeHuffmanCode(ref reader, component.DCHuffmanTable!);
+      int t = DecodeHuffmanCode(ref reader, ref br, component.DCHuffmanTable!);
       if (t != 0)
       {
-        t = ReceiveAndExtend(ref reader, t);
+        t = ReceiveAndExtend(ref reader, ref br, t);
       }
 
       t += component.DcPredictor;
       component.DcPredictor = t;
-
+      destBlock.Data[0] = (short)t;
       // rest are AC
       // Figure F.13 – Huffman decoding procedure for AC coefficients
       JPEG_HuffmanTable acTable = component.ACHuffmanTable!;
       for (int i = 1; i < 64;)
       {
-        int s = DecodeHuffmanCode(ref reader, acTable);
+        int s = DecodeHuffmanCode(ref reader, ref br, acTable);
         int r = s >> 4;
         s &= 15;
         if (s != 0)
         {
           i += r;
-          s = ReceiveAndExtend(ref reader, s);
+          s = ReceiveAndExtend(ref reader, ref br, s);
           destBlock.Data[Math.Min(i++, 63)] = (short)s;
         }
         else
@@ -607,19 +685,20 @@ namespace Converter.Parsers.Images.JPEG
       }
 
     }
-    public static int DecodeHuffmanCode(ref JPEGBitReader r, JPEG_HuffmanTable t)
+    public static int DecodeHuffmanCode(ref JPEGBitReader reader, ref ByteReader r, JPEG_HuffmanTable t)
     {
-      int bits = r.PeekBits(16, out int bitsRead);
+      int bits = reader.PeekBits(16, out int bitsRead, ref r);
+      Code16List.Add(bits);
       JPEG_HuffmanTableEntry entry = LookupBitsInHuffmanTable(t, bits);
       bitsRead = Math.Min(entry.CodeSize, bitsRead);
-      r.SkipBits(bitsRead, out _);
+      reader.SkipBits(bitsRead, out _, ref r);
       return entry.CodeValue;
     }
 
     // Figure F.12 – Extending the sign bit of a decoded value in V
-    public static int ReceiveAndExtend(ref JPEGBitReader r, int length)
+    public static int ReceiveAndExtend(ref JPEGBitReader reader, ref ByteReader r, int length)
     {
-      int value = r.ReadBits(length, out bool isMarkerEncountered);
+      int value = reader.ReadBits(length, out bool isMarkerEncountered, ref r);
       if (isMarkerEncountered)
         throw new InvalidDataException("Expect raw data from bit stream. Yet a marker is encountered.");
       return (value - ((((value + value) >> length) - 1) & ((1 << length) - 1)));
@@ -641,10 +720,10 @@ namespace Converter.Parsers.Images.JPEG
         throw new InvalidDataException("Invalid huffman code encoutnered!");
 
       code16bit >>= (16 - size);
-      entry = new JPEG_HuffmanTableEntry();
-      entry.CodeSize = (byte)size;
-      entry.CodeValue = t.Values[(t.ValOffset[size] + code16bit) & 0xFF];
-      return entry;
+      JPEG_HuffmanTableEntry e = new JPEG_HuffmanTableEntry();
+      e.CodeSize = (byte)size;
+      e.CodeValue = t.Values[(t.ValOffset[size] + code16bit) & 0xFF];
+      return e;
     }
 
     public static void PrepareComponentsForDecoding(JPEG_DecodeComponentsData[] components, JPEG_FrameHeader frameHeader, JPEG_ScanHeader scanHeader, JPEG_HuffmanData huffmanData, JPEG_QuantTable[] quantTables)
@@ -704,7 +783,7 @@ namespace Converter.Parsers.Images.JPEG
       int j = 1;
       for (; i <= 16; i++)
       {
-        while (j < bits[i - 1])
+        while (j <= bits[i - 1])
         {
           huffSize[k] = (byte)i;
           k++;
@@ -785,6 +864,8 @@ namespace Converter.Parsers.Images.JPEG
       else
         t = hData.HuffTablesDC[dest];
 
+      t.Dest = dest;
+      t.Type = (JPEG_HUFFMAN_TABLE_TYPE)tc;
       Span<byte> lengths = stackalloc byte[16];
       int tm = 0;
 
@@ -814,9 +895,14 @@ namespace Converter.Parsers.Images.JPEG
       if (table.Values == null)
       {
         table.Values = new byte[256]; //Vi,j
-        table.MaxCode = new ushort[17];
+        table.MaxCode = new ushort[18];
         table.ValOffset = new byte[19];
         table.LookaheadTable = new JPEG_HuffmanTableEntry[256];
+        for (int i = 0; i < table.LookaheadTable.Length; i++)
+        {
+          JPEG_HuffmanTableEntry e = new JPEG_HuffmanTableEntry();
+          table.LookaheadTable[i] = e;
+        }
       }
 
       values.CopyTo(table.Values);
@@ -828,7 +914,7 @@ namespace Converter.Parsers.Images.JPEG
           int offset = p - huffCode[p];
           table.ValOffset[l] = (byte)offset;
           p += codeLengths[l - 1];
-          table.MaxCode[l] = huffCode[l - 1];
+          table.MaxCode[l] = huffCode[p - 1];
           table.MaxCode[l] <<= 16 - l;
           table.MaxCode[l] = (ushort)(table.MaxCode[l] | (uint)((1 << (16 - l)) - 1));
         }
@@ -843,7 +929,7 @@ namespace Converter.Parsers.Images.JPEG
       p = 0;
       for (int l = 1; l <= 8; l++)
       {
-        for (int i = 0; i < codeLengths[l - i]; i++, p++)
+        for (int i = 0; i < codeLengths[l - 1]; i++, p++)
         {
           FillByteLookupTable(huffCode[p], (byte)l, table.Values[p], table.LookaheadTable);
         }
@@ -859,6 +945,9 @@ namespace Converter.Parsers.Images.JPEG
       code = (byte)(code << freeBitCount);
       for (int i = 0; i < (1 << freeBitCount); i++)
       {
+        //JPEG_HuffmanTableEntry e = new JPEG_HuffmanTableEntry();
+        //e.CodeSize = codeSize;
+        //e.CodeValue = value;
         entries[code + i].CodeSize = codeSize;
         entries[code + i].CodeValue = value;
       }
@@ -934,7 +1023,19 @@ namespace Converter.Parsers.Images.JPEG
     }
   
 
-
+    public static void TransposeBlock(JPEG_Block8x8 inputBlock)
+    {
+      Span<short> temp = stackalloc short[64];
+      for (int i = 0; i < 8; i++)
+      {
+        for (int j = 0; j < 8; j++)
+        {
+          temp[j * 8 + i] = inputBlock.Data[i * 8 + j];
+        }
+      }
+      for (int i = 0; i < 64; i++)
+        inputBlock.Data[i] = temp[i];
+    }
     public static int GetLengthFieldByteSize(JPEG_MARKERS m) => m switch
     {
       JPEG_MARKERS.SOF0  => 2,

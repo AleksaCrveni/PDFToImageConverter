@@ -31,26 +31,24 @@ namespace Converter.Utils.JPEG
   //SOFTWARE.
   public ref struct JPEGBitReader
   {
-    public ByteReader r;
     public BitReaderBuffer buffer;
     public JPEG_MARKERS nextMarker; // _nextMarker==0: No marker is encountered in the stream; otherwise the next marker in the stream after the bits read in the buffer.
-    public JPEGBitReader(ByteReader reader)
+    public JPEGBitReader()
     {
-      r = reader;
       buffer = new BitReaderBuffer();
     }
     
-    public void AdvanceAlignByte()
+    public void AdvanceAlignByte(ref ByteReader r)
     {
       buffer.Size = (byte)(buffer.Size - (buffer.Size % 8));
-      FillBuffer();
+      FillBuffer(ref r);
     }
 
-    public void SkipBits(int len, out bool isMarkerEncountered)
+    public void SkipBits(int len, out bool isMarkerEncountered, ref ByteReader r)
     {
       if (buffer.Size < len)
       {
-        if (!LoadBits(len, out isMarkerEncountered))
+        if (!LoadBits(len, out isMarkerEncountered, ref r))
           throw new InvalidDataException("Unable to load bits!");
       }
       buffer.Size = (byte)(buffer.Size - len);
@@ -59,7 +57,7 @@ namespace Converter.Utils.JPEG
     /// <summary>
     /// NOTE(@Aleksa): I think that since we load in entire jpeg in byte[] we should throw if IsEOF() is true
     /// </summary>
-    public void FillBuffer()
+    public void FillBuffer(ref ByteReader r)
     {
       while (buffer.Size < 32)
       {
@@ -97,11 +95,11 @@ namespace Converter.Utils.JPEG
         buffer.Size += 8;
       }
     }
-    public int ReadBits(int length, out bool isMarkerEncountered)
+    public int ReadBits(int length, out bool isMarkerEncountered, ref ByteReader r)
     {
       if (buffer.Size < length)
       {
-        FillBuffer();
+        FillBuffer(ref r);
         // didnt load any bits since we hit marker
         if (buffer.Size < length)
         {
@@ -113,14 +111,14 @@ namespace Converter.Utils.JPEG
       buffer.Size -= (byte)length;
       isMarkerEncountered = false;
       // get first length bits from left to right
-      return (int)(buffer.Val >> length) & ((1 << length) - 1);
+      return (int)(buffer.Val >> buffer.Size) & ((1 << length) - 1);
     }
 
-    public int PeekBits(int length, out int bitsPeeked)
+    public int PeekBits(int length, out int bitsPeeked, ref ByteReader r)
     {
       if (buffer.Size < length)
       {
-        FillBuffer();
+        FillBuffer(ref r);
         // 
         if (buffer.Size < length)
         {
@@ -135,9 +133,9 @@ namespace Converter.Utils.JPEG
       return (int)(buffer.Val >> remainingBIts) & ((1 << length) - 1);
     }
 
-    public bool LoadBits(int length, out bool isMarkerEncountered)
+    public bool LoadBits(int length, out bool isMarkerEncountered, ref ByteReader r)
     {
-      FillBuffer();
+      FillBuffer(ref r);
       if (buffer.Size < length)
       {
         isMarkerEncountered = buffer.Size == 0 && nextMarker != 0;

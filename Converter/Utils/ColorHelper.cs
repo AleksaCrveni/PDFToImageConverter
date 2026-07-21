@@ -29,7 +29,7 @@ namespace Converter.Utils
       rgb.B = (1 - Y) * (1 - K);
     }
 
-    public static void ConvertYCbCrToRGBArray(byte[] ycbcr, byte[] rgb)
+    public static void ConvertYCbCrToRGBArray(byte[] ycbcr, byte[] rgb, int width, int height)
     {
       int R = 0;
       int G = 0;
@@ -37,11 +37,13 @@ namespace Converter.Utils
       double y = 0;
       double cb = 0;
       double cr = 0;
+      
       for (int i = 0; i < ycbcr.Length; i +=3)
       {
         y = ycbcr[i];
         cb = ycbcr[i + 1];
         cr = ycbcr[i + 2];
+
         R = (int)(y + 1.40200 * (cr - 0x80));
         G = (int)(y - 0.34414 * (cb - 0x80) - 0.71414 * (cr - 0x80));
         B = (int)(y + 1.77200 * (cb - 0x80));

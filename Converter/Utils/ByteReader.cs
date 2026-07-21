@@ -33,7 +33,7 @@ namespace Converter.Utils
     public ReadOnlySpan<byte> SliceBuffer(int n)
     {
       _pos += n;
-      return _buffer.Slice(_pos, n);
+      return _buffer.Slice(_pos - n, n);
     }
 
     public byte ReadByte() => _buffer[_pos++];
@@ -41,7 +41,7 @@ namespace Converter.Utils
     /// NOTE(@Aleksa) Don't care to check size atm since if its out of index something upstream went wrong
     /// </summary>
     /// <returns></returns>
-    public byte PeekByte() => _buffer[_pos + 1];
+    public byte PeekByte() => _buffer[_pos];
     public void SkipNextByte() => _pos++;
     #endregion General
 

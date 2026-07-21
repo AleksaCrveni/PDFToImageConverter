@@ -10,6 +10,9 @@ namespace Converter.FileStructures.JPEG
     public JPEG_HeaderData JFIF;
     public JPEG_QuantTable[] QuantTables;
     public JPEG_HuffmanData HuffmanData;
+    public int Width;
+    public int Height;
+    public byte[] Buffer; // YCrCb
   }
   public class JPEG_HuffmanData
   {
