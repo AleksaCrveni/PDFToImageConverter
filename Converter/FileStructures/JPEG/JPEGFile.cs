@@ -13,6 +13,7 @@ namespace Converter.FileStructures.JPEG
     public int Width;
     public int Height;
     public byte[] Buffer; // YCrCb
+    public bool IsRGB; // if false then buffer is in YCrCb format
   }
   public class JPEG_HuffmanData
   {

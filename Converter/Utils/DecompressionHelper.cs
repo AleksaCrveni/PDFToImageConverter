@@ -1,4 +1,7 @@
 ﻿using Converter.FileStructures.General;
+using Converter.Parsers.Images.JPEG;
+using System.Buffers;
+using System.ComponentModel.DataAnnotations;
 using System.IO.Compression;
 
 namespace Converter.Utils
@@ -70,7 +73,8 @@ namespace Converter.Utils
           decoded = Array.Empty<byte>();
           break;
         case ENCODING_FILTER.DCTDecode:
-          decoded = Array.Empty<byte>();
+          bool convertToRGB = true;
+          decoded = JPEGParser.Parse(inputBuffer, convertToRGB).Buffer;
           break;
         case ENCODING_FILTER.JPXDecode:
           decoded = Array.Empty<byte>();

@@ -64,18 +64,18 @@ namespace Converter.Parsers.Images.JPEG
       0.382683, -0.923880,  0.923880, -0.382683, -0.382683,  0.923880, -0.923880,  0.382683,
       0.195090, -0.555570,  0.831470, -0.980785,  0.980785, -0.831470,  0.555570, -0.195090
       ];
-    public static JPEGFile Parse(string filename)
+    public static JPEGFile Parse(string filename, bool convertToRGB = false)
     {
       Stream stream = File.OpenRead(filename);
       if (stream.Length > Int32.MaxValue)
         throw new NotSupportedException("Only supported up to 4GB files");
       byte[] arr = ArrayPool<byte>.Shared.Rent((int)stream.Length);
       stream.Read(arr);
-      JPEGFile f = Parse(arr.AsSpan());
+      JPEGFile f = Parse(arr.AsSpan(), convertToRGB);
       ArrayPool<byte>.Shared.Return(arr);
       return f;
     }
-    public static JPEGFile Parse(Span<byte> buffer)
+    public static JPEGFile Parse(ReadOnlySpan<byte> buffer, bool convertToRGB = false)
     {
       JPEGFile file = new JPEGFile();
       ByteReader r = new ByteReader(buffer);
@@ -172,7 +172,15 @@ namespace Converter.Parsers.Images.JPEG
 
       file.Height = currentFrameHeader.Height;
       file.Width = currentFrameHeader.Width;
+      if (convertToRGB)
+      {
+        ColorHelper.ConvertYCbCrToRGBArray(outputBuffer);
+        file.IsRGB = true;
+      }
+        
       file.Buffer = outputBuffer;
+      
+
       return file;
     }
 
@@ -320,7 +328,7 @@ namespace Converter.Parsers.Images.JPEG
                 //for (int i = 0; i < 64; i++)
                 //{
                 //  idctfloats.Add(outputFBlock[i]);
-                //}
+                //} 
 
 
                 ShiftBlockLevel(ref outputFBlock, ref outputBlock, state.LevelShift);
