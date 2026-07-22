@@ -15,7 +15,7 @@ using System.Transactions;
 namespace Converter.Parsers.Images.JPEG
 {
   /*
-   * Parts of this implementation of JPEGPArser (mostly constructing huffmantables, computing MCUs and processing compneents
+   * Parts of this implementation of JPEGPArser (mostly constructing huffmantables, computing MCUs and processing compneents)
    * is inspired by/altered/simplified and slower version of
    * https://github.com/yigolden-oss/JpegLibrary
     which has MIT licence that is included bellow
@@ -137,72 +137,12 @@ namespace Converter.Parsers.Images.JPEG
               outputBuffer = new byte[currentFrameHeader.Height * currentFrameHeader.Width * currentFrameHeader.NumOfImageComponentsInFrame];
             }
             break;
-          case JPEG_MARKERS.SOF1:
-            throw new NotSupportedException($"Marker {marker.ToString()} not supported!");
-            break;
-          case JPEG_MARKERS.SOF2:
-            throw new NotSupportedException($"Marker {marker.ToString()} not supported!");
-            break;
-          case JPEG_MARKERS.SOF3:
-            throw new NotSupportedException($"Marker {marker.ToString()} not supported!");
-            break;
           case JPEG_MARKERS.DHT:
             ParseDHT(file.HuffmanData, ref r, size);
             break;
-          case JPEG_MARKERS.SOF5:
-            throw new NotSupportedException($"Marker {marker.ToString()} not supported!");
-            break;
-          case JPEG_MARKERS.SOF6:
-            throw new NotSupportedException($"Marker {marker.ToString()} not supported!");
-            break;
-          case JPEG_MARKERS.SOF7:
-            throw new NotSupportedException($"Marker {marker.ToString()} not supported!");
-            break;
           case JPEG_MARKERS.JPG:
             break;
-          case JPEG_MARKERS.SOF9:
-            throw new NotSupportedException($"Marker {marker.ToString()} not supported!");
-            break;
-          case JPEG_MARKERS.SOF10:
-            throw new NotSupportedException($"Marker {marker.ToString()} not supported!");
-            break;
-          case JPEG_MARKERS.SOF11:
-            throw new NotSupportedException($"Marker {marker.ToString()} not supported!");
-            break;
           case JPEG_MARKERS.DAC:
-            break;
-          case JPEG_MARKERS.SOF13:
-            throw new NotSupportedException($"Marker {marker.ToString()} not supported!");
-            break;
-          case JPEG_MARKERS.SOF14:
-            throw new NotSupportedException($"Marker {marker.ToString()} not supported!");
-            break;
-          case JPEG_MARKERS.SOF15:
-            throw new NotSupportedException($"Marker {marker.ToString()} not supported!");
-            break;
-          case JPEG_MARKERS.RST0:
-            throw new NotSupportedException($"Marker {marker.ToString()} not supported!");
-            break;
-          case JPEG_MARKERS.RST1:
-            throw new NotSupportedException($"Marker {marker.ToString()} not supported!");
-            break;
-          case JPEG_MARKERS.RST2:
-            throw new NotSupportedException($"Marker {marker.ToString()} not supported!");
-            break;
-          case JPEG_MARKERS.RST3:
-            throw new NotSupportedException($"Marker {marker.ToString()} not supported!");
-            break;
-          case JPEG_MARKERS.RST4:
-            throw new NotSupportedException($"Marker {marker.ToString()} not supported!");
-            break;
-          case JPEG_MARKERS.RST5:
-            throw new NotSupportedException($"Marker {marker.ToString()} not supported!");
-            break;
-          case JPEG_MARKERS.RST6:
-            throw new NotSupportedException($"Marker {marker.ToString()} not supported!");
-            break;
-          case JPEG_MARKERS.RST7:
-            throw new NotSupportedException($"Marker {marker.ToString()} not supported!");
             break;
           case JPEG_MARKERS.SOI:
             break;
@@ -216,109 +156,13 @@ namespace Converter.Parsers.Images.JPEG
           case JPEG_MARKERS.DQT:
             ParseDQT(ref r, file.QuantTables, size);
             break;
-          case JPEG_MARKERS.DNL:
-            throw new NotSupportedException($"Marker {marker.ToString()} not supported!");
-            break;
           case JPEG_MARKERS.DRI:
             restartInterval = ParseDRI(ref r);
-            break;
-          case JPEG_MARKERS.DHP:
-            throw new NotSupportedException($"Marker {marker.ToString()} not supported!");
-            break;
-          case JPEG_MARKERS.EXP:
-            throw new NotSupportedException($"Marker {marker.ToString()} not supported!");
             break;
           case JPEG_MARKERS.APP0:
             file.JFIF = ParseJFIF(ref r);
             break;
-          case JPEG_MARKERS.APP1:
-            throw new NotSupportedException($"Marker {marker.ToString()} not supported!");
-            break;
-          case JPEG_MARKERS.APP2:
-            throw new NotSupportedException($"Marker {marker.ToString()} not supported!");
-            break;
-          case JPEG_MARKERS.APP3:
-            throw new NotSupportedException($"Marker {marker.ToString()} not supported!");
-            break;
-          case JPEG_MARKERS.APP4:
-            throw new NotSupportedException($"Marker {marker.ToString()} not supported!");
-            break;
-          case JPEG_MARKERS.APP5:
-            throw new NotSupportedException($"Marker {marker.ToString()} not supported!");
-            break;
-          case JPEG_MARKERS.APP6:
-            throw new NotSupportedException($"Marker {marker.ToString()} not supported!");
-            break;
-          case JPEG_MARKERS.APP7:
-            throw new NotSupportedException($"Marker {marker.ToString()} not supported!");
-            break;
-          case JPEG_MARKERS.APP8:
-            throw new NotSupportedException($"Marker {marker.ToString()} not supported!");
-            break;
-          case JPEG_MARKERS.APP9:
-            throw new NotSupportedException($"Marker {marker.ToString()} not supported!");
-            break;
-          case JPEG_MARKERS.APP10:
-            throw new NotSupportedException($"Marker {marker.ToString()} not supported!");
-            break;
-          case JPEG_MARKERS.APP11:
-            throw new NotSupportedException($"Marker {marker.ToString()} not supported!");
-            break;
-          case JPEG_MARKERS.APP12:
-            throw new NotSupportedException($"Marker {marker.ToString()} not supported!");
-            break;
-          case JPEG_MARKERS.APP13:
-            throw new NotSupportedException($"Marker {marker.ToString()} not supported!");
-            break;
-          case JPEG_MARKERS.APP14:
-            throw new NotSupportedException($"Marker {marker.ToString()} not supported!");
-            break;
-          case JPEG_MARKERS.APP15:
-            throw new NotSupportedException($"Marker {marker.ToString()} not supported!");
-            break;
-          case JPEG_MARKERS.JPG0:
-            throw new NotSupportedException($"Marker {marker.ToString()} not supported!");
-            break;
-          case JPEG_MARKERS.JPG1:
-            throw new NotSupportedException($"Marker {marker.ToString()} not supported!");
-            break;
-          case JPEG_MARKERS.JPG2:
-            throw new NotSupportedException($"Marker {marker.ToString()} not supported!");
-            break;
-          case JPEG_MARKERS.JPG3:
-            throw new NotSupportedException($"Marker {marker.ToString()} not supported!");
-            break;
-          case JPEG_MARKERS.JPG4:
-            throw new NotSupportedException($"Marker {marker.ToString()} not supported!");
-            break;
-          case JPEG_MARKERS.JPG5:
-            throw new NotSupportedException($"Marker {marker.ToString()} not supported!");
-            break;
-          case JPEG_MARKERS.JPG6:
-            throw new NotSupportedException($"Marker {marker.ToString()} not supported!");
-            break;
-          case JPEG_MARKERS.JPG7:
-            throw new NotSupportedException($"Marker {marker.ToString()} not supported!");
-            break;
-          case JPEG_MARKERS.JPG8:
-            throw new NotSupportedException($"Marker {marker.ToString()} not supported!");
-            break;
-          case JPEG_MARKERS.JPG9:
-            throw new NotSupportedException($"Marker {marker.ToString()} not supported!");
-            break;
-          case JPEG_MARKERS.JPG10:
-            throw new NotSupportedException($"Marker {marker.ToString()} not supported!");
-            break;
-          case JPEG_MARKERS.JPG11:
-            throw new NotSupportedException($"Marker {marker.ToString()} not supported!");
-            break;
-          case JPEG_MARKERS.JPG12:
-            throw new NotSupportedException($"Marker {marker.ToString()} not supported!");
-            break;
-          case JPEG_MARKERS.JPG13:
-            throw new NotSupportedException($"Marker {marker.ToString()} not supported!");
-            break;
-          case JPEG_MARKERS.COM:
+          default:
             throw new NotSupportedException($"Marker {marker.ToString()} not supported!");
             break;
         }
