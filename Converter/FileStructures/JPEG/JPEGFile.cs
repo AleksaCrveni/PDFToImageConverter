@@ -111,15 +111,6 @@ namespace Converter.FileStructures.JPEG
     public int VerticalSubsamplingFactor;
   }
 
-  public class JPEG_Block8x8
-  {
-    public short[] Data = new short[64];
-  }
-  public class JPEG_Block8x8F
-  {
-    public float[] Data = new float[64];
-  }
-
   public interface JPEG_IDecoderState { }
   public class JPEG_BaselineDecoderState : JPEG_IDecoderState
   {
