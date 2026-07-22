@@ -251,7 +251,6 @@ namespace Converter.Parsers.Images.JPEG
 
           foreach (JPEG_DecodeComponentsData component in state.Components)
           {
-            outputBlock.Clear();
             int index = component.ComponentIndex;
             int h = component.HorizontalSamplingFactor;
             int v = component.VerticalSamplingFactor;
