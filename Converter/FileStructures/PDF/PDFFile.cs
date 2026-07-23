@@ -675,7 +675,7 @@ namespace Converter.FileStructures.PDF
     public double Flatness;
     public double Smoothness;
     public bool StrokeAdjustment;
-    public object[] BlendMode;
+    public PDF_BlendMode BlendMode;
     public PDF_GraphicsStateSoftMask SMask;
     public double StrokingAlphaConstant;
     public double NonStrokingAlphaConstant;

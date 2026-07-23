@@ -246,4 +246,26 @@
     Perceptual
   }
 
+  // Table 136 + 137 
+  public enum PDF_BlendMode
+  {
+    NULL,
+    Normal,
+    Compatible,
+    Multiply,
+    Screen,
+    Overlay,
+    Darken,
+    Lighten,
+    ColorDodge,
+    ColorBurn,
+    HardLight,
+    SoftLight,
+    Difference,
+    Exclusion,
+    Hue,
+    Saturation,
+    Color,
+    Luminosity
+  }
 }

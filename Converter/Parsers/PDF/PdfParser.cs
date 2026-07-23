@@ -542,7 +542,20 @@ namespace Converter.Parsers.PDF
             state.StrokeAdjustment = helper.GetNextBool();
             break;
           case "BM":
-            throw new NotImplementedException("Blend mode not implemented yet!");
+            List<PDF_BlendMode> blendModes = helper.GetListOfNames<PDF_BlendMode>();
+            if (blendModes.Count == 0)
+              throw new InvalidDataException("Invalid BM values!");
+            state.BlendMode = PDF_BlendMode.NULL;
+            foreach (PDF_BlendMode bm in blendModes)
+            {
+              if (bm != PDF_BlendMode.NULL)
+              {
+                state.BlendMode = bm;
+              }  
+            }
+
+            if (state.BlendMode == PDF_BlendMode.NULL)
+              throw new InvalidDataException("Unknown BlendMode!");
             break;
           case "SMask":
             PDF_GraphicsStateSoftMask sMask = new PDF_GraphicsStateSoftMask();
