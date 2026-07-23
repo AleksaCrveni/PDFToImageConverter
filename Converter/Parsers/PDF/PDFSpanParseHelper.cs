@@ -941,5 +941,7 @@ namespace Converter.Parsers.PDF
       _readPosition = 0;
       _position = 0;
     }
+    public bool IsEndOfBuffer() => _readPosition >= _buffer.Length;
+
   }
 }

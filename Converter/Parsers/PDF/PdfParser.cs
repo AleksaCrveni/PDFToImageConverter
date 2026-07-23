@@ -2,6 +2,7 @@
 using Converter.Converters.Image.TIFF;
 using Converter.FileStructures.General;
 using Converter.FileStructures.PDF;
+using Converter.FileStructures.PDF.GraphicsInterpreter;
 using Converter.Parsers.Fonts;
 using Converter.Parsers.ICC;
 using Converter.Rasterizers;
@@ -321,7 +322,28 @@ namespace Converter.Parsers.PDF
         switch (tokenString)
         {
           case "ExtGState":
-            resourceDict.ExtGState = helper.GetNextDict();
+            Dictionary<string, PDF_ExtGState> xGStateDict = new Dictionary<string, PDF_ExtGState>();
+
+            
+            helper.SkipWhiteSpace();
+            if (helper.IsCurrentByteDigit())
+            {
+              #region memAllocAndHelper
+              (int objIndex, int generation) objPosition = helper.GetNextIndirectReference();
+              SharedAllocator allocator = GetObjBuffer(file, objPosition);
+              ReadOnlySpan<byte> xGStateSpan = allocator.Buffer.AsSpan(allocator.Range);
+              PDFSpanParseHelper xGStateHelper = new PDFSpanParseHelper(ref xGStateSpan);
+              #endregion memAllocAndHelper
+              ParseXGStateList(file, ref xGStateHelper, xGStateDict);
+              #region freeMem
+              FreeAllocator(allocator);
+              #endregion freeMem  
+            }
+            else
+            {
+              ParseXGStateList(file, ref helper, xGStateDict);
+            }
+            resourceDict.ExtGState = xGStateDict;
             break;
           case "ColorSpace":
             // NOTE: skip[ for now beacuase i have no idea how to parse
@@ -414,7 +436,167 @@ namespace Converter.Parsers.PDF
         throw new InvalidDataException("Invalid dictionary");
       helper.ReadChar(); // needs to be done so if its embedded so outside dict isnt dettected
     }
+    
+    private void ParseXGStateList(PDFFile file, ref PDFSpanParseHelper helper, Dictionary<string, PDF_ExtGState> dict)
+    {
+      if (!helper.GoToStartOfDict())
+        throw new InvalidDataException("Invalid ExtGState list!");
+      while (!helper.IsEndOfBuffer())
+      {
+        string key = helper.GetNextToken();
+        PDF_ExtGState gState = new PDF_ExtGState();
+        
+        helper.SkipWhiteSpace();
+        if (helper.IsCurrentByteDigit())
+        {
+          #region memAllocAndHelper
+          (int objIndex, int generation) objPosition = helper.GetNextIndirectReference();
+          SharedAllocator allocator = GetObjBuffer(file, objPosition);
+          ReadOnlySpan<byte> irSpan = allocator.Buffer.AsSpan(allocator.Range);
+          PDFSpanParseHelper irHelper = new PDFSpanParseHelper(ref irSpan);
+          #endregion memAllocAndHelper
+          ParseXGState(file, ref irHelper, gState);
+          #region freeMem
+          FreeAllocator(allocator);
+          #endregion freeMem  
+        }
+        else
+        {
+          ParseXGState(file, ref helper, gState);
+        }
+        dict.Add(key, gState);
 
+        helper.ReadUntilNonWhiteSpaceDelimiter();
+        if (helper._char == '>' && helper.IsCurrentCharacterSameAsNext())
+          break;
+        
+      }
+      helper.ReadChar();
+      helper.ReadChar();
+    }
+    private void ParseXGState(PDFFile file, ref PDFSpanParseHelper helper, PDF_ExtGState state)
+    {
+      if (!helper.GoToStartOfDict())
+        throw new InvalidDataException("Invalid ExtGState dict!");
+      string tokenString = helper.GetNextToken();
+      while (tokenString != "")
+      {
+
+        switch (tokenString)
+        {
+          case "LW":
+            state.LineWidth = helper.GetNextDouble();
+            break;
+          case "LC":
+            state.LineCap = helper.GetNextInt32();
+            if (state.LineCap < 0 || state.LineCap > 2)
+              throw new InvalidDataException("Invalid Line Cap!");
+            break;
+          case "LJ":
+            state.LineJoin = helper.GetNextInt32();
+            if (state.LineJoin < 0 || state.LineJoin > 2)
+              throw new InvalidDataException("Invalid Line Join!");
+            break;
+          case "ML":
+            state.MiterLimit = helper.GetNextDouble();
+            break;
+          case "D":
+            PDFGI_DashPattern dp = new PDFGI_DashPattern();
+            // to array is ok here now since its only 2 elements and i dont have to change it for other place
+            // where its parsed
+            dp.DashArray = helper.GetNextInt32Array().ToArray();
+            dp.Phase = helper.GetNextInt32();
+            break;
+          case "RI":
+            break;
+            state.RenderingIntent = helper.GetNextName<PDFGI_RenderingIntent>();
+            if (state.RenderingIntent == null)
+              throw new InvalidDataException("Invalid Rendering intent");
+          case "OP":
+            state.Overprint = helper.GetNextBool();
+            break;
+          case "op":
+            state.NonStrokingOverprint = helper.GetNextBool();
+            break;
+          case "OPM":
+            state.OverprintMode = helper.GetNextInt32();
+            break;
+          case "Font":
+            throw new NotImplementedException("Fonts in external dict not implemented yet!");
+            break;
+          case "BG":
+          case "BG2":
+          case "UCR":
+          case "UCR2":
+          case "TR":
+          case "TR2":
+          case "HT":
+            throw new NotImplementedException($"{tokenString} not implemented yet!");
+          case "FL":
+            state.Flatness = helper.GetNextDouble();
+            break;
+          case "SM":
+            state.Smoothness = helper.GetNextDouble();
+            break;
+          case "SA":
+            state.StrokeAdjustment = helper.GetNextBool();
+            break;
+          case "BM":
+            throw new NotImplementedException("Blend mode not implemented yet!");
+            break;
+          case "SMask":
+            PDF_GraphicsStateSoftMask sMask = new PDF_GraphicsStateSoftMask();
+            sMask = new PDF_GraphicsStateSoftMask();
+            helper.SkipWhiteSpace();
+            if (helper.IsCurrentByteDigit())
+            {
+              #region memAllocAndHelper
+              (int objIndex, int generation) objPosition = helper.GetNextIndirectReference();
+              SharedAllocator allocator = GetObjBuffer(file, objPosition);
+              ReadOnlySpan<byte> sMaskSpan = allocator.Buffer.AsSpan(allocator.Range);
+              PDFSpanParseHelper sMaskHelper = new PDFSpanParseHelper(ref sMaskSpan);
+              #endregion memAllocAndHelper
+              ParseXObjectImage(file, ref sMaskHelper, sMask.SMask);
+              #region freeMem   
+              FreeAllocator(allocator);
+              #endregion freeMem
+            }
+            else if (helper._char == '/')
+            {
+              // i dont kno what names can it be..
+              // so only do for none for now
+              string key = helper.GetNextToken();
+              if (key != "None")
+                throw new InvalidDataException("Unknown Smask Name!");
+            }
+            else
+            {
+              ParseXObjectImage(file, ref helper, sMask.SMask);
+            }
+            break;
+          case "CA":
+            state.StrokingAlphaConstant = helper.GetNextDouble();
+            break;
+          case "ca":
+            state.NonStrokingAlphaConstant = helper.GetNextDouble();
+            break;
+          case "AIS":
+            state.AlphaSource = helper.GetNextBool();
+            break;
+          case "TK":
+            state.TextKnockout = helper.GetNextBool();
+            break;
+          default:
+            break;
+            
+        }
+
+        helper.ReadUntilNonWhiteSpaceDelimiter();
+        if (helper._char == '>' && helper.IsCurrentCharacterSameAsNext())
+          break;
+        tokenString = helper.GetNextToken();
+      }
+    }
     private void ParseXObjects(PDFFile file, ref PDFSpanParseHelper helper, Dictionary<string, PDF_XObject> dict)
     {
       if (!helper.GoToStartOfDict())
@@ -903,7 +1085,7 @@ namespace Converter.Parsers.PDF
 
       List<(string key, (int objIndex, int generation) objPosition)> objPositions = new List<(string key, (int objIndex, int generation) objPosition)>();
 
-      while (helper._char != '>' && !helper.IsCurrentCharacterSameAsNext())
+      while (helper._char != '>' && !helper.IsCurrentCharacterSameAsNext() && !helper.IsEndOfBuffer())
       {
         key = helper.GetNextToken();
         if (key == "")

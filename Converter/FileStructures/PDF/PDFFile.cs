@@ -1,5 +1,6 @@
 ﻿using Converter.FileStructures.CompositeFonts;
 using Converter.FileStructures.General;
+using Converter.FileStructures.PDF.GraphicsInterpreter;
 using Converter.Rasterizers;
 using System.Numerics;
 
@@ -187,7 +188,7 @@ namespace Converter.FileStructures.PDF
   /// </summary>
   public class PDF_ResourceDict()
   {
-    public Dictionary<object, object>? ExtGState;
+    public Dictionary<string, PDF_ExtGState>? ExtGState;
     public List<PDF_ColorSpace>? ColorSpace;
     public Dictionary<object, object>? Pattern;
     public Dictionary<object, object>? Shading;
@@ -640,6 +641,56 @@ namespace Converter.FileStructures.PDF
     public bool DefaultForPrinting;
     public Dictionary<object, object>? OC;
   }
+
+  /// <summary>
+  ///  Similar GraphicsState struct
+  ///  Table 58
+  /// </summary>
+  public class PDF_ExtGState
+  {
+    public double LineWidth;
+    public int LineCap;
+    public int LineJoin;
+    public double MiterLimit;
+    public PDFGI_DashPattern DashPattern;
+    public PDFGI_RenderingIntent RenderingIntent;
+    /// <summary>
+    ///  FOR ALL PAINTING OPERATIONS
+    /// </summary>
+    public bool Overprint;
+    /// <summary>
+    /// FOR ALL PAINTING OPERATIONS OTHER THAN STROKING
+    /// </summary>
+    public bool NonStrokingOverprint; 
+    public double OverprintMode;
+    public PDF_FontData Font;
+    public object BG;
+    public object BG2;
+    public object UCR;
+    public object UCR2;
+    public object TR;
+    public object TR2;
+
+    public object Halftone;
+    public double Flatness;
+    public double Smoothness;
+    public bool StrokeAdjustment;
+    public object[] BlendMode;
+    public PDF_GraphicsStateSoftMask SMask;
+    public double StrokingAlphaConstant;
+    public double NonStrokingAlphaConstant;
+    public bool AlphaSource;
+    public bool TextKnockout;
+  }
+
+  public class PDF_GraphicsStateSoftMask
+  {
+    public string Key;
+    // these can be differnt type of Smasks..
+    public PDF_XObjectImageData SMask;
+  }
+
+
 
 
 }
