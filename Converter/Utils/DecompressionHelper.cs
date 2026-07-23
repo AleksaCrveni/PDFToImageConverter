@@ -2,6 +2,7 @@
 using Converter.Parsers.Images.JPEG;
 using System.Buffers;
 using System.ComponentModel.DataAnnotations;
+using System.Diagnostics;
 using System.IO.Compression;
 
 namespace Converter.Utils
@@ -94,6 +95,7 @@ namespace Converter.Utils
     public static byte[] DecodeFilters(ref ReadOnlySpan<byte> inputBuffer, List<ENCODING_FILTER> filters)
     {
       // first just do single filter
+      Debug.Assert(filters.Count < 2);
       ENCODING_FILTER f = filters[0];
       return DecodeFilter(ref inputBuffer, f);
     }

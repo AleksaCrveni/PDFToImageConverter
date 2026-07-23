@@ -355,9 +355,6 @@ namespace Converter.Parsers.PDF
             resourceDict.Shading = helper.GetNextDict();
             break;
           case "XObject":
-            //NOTE(@Aleksa): TEMP UNTIL COLORS ARE IMPLEMENTED
-            helper.SkipNextDictOrIR();
-            break;
             Dictionary<string, PDF_XObject> dict = new();
             helper.SkipWhiteSpace();
             if (helper.IsCurrentByteDigit())
@@ -544,7 +541,25 @@ namespace Converter.Parsers.PDF
             throw new NotImplementedException("Alternates not implemented yet");
             break;
           case "SMask":
-            throw new NotImplementedException("Alternates not implemented yet");
+            IPDF_XObjectData iSmaskData = new PDF_XObjectImageData();
+            helper.SkipWhiteSpace();
+            if (helper.IsCurrentByteDigit())
+            {
+              #region memAllocAndHelper
+              (int objIndex, int generation) objPosition = helper.GetNextIndirectReference();
+              SharedAllocator allocator = GetObjBuffer(file, objPosition);
+              ReadOnlySpan<byte> sMaskSpan = allocator.Buffer.AsSpan(allocator.Range);
+              PDFSpanParseHelper sMaskHelper = new PDFSpanParseHelper(ref sMaskSpan);
+              #endregion memAllocAndHelper
+              ParseXObjectImage(file, ref sMaskHelper, iSmaskData);
+              #region freeMem
+              FreeAllocator(allocator);
+              #endregion freeMem
+            }
+            else
+            {
+              ParseXObjectImage(file, ref helper, iSmaskData);
+            }
             break;
           case "SmaskInData":
             throw new NotImplementedException("SmaskInData not implemented yet");
@@ -600,12 +615,16 @@ namespace Converter.Parsers.PDF
       
       helper.SkipWhiteSpaceAndDelimiters();
       helper.SkipNextToken(); // streeam
-
-      ReadOnlySpan<byte> encodedSpan = helper._buffer.Slice(helper._position, (int)data.CommonStreamData.Length);
-      data.CommonStreamData.RawStreamData = DecompressionHelper.DecodeFilters(ref encodedSpan, data.CommonStreamData.Filters);
-
+      DecodeStreamFromHelper(ref helper, data.CommonStreamData);
     }
 
+    private void DecodeStreamFromHelper(ref PDFSpanParseHelper helper, PDF_CommonStreamDict dict)
+    {
+      helper.SkipWhiteSpace();
+      ReadOnlySpan<byte> encodedSpan = helper._buffer.Slice(helper._position, (int)dict.Length);
+      dict.RawStreamData = DecompressionHelper.DecodeFilters(ref encodedSpan, dict.Filters);
+    }
+  
     private void ParseXObjectForm(PDFFile file, ref PDFSpanParseHelper helper, IPDF_XObjectData iData)
     {
       PDF_XObjectFormData data = (PDF_XObjectFormData)iData;
@@ -677,9 +696,7 @@ namespace Converter.Parsers.PDF
       }
       helper.SkipWhiteSpaceAndDelimiters();
       helper.SkipNextToken(); // skip stream
-
-      ReadOnlySpan<byte> encodedSpan = helper._buffer.Slice(helper._position, (int)data.CommonStreamData.Length);
-      data.CommonStreamData.RawStreamData = DecompressionHelper.DecodeFilters(ref encodedSpan, data.CommonStreamData.Filters);
+      DecodeStreamFromHelper(ref helper, data.CommonStreamData);
     }
     private void ParseXObjectPS(PDFFile file, ref PDFSpanParseHelper helper, IPDF_XObjectData? data)
     {
@@ -843,9 +860,7 @@ namespace Converter.Parsers.PDF
         throw new InvalidDataException("Invalid dictionary");
 
       helper.SkipNextToken(); // skip stream
-      helper.SkipWhiteSpace(); // skip LF
-      ReadOnlySpan<byte> encodedSpan = helper._buffer.Slice(helper._position, (int)commonStreamDict.Length);
-      commonStreamDict.RawStreamData = DecompressionHelper.DecodeFilters(ref encodedSpan, commonStreamDict.Filters);
+      DecodeStreamFromHelper(ref helper, commonStreamDict);
 
       //#if DEBUG
       //  File.WriteAllBytes(Path.Join(Files.RootFolder, "Sample-ICCSample.txt"), commonStreamDict.RawStreamData);

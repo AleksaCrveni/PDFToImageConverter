@@ -617,7 +617,7 @@ namespace Converter.FileStructures.PDF
     public List<int>? DecodeArray;
     public bool Interpolate;
     public List<PDF_AlternateImageDictionary>? AlternateImages;
-    public byte[]? SMask;
+    public PDF_XObjectImageData? SMask;
     public int SMaskInData;
     // skip Name
     public int StructParent;
