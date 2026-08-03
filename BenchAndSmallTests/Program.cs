@@ -25,6 +25,10 @@ using Microsoft.Diagnostics.Tracing.Parsers.AspNet;
 using BenchmarkDotNet.Loggers;
 using BenchmarkDotNet.Attributes;
 using Microsoft.Diagnostics.Tracing.Parsers.Kernel;
+using Converter.FileStructures.JPEG;
+using Converter.Parsers.Images.JPEG;
+using Converter.Utils;
+using System.Diagnostics;
 //int count1 = 0b_0000_0001;
 //int count2 = 0b_1110_0010;
 
@@ -264,44 +268,126 @@ using Microsoft.Diagnostics.Tracing.Parsers.Kernel;
 //PNGFile file = PNGParser.Parse(Files.PNGInternlancedSample);
 ////PNGWriter.Write("test.png", file);
 
-GraphicsPath gp1 = new GraphicsPath();
-RectangleF r1 = new RectangleF(0, 0, 10, 20);
-gp1.AddRectangle(r1);
-GraphicsPath gp2 = new GraphicsPath();
-RectangleF r2 = new RectangleF(5, 5, 10, 20);
-gp2.AddRectangle(r2);
-Region region1 = new Region(gp1);
+//GraphicsPath gp1 = new GraphicsPath();
+//RectangleF r1 = new RectangleF(0, 0, 10, 20);
+//gp1.AddRectangle(r1);
+//GraphicsPath gp2 = new GraphicsPath();
+//RectangleF r2 = new RectangleF(5, 5, 10, 20);
+//gp2.AddRectangle(r2);
+//Region region1 = new Region(gp1);
 
-RegionData regionData = region1.GetRegionData();
-File.WriteAllBytes("regionData.bin", regionData.Data);
-Log(regionData);
-LogPath(gp1.PathData);
-LogPath(gp2.PathData);
-region1.Intersect(gp2);
-Console.WriteLine("----------------------------");
-Log(region1.GetRegionData());
-LogPath(gp1.PathData);
-LogPath(gp2.PathData);
-void Log(RegionData r)
-{
-  StringBuilder sb = new StringBuilder();
-  foreach (byte b in r.Data)
-  {
-    sb.Append((int)b);
-    sb.Append(' ');
-  }
-  Console.WriteLine(sb.ToString());
-}
+//RegionData regionData = region1.GetRegionData();
+//File.WriteAllBytes("regionData.bin", regionData.Data);
+//Log(regionData);
+//LogPath(gp1.PathData);
+//LogPath(gp2.PathData);
+//region1.Intersect(gp2);
+//Console.WriteLine("----------------------------");
+//Log(region1.GetRegionData());
+//LogPath(gp1.PathData);
+//LogPath(gp2.PathData);
+//void Log(RegionData r)
+//{
+//  StringBuilder sb = new StringBuilder();
+//  foreach (byte b in r.Data)
+//  {
+//    sb.Append((int)b);
+//    sb.Append(' ');
+//  }
+//  Console.WriteLine(sb.ToString());
+//}
 
-void LogPath(PathData p)
-{
-  StringBuilder sb = new StringBuilder();
-  foreach (PointF b in p.Points)
-  {
-    sb.Append(b.X);
-    sb.Append(' ');
-    sb.Append(b.Y);
-    sb.Append(' ');
-  }
-  Console.WriteLine(sb.ToString());
-}
+//void LogPath(PathData p)
+//{
+//  StringBuilder sb = new StringBuilder();
+//  foreach (PointF b in p.Points)
+//  {
+//    sb.Append(b.X);
+//    sb.Append(' ');
+//    sb.Append(b.Y);
+//    sb.Append(' ');
+//  }
+//  Console.WriteLine(sb.ToString());
+//}
+
+//MyRefField f = new MyRefField();
+//MyRef r = new MyRef(ref f);
+
+//r.f = f;
+//void Mutate(ref MyRef rr)
+//{
+//rr.f.i = 10;
+//}
+
+//Mutate(ref r);
+//Console.WriteLine(r.f.i);
+//ref struct MyRef
+//{
+//  public MyRefField f;
+//  public MyRef(ref MyRefField field)
+//  {
+//    f = field;
+//  }
+//}
+
+//ref struct MyRefField
+//{
+//  public int i;
+//}
+
+
+
+
+//JPEG_Block8x8F dct = new JPEG_Block8x8F();
+//dct.Data = [8160.000000f, 0.000004f,   0.000002f,   -0.000001f,  -0.000011f,  0.000001f,   0.000001f,
+//  0.000015f, -0.000088f,  132.544678f, -0.000014f,  156.347122f, -0.000000f,  233.990005f, 0.000008f,   666.347168f,
+//0.000032f,   -0.000045f,  0.000002f,   -0.000013f,  0.000001f,   -0.000009f,  0.000002f,   0.000012f,
+//0.000029f,   156.347122f, 0.000002f,   184.423996f, -0.000006f,  276.009979f, -0.000008f,  786.010010f,
+//-0.000027f,  -0.000000f,  0.000001f,   0.000025f,   -0.000000f,  0.000025f,   0.000000f,   -0.000039f,
+//0.000001f,   233.989990f, 0.000007f,   276.009949f, 0.000002f,   413.078125f, 0.000024f,   1176.347290f,
+//-0.000014f,  0.000008f,   -0.000006f,  -0.000023f,  0.000000f,   -0.000040f,  0.000002f,   0.000048f,
+//-0.000000f,  666.347168f, -0.000007f,  786.010010f, 0.000010f,   1176.347046f,-0.000005f,  3349.953125f];
+
+
+//JPEG_Block8x8F IDCT = JPEGParser.InverseDCTBlock8x8(dct);
+
+
+
+//void PrintBLock(JPEG_Block8x8F b)
+//{
+//  for (int i = 0; i < 8; i++)
+//  {
+//    for (int j = 0; j < 8; j++)
+//    {
+//      Console.Write($"{b.Data[i * 8 + j]:F6} ");
+//    }
+//    Console.WriteLine();
+//  }
+//}
+
+//PrintBLock(dct);
+//Console.WriteLine('\n');
+//Console.WriteLine('\n');
+//Console.WriteLine('\n');
+//Console.WriteLine('\n');
+//PrintBLock(IDCT);
+//Console.ReadKey();
+//JPEGFile file = JPEGParser.Parse(Path.Join(Files.RootFolder, "pdf-stream5-0.jpg"), true);
+//File.WriteAllBytes("rawycbrMy.bin", file.Buffer);
+//byte[] rgb = new byte[file.Buffer.Length];
+//Debug.Assert(file.Buffer.Length == file.Height * file.Width * 3);
+//File.WriteAllBytes("rgbRawMy.bin",rgb);
+////ColorHelper.ConvertYCbCrToRGBArray(file.Buffer);
+//TIFFRGBWriter writer = new TIFFRGBWriter("test.tiff");
+//TIFFWriterOptions options = new TIFFWriterOptions();
+//options.Height = file.Height;
+//options.Width = file.Width;
+//writer.WriteEmptyImage(ref options);
+//writer.WriteImageWithBuffer(ref options, file.Buffer);
+//TIFFWriter.WriteRandomRGBFullColorTiff("real.tiff", options);
+PdfParser p = new PdfParser();
+PDF_Options o = new PDF_Options();
+p.Parse(Files.Report, ref o);
+//var summary = BenchmarkRunner.Run<MyBenches>();
+
+
