@@ -6,6 +6,7 @@ using Converter.FileStructures.PDF.GraphicsInterpreter;
 using Converter.Rasterizers;
 using Converter.StaticData;
 using Converter.Utils;
+using System.Buffers;
 using System.ComponentModel.Design;
 using System.Diagnostics;
 using System.Globalization;
@@ -554,8 +555,7 @@ namespace Converter.Parsers.PDF
             // inline images
             break;
           case 0x6f44: // Do
-                       // XObject
-                       // throw new NotImplementedException("Operator not i implemented");
+            ProcessExternalObject();
             break;
           case 0x504d: // MP
             throw new NotImplementedException("Operator not i implemented");
@@ -1263,6 +1263,68 @@ namespace Converter.Parsers.PDF
       #endregion
     }
 
+    public void ProcessExternalObject()
+    {
+      string key = PopString();
+      Debug.Assert(_resourceDict.XObjects != null);
+      Debug.Assert(_resourceDict.XObjects.Count > 0);
+      if (_resourceDict.XObjects == null || _resourceDict.XObjects.Count == 0)
+        return;
+
+      PDF_XObject? external = _resourceDict.XObjects!.GetValueOrDefault(key);
+      Debug.Assert(external != null);
+      if (external == null)
+        return;
+      
+      switch (external!.Type)
+      {
+        case PDF_XObjectType.Image:
+          PDF_XObjectImageData imgData = (PDF_XObjectImageData)external.Data;
+          ProcessImageExternalObject(imgData);
+          break;
+        case PDF_XObjectType.Form:
+          PDF_XObjectFormData formData = (PDF_XObjectFormData)external.Data;
+          ProcessFormExternalObject(formData);
+          break;
+        case PDF_XObjectType.PS:
+          PDF_XObjectPSData PSData = (PDF_XObjectPSData)external.Data;
+          ProcessPSExternalObject(PSData);
+          break;
+      }
+    }
+
+    public void ProcessImageExternalObject(PDF_XObjectImageData data)
+    {
+
+      int width = (int)Math.Round(GS.CTM[0, 0]);
+      int height = (int)Math.Round(GS.CTM[1, 1]);
+      int scaledLen = width * height * 3;
+      byte[] scaled = ArrayPool<byte>.Shared.Rent(scaledLen);
+      GenericImageHelper.ScaleRGBImage(data.CommonStreamData.DecodedData, data.Height, data.Width, scaled, height, width);
+      RasterImage(width, height, scaled);
+      ArrayPool<byte>.Shared.Return(scaled);
+    }
+
+    public void ProcessFormExternalObject(PDF_XObjectFormData data)
+    {
+
+    }
+
+    public void ProcessPSExternalObject(PDF_XObjectPSData data) => throw new NotSupportedException("PS External objects not supported yet");
+
+    // we don't support scaling or rotation atm
+    public void RasterImage(int width, int height, byte[] img)
+    {
+      // rounding makes it look a bit better?
+      int X = (int)MathF.Round((float)GS.CTM[2, 0]);
+      // because origin is bottom-left we have do bitmapHeight - , to get position on the top
+      int Y = _targetSize.Height - (int)(GS.CTM[2, 1]) - height;
+      // copy lines
+      for (int y = 0; y < height; y++)
+      {
+        Array.ConstrainedCopy(img, (y * width) * 3, _outputBuffer, ((Y + y) * _targetSize.Width + X) * 3, width * 3);
+      }
+    }
     public void SetupFont()
     {
       foreach (PDF_FontData fd in _resourceDict.Font)
