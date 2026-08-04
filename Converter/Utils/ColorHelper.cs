@@ -29,7 +29,7 @@ namespace Converter.Utils
       rgb.B = (1 - Y) * (1 - K);
     }
 
-    public static void ConvertYCbCrToRGBArray(byte[] arr)
+    public static void ConvertYCbCrToRGBArray(byte[] arr, int numOfColors)
     {
       int R = 0;
       int G = 0;
@@ -38,20 +38,45 @@ namespace Converter.Utils
       double cb = 0;
       double cr = 0;
       byte[] second = new byte[arr.Length];
-      for (int i = 0; i < arr.Length; i +=3)
+      if (numOfColors == 1)
       {
-        y = arr[i];
-        cb = arr[i + 1];
-        cr = arr[i + 2];
+        for (int i = 0; i < arr.Length; i += 3)
+        {
+          y = arr[i];
+          cb = 128;
+          cr = 128;
 
-        R = (int)(y + 1.40200 * (cr - 0x80));
-        G = (int)(y - 0.34414 * (cb - 0x80) - 0.71414 * (cr - 0x80));
-        B = (int)(y + 1.77200 * (cb - 0x80));
+          R = (int)(y + 1.40200 * (cr - 0x80));
+          G = (int)(y - 0.34414 * (cb - 0x80) - 0.71414 * (cr - 0x80));
+          B = (int)(y + 1.77200 * (cb - 0x80));
 
-        arr[i] = (byte)Math.Clamp(R, 0, 255);
-        arr[i + 1] = (byte)Math.Clamp(G, 0, 255);
-        arr[i + 2] = (byte)Math.Clamp(B, 0, 255);
+          arr[i] = (byte)Math.Clamp(R, 0, 255);
+          arr[i + 1] = (byte)Math.Clamp(G, 0, 255);
+          arr[i + 2] = (byte)Math.Clamp(B, 0, 255);
+        }
       }
+      else if (numOfColors == 3)
+      {
+        for (int i = 0; i < arr.Length; i += 3)
+        {
+          y = arr[i];
+          cb = arr[i + 1];
+          cr = arr[i + 2];
+
+          R = (int)(y + 1.40200 * (cr - 0x80));
+          G = (int)(y - 0.34414 * (cb - 0x80) - 0.71414 * (cr - 0x80));
+          B = (int)(y + 1.77200 * (cb - 0x80));
+
+          arr[i] = (byte)Math.Clamp(R, 0, 255);
+          arr[i + 1] = (byte)Math.Clamp(G, 0, 255);
+          arr[i + 2] = (byte)Math.Clamp(B, 0, 255);
+        }
+      }
+      else
+      {
+        throw new NotSupportedException("Other numbler of samples not supported!");
+      }
+      
     }
   }
 }
