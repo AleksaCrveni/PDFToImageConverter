@@ -412,7 +412,7 @@ namespace Converter.FileStructures.PDF
     // so just in case i will support both for length
     public long Length;
     public List<ENCODING_FILTER> Filters = new List<ENCODING_FILTER>() { ENCODING_FILTER.Null };
-    public byte[] RawStreamData;
+    public byte[] DecodedData;
   }
 
   /// <summary>
@@ -627,6 +627,7 @@ namespace Converter.FileStructures.PDF
     public byte[] Metadata;
     public Dictionary<object, object>? OC;
     public PDF_CommonStreamDict CommonStreamData;
+    public bool IsRGB;
   }
 
   public class PDF_ImageMaskData

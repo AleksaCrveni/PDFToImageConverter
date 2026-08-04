@@ -106,7 +106,7 @@ namespace Converter.Parsers.PDF
 
     private void ConvertPageDataToImage(PDFFile file, Stream outStream)
     {
-      byte[] rawContent = file.PageInformation[0].ContentDict.RawStreamData;
+      byte[] rawContent = file.PageInformation[0].ContentDict.DecodedData;
       PDF_ResourceDict rDict = file.PageInformation[0].ResourceDict;
 
       // TODO: make this later based on some mode, to be to convert to other file formats as well
@@ -164,9 +164,9 @@ namespace Converter.Parsers.PDF
       foreach ((int objIndex, int generation) objPosition in objPositions)
       {
         ParseCommonStream(file, objPosition, ref intermDict);
-        buff.AddRange(intermDict.RawStreamData);
+        buff.AddRange(intermDict.DecodedData);
       }
-      contentDict.RawStreamData = buff.ToArray();
+      contentDict.DecodedData = buff.ToArray();
     }
 
     private void ParseCommonStream(PDFFile file, (int objIndex, int generation) objPosition, ref PDF_CommonStreamDict dict)
@@ -188,7 +188,7 @@ namespace Converter.Parsers.PDF
       helper.SkipNextToken(); // stream
       helper.SkipWhiteSpace();
       ReadOnlySpan<byte> encodedSpan = buffer.Slice(helper._position, (int)dict.Length);
-      dict.RawStreamData = DecompressionHelper.DecodeFilters(ref encodedSpan, dict.Filters);
+      dict.DecodedData = DecompressionHelper.DecodeFilters(ref encodedSpan, dict.Filters);
       FreeAllocator(allocator);
     }
 
@@ -249,7 +249,7 @@ namespace Converter.Parsers.PDF
       // go to next line
       helper.SkipWhiteSpace();
       ReadOnlySpan<byte> encodedSpan = buffer.Slice(helper._position, (int)encodedStreamLen);
-      commonStreamDict.RawStreamData = DecompressionHelper.DecodeFilters(ref encodedSpan, commonStreamDict.Filters);
+      commonStreamDict.DecodedData = DecompressionHelper.DecodeFilters(ref encodedSpan, commonStreamDict.Filters);
       fontFileInfo.CommonStreamInfo = commonStreamDict;
       FreeAllocator(allocator);
     }
@@ -811,13 +811,14 @@ namespace Converter.Parsers.PDF
       helper.SkipWhiteSpaceAndDelimiters();
       helper.SkipNextToken(); // streeam
       DecodeStreamFromHelper(ref helper, data.CommonStreamData);
+      data.IsRGB = true;
     }
 
     private void DecodeStreamFromHelper(ref PDFSpanParseHelper helper, PDF_CommonStreamDict dict)
     {
       helper.SkipWhiteSpace();
       ReadOnlySpan<byte> encodedSpan = helper._buffer.Slice(helper._position, (int)dict.Length);
-      dict.RawStreamData = DecompressionHelper.DecodeFilters(ref encodedSpan, dict.Filters);
+      dict.DecodedData = DecompressionHelper.DecodeFilters(ref encodedSpan, dict.Filters);
     }
   
     private void ParseXObjectForm(PDFFile file, ref PDFSpanParseHelper helper, IPDF_XObjectData iData)
@@ -1062,7 +1063,7 @@ namespace Converter.Parsers.PDF
       //#endif
       data.CommonStreamDict = commonStreamDict;
 
-      ICCParser iCCParser = new ICCParser(commonStreamDict.RawStreamData);
+      ICCParser iCCParser = new ICCParser(commonStreamDict.DecodedData);
       iCCParser.Parse();
     }
 
@@ -1134,7 +1135,7 @@ namespace Converter.Parsers.PDF
         // it can happen that font file is not embedded
         if (fontInfo.FontDescriptor != null && fontInfo.FontDescriptor.FontFile != null)
         {
-          File.WriteAllBytes(Files.RootFolder + @$"\{name}-{fontInfo.FontDescriptor.FontName}" + @"-fontFile.txt", fontInfo.FontDescriptor.FontFile.CommonStreamInfo.RawStreamData);
+          File.WriteAllBytes(Files.RootFolder + @$"\{name}-{fontInfo.FontDescriptor.FontName}" + @"-fontFile.txt", fontInfo.FontDescriptor.FontFile.CommonStreamInfo.DecodedData);
         }
         else if (fontInfo.DescendantFontsInfo != null)
         {
@@ -1142,7 +1143,7 @@ namespace Converter.Parsers.PDF
           {
             if (entry.DescendantDict.FontDescriptor != null && entry.DescendantDict.FontDescriptor.FontFile != null)
             {
-              File.WriteAllBytes(Files.RootFolder + @$"\Composite_{entry.DescendantDict.BaseFont}" + @"-fontFile.txt", entry.DescendantDict.FontDescriptor.FontFile.CommonStreamInfo.RawStreamData);
+              File.WriteAllBytes(Files.RootFolder + @$"\Composite_{entry.DescendantDict.BaseFont}" + @"-fontFile.txt", entry.DescendantDict.FontDescriptor.FontFile.CommonStreamInfo.DecodedData);
             }
           }
         }
@@ -1157,7 +1158,7 @@ namespace Converter.Parsers.PDF
           case PDF_FontType.Type0:
             if (fontInfo.DescendantFontsInfo != null && fontInfo.DescendantFontsInfo[0].DescendantDict.FontDescriptor.FontFile != null)
             {
-              rasterizer = new CompositeFontRasterizer(fontInfo.DescendantFontsInfo[0].DescendantDict.FontDescriptor.FontFile.CommonStreamInfo.RawStreamData, fontInfo);
+              rasterizer = new CompositeFontRasterizer(fontInfo.DescendantFontsInfo[0].DescendantDict.FontDescriptor.FontFile.CommonStreamInfo.DecodedData, fontInfo);
             }
             else
             {
@@ -1167,7 +1168,7 @@ namespace Converter.Parsers.PDF
           case PDF_FontType.Type1:
             if (fontInfo.FontDescriptor != null && fontInfo.FontDescriptor.FontFile != null)
             {
-              rasterizer = new Type1Rasterizer(fontInfo.FontDescriptor.FontFile.CommonStreamInfo.RawStreamData, ref fontInfo);
+              rasterizer = new Type1Rasterizer(fontInfo.FontDescriptor.FontFile.CommonStreamInfo.DecodedData, ref fontInfo);
             }
             else
             {
@@ -1181,7 +1182,7 @@ namespace Converter.Parsers.PDF
           case PDF_FontType.TrueType:
             if (fontInfo.FontDescriptor != null && fontInfo.FontDescriptor.FontFile != null)
             {
-              rasterizer = new TTFRasterizer(fontInfo.FontDescriptor.FontFile.CommonStreamInfo.RawStreamData, ref fontInfo);
+              rasterizer = new TTFRasterizer(fontInfo.FontDescriptor.FontFile.CommonStreamInfo.DecodedData, ref fontInfo);
             }
             else
             {
@@ -1390,7 +1391,7 @@ namespace Converter.Parsers.PDF
       PDF_CommonStreamDict dict = new PDF_CommonStreamDict();
       ParseCommonStream(file, objPosition, ref dict);
 
-      ReadOnlySpan<byte> buffer = dict.RawStreamData.AsSpan();
+      ReadOnlySpan<byte> buffer = dict.DecodedData.AsSpan();
       CIDCmapParserHelper helper = new CIDCmapParserHelper(ref buffer, cmapEncoding);
       helper.Parse(cmap);
     }
@@ -3286,11 +3287,11 @@ namespace Converter.Parsers.PDF
         helper = new PDFSpanParseHelper(ref buffer);
         // TODO: this isnt used
       }
-      commonStreamDict.RawStreamData = DecompressionHelper.DecodeFilters(ref buffer, commonStreamDict.Filters);
+      commonStreamDict.DecodedData = DecompressionHelper.DecodeFilters(ref buffer, commonStreamDict.Filters);
       objStreamInfo.CommonStreamDict = commonStreamDict;
 
       // Parse offsets
-      buffer = objStreamInfo.CommonStreamDict.RawStreamData.AsSpan();
+      buffer = objStreamInfo.CommonStreamDict.DecodedData.AsSpan();
       helper = new PDFSpanParseHelper(ref buffer);
       objStreamInfo.Offsets = new List<(int, int)>();
       for (int i = 0; i < objStreamInfo.N; i++)
@@ -3514,12 +3515,12 @@ namespace Converter.Parsers.PDF
         if (info.Offsets[i].objId == entry.Index)
         {
           offset = info.Offsets[i].offset;
-          len = info.CommonStreamDict.RawStreamData.Length - offset;
+          len = info.CommonStreamDict.DecodedData.Length - offset;
           // offsets are in increasing order, so to get object size we can just do next objcet offset - current offset
           // unless we are at last index
           if (i + 1 < info.Offsets.Count)
             len = info.Offsets[i + 1].offset - offset;
-          return info.CommonStreamDict.RawStreamData;
+          return info.CommonStreamDict.DecodedData;
           break;
         }
       }

@@ -103,7 +103,7 @@ namespace Converter.Parsers.Images.JPEG
       }
 
       byte[] outputBuffer = Array.Empty<byte>();
-
+      int numOfComponents = 0;
       JPEG_FrameHeader currentFrameHeader = new JPEG_FrameHeader();
       int byteSizeOfMarkerSizeField;
       JPEG_IDecoderState state = null;
@@ -137,6 +137,8 @@ namespace Converter.Parsers.Images.JPEG
               currentFrameHeader.Width = currentFrameHeader.NumOfSamplesPerLine;
               outputBuffer = new byte[currentFrameHeader.Height * currentFrameHeader.Width * currentFrameHeader.NumOfImageComponentsInFrame];
             }
+            if (numOfComponents < currentFrameHeader.NumOfImageComponentsInFrame)
+              numOfComponents = currentFrameHeader.NumOfImageComponentsInFrame;
             break;
           case JPEG_MARKERS.DHT:
             ParseDHT(file.HuffmanData, ref r, size);
@@ -174,7 +176,7 @@ namespace Converter.Parsers.Images.JPEG
       file.Width = currentFrameHeader.Width;
       if (convertToRGB)
       {
-        ColorHelper.ConvertYCbCrToRGBArray(outputBuffer);
+        ColorHelper.ConvertYCbCrToRGBArray(outputBuffer, numOfComponents);
         file.IsRGB = true;
       }
         

@@ -36,7 +36,7 @@ namespace RasterizeDebugger
         else
         {
           tw.Nodes[0].LastNode.Nodes.Add("CIDToGIDMap");
-          tw.Nodes[0].LastNode.LastNode.Nodes.Add(Encoding.Default.GetString(fontDict.CIDToGIDMap.RawStreamData));
+          tw.Nodes[0].LastNode.LastNode.Nodes.Add(Encoding.Default.GetString(fontDict.CIDToGIDMap.DecodedData));
         }
 
         PDF_CID_CMAP cmap = fontData.FontInfo.DescendantFontsInfo[0].Cmap;
