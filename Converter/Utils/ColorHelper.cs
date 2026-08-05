@@ -6,19 +6,19 @@ namespace Converter.Utils
   public static class ColorHelper
   {
     // Table 90
-    public static int GetPDFColorCountInSpace(PDF_ColorSpaceFamily f) => f switch
+    public static PDFGI_ColorChannel GetPDFColorCountInSpace(PDF_ColorSpaceFamily f) => f switch
     {
       PDF_ColorSpaceFamily.NULL => 0,
-      PDF_ColorSpaceFamily.DeviceGray => 1,
-      PDF_ColorSpaceFamily.DeviceRGB => 3,
-      PDF_ColorSpaceFamily.DeviceCMYK => 4,
-      PDF_ColorSpaceFamily.CalGray => 1,
-      PDF_ColorSpaceFamily.CalRGB => 3,
+      PDF_ColorSpaceFamily.DeviceGray => PDFGI_ColorChannel.GRAY,
+      PDF_ColorSpaceFamily.DeviceRGB => PDFGI_ColorChannel.RGB,
+      PDF_ColorSpaceFamily.DeviceCMYK => PDFGI_ColorChannel.RGB,
+      PDF_ColorSpaceFamily.CalGray => PDFGI_ColorChannel.GRAY,
+      PDF_ColorSpaceFamily.CalRGB => PDFGI_ColorChannel.RGB,
       PDF_ColorSpaceFamily.Lab => throw new NotImplementedException(),
       PDF_ColorSpaceFamily.ICCBased => throw new NotImplementedException(),
       PDF_ColorSpaceFamily.Indexed => throw new NotSupportedException(),
       PDF_ColorSpaceFamily.Pattern => throw new NotSupportedException(),
-      PDF_ColorSpaceFamily.Separation => 1,
+      PDF_ColorSpaceFamily.Separation => PDFGI_ColorChannel.GRAY,
       PDF_ColorSpaceFamily.DeviceN => throw new NotImplementedException(),
     };
 

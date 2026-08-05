@@ -736,7 +736,7 @@ namespace Converter.Parsers.PDF
             throw new NotImplementedException("Alternates not implemented yet");
             break;
           case "SMask":
-            IPDF_XObjectData iSmaskData = new PDF_XObjectImageData();
+            PDF_XObjectImageData iSmaskData = new PDF_XObjectImageData();
             helper.SkipWhiteSpace();
             if (helper.IsCurrentByteDigit())
             {
@@ -755,6 +755,7 @@ namespace Converter.Parsers.PDF
             {
               ParseXObjectImage(file, ref helper, iSmaskData);
             }
+            data.SMask = iSmaskData;
             break;
           case "SmaskInData":
             throw new NotImplementedException("SmaskInData not implemented yet");
@@ -798,7 +799,7 @@ namespace Converter.Parsers.PDF
         else if (data.CommonStreamData.Filters.Contains(ENCODING_FILTER.JPXDecode) == false)
         {
           // TODO(@Aleksa) Make this better
-          int colorsRequired = ColorHelper.GetPDFColorCountInSpace(data.ColorSpace[0]);
+          int colorsRequired = (int)ColorHelper.GetPDFColorCountInSpace(data.ColorSpace[0]);
           if (data.DecodeArray.Count != colorsRequired * 2)
             throw new InvalidDataException("Invalid DecodeArray values!");
         }
@@ -811,7 +812,9 @@ namespace Converter.Parsers.PDF
       helper.SkipWhiteSpaceAndDelimiters();
       helper.SkipNextToken(); // streeam
       DecodeStreamFromHelper(ref helper, data.CommonStreamData);
-      data.IsRGB = true;
+      // this function also process masks and stuff and they may not be in RGB 
+      if (data.CommonStreamData.Filters.Contains(ENCODING_FILTER.DCTDecode) || data.CommonStreamData.Filters.Contains(ENCODING_FILTER.JPXDecode))
+        data.IsRGB = true;
     }
 
     private void DecodeStreamFromHelper(ref PDFSpanParseHelper helper, PDF_CommonStreamDict dict)

@@ -20,4 +20,10 @@
     re,
     n
   }
+
+  public enum PDFGI_ColorChannel
+  {
+    GRAY = 1,
+    RGB = 3
+  }
 }

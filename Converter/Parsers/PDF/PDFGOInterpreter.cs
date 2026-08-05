@@ -1295,14 +1295,107 @@ namespace Converter.Parsers.PDF
 
     public void ProcessImageExternalObject(PDF_XObjectImageData data)
     {
+      if (data.SMask != null)
+      {
+        if (GS.AlphaSource == true)
+          throw new NotImplementedException("Alpha is shape not supported yet!");
 
-      int width = (int)Math.Round(GS.CTM[0, 0]);
-      int height = (int)Math.Round(GS.CTM[1, 1]);
-      int scaledLen = width * height * 3;
-      byte[] scaled = ArrayPool<byte>.Shared.Rent(scaledLen);
-      GenericImageHelper.ScaleRGBImage(data.CommonStreamData.DecodedData, data.Height, data.Width, scaled, height, width);
-      RasterImage(width, height, scaled);
-      ArrayPool<byte>.Shared.Return(scaled);
+        if (data.SMaskInData != 0)
+          throw new NotImplementedException("SMaskInData not supported yet!");
+
+        Debug.Assert(data.Height == data.SMask.Height);
+        Debug.Assert(data.Width == data.SMask.Width);
+        
+        if (data.BitsPerComponent != 8 || data.SMask.BitsPerComponent != 8)
+        {
+          Debug.Assert(data.BitsPerComponent == 8);
+          Debug.Assert(data.SMask.BitsPerComponent == 8);
+          return;
+        }
+
+        PDFGI_ColorChannel imgCC = ColorHelper.GetPDFColorCountInSpace(data.ColorSpace[0]);
+        PDFGI_ColorChannel maskCC= ColorHelper.GetPDFColorCountInSpace(data.SMask.ColorSpace[0]);
+        byte[] img = data.CommonStreamData.DecodedData;
+        GenericImageHelper.ApplyMask(img, imgCC, data.SMask.CommonStreamData.DecodedData, maskCC, data.Height, data.Width, GS.AlphaSource);
+
+        int width = (int)Math.Round(GS.CTM[0, 0]);
+        int height = (int)Math.Round(GS.CTM[1, 1]);
+
+        int scaledLen = width * height * (int)imgCC; 
+        byte[] scaled = ArrayPool<byte>.Shared.Rent(scaledLen);
+        GenericImageHelper.ScaleImage(img, data.Height, data.Width, scaled, height, width, imgCC);
+        RasterTransparentImage(width, height, scaled, imgCC);
+        ArrayPool<byte>.Shared.Return(scaled);
+
+      }
+      else if (data.ImageMask)
+      {
+        throw new NotImplementedException("Image masks not supported yet!");
+      }
+      else if (data.Mask != null)
+      {
+        throw new NotImplementedException("Masks not supported yet!");
+      }
+      else
+      {
+        if (GS.SoftMask != null)
+          throw new NotImplementedException("Interpreter GS not supported at the moment!");
+        int width = (int)Math.Round(GS.CTM[0, 0]);
+        int height = (int)Math.Round(GS.CTM[1, 1]);
+        PDFGI_ColorChannel imgChannelCount = ColorHelper.GetPDFColorCountInSpace(data.ColorSpace[0]);
+        int scaledLen = width * height * (int)imgChannelCount;
+        byte[] scaled = ArrayPool<byte>.Shared.Rent(scaledLen);
+        GenericImageHelper.ScaleImage(data.CommonStreamData.DecodedData, data.Height, data.Width, scaled, height, width, imgChannelCount);
+        RasterImage(width, height, scaled, imgChannelCount);
+        ArrayPool<byte>.Shared.Return(scaled);
+      }
+    }
+
+    // NOTE(@Aleksa): See if this can be optimized by instead of we could compute uint with shifts and then write it as 3 bytes or something, maybe irrelevant
+    public void RasterTransparentImage(int width, int height, byte[] img, PDFGI_ColorChannel channelCount)
+    {
+      int X = (int)MathF.Round((float)GS.CTM[2, 0]);
+      // because origin is bottom-left we have do bitmapHeight - , to get position on the top
+      int Y = _targetSize.Height - (int)(GS.CTM[2, 1]) - height;
+
+      if (channelCount == PDFGI_ColorChannel.GRAY)
+      {
+        for (int y = 0; y < height; y++)
+        {
+          for (int x = 0; x < width; x++)
+          {
+            int outPos = ((Y + y) * _targetSize.Width + X + x) * 3;
+            byte imgVal = img[y * width + x];
+            if (imgVal > 0)
+            {
+              _outputBuffer[outPos] = imgVal;
+              _outputBuffer[outPos + 1] = imgVal;
+              _outputBuffer[outPos + 2] = imgVal;
+            }
+          }
+        }
+      }
+      else
+      {
+        for (int y = 0; y < height; y++)
+        {
+          for (int x = 0; x < width; x++)
+          {
+            int outPos = ((Y + y) * _targetSize.Width + X + x) * 3;
+            int imgPos = (y * width + x) * 3;
+            byte R = img[imgPos];
+            byte G = img[imgPos + 1];
+            byte B = img[imgPos + 2];
+            int sum = R + G + B;
+            if (sum > 0)
+            {
+              _outputBuffer[outPos] = R;
+              _outputBuffer[outPos + 1] = G;
+              _outputBuffer[outPos + 2] = B;
+            }
+          }
+        }
+      }
     }
 
     public void ProcessFormExternalObject(PDF_XObjectFormData data)
@@ -1313,17 +1406,35 @@ namespace Converter.Parsers.PDF
     public void ProcessPSExternalObject(PDF_XObjectPSData data) => throw new NotSupportedException("PS External objects not supported yet");
 
     // we don't support scaling or rotation atm
-    public void RasterImage(int width, int height, byte[] img)
+    public void RasterImage(int width, int height, byte[] img, PDFGI_ColorChannel channelCount)
     {
       // rounding makes it look a bit better?
       int X = (int)MathF.Round((float)GS.CTM[2, 0]);
       // because origin is bottom-left we have do bitmapHeight - , to get position on the top
       int Y = _targetSize.Height - (int)(GS.CTM[2, 1]) - height;
       // copy lines
-      for (int y = 0; y < height; y++)
+      if (channelCount == PDFGI_ColorChannel.GRAY)
       {
-        Array.ConstrainedCopy(img, (y * width) * 3, _outputBuffer, ((Y + y) * _targetSize.Width + X) * 3, width * 3);
+        for (int y = 0; y < height; y++)
+        {
+          for (int x = 0; x < width; x++)
+          {
+            int outPos = ((Y + y) * _targetSize.Width + X + x) * 3;
+            byte imgVal = img[y * width + x];
+            _outputBuffer[outPos] = imgVal;
+            _outputBuffer[outPos + 1] = imgVal;
+            _outputBuffer[outPos + 2] = imgVal;
+          }
+        }
       }
+      else
+      {
+        for (int y = 0; y < height; y++)
+        {
+          Array.ConstrainedCopy(img, (y * width) * 3, _outputBuffer, ((Y + y) * _targetSize.Width + X) * 3, width * 3);
+        }
+      }
+      
     }
     public void SetupFont()
     {
