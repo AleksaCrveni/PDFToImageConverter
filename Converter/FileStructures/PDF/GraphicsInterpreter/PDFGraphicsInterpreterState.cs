@@ -11,7 +11,7 @@ namespace Converter.FileStructures.PDF.GraphicsInterpreter
     {
       // double assignedmnet, fix later
       CTM = new double[3,3];
-      BlendMode = new object[1];
+      BlendMode = PDF_BlendMode.Normal;
       TextState = new PDFGI_TextObject();
     }
     // Device Independent
@@ -29,14 +29,16 @@ namespace Converter.FileStructures.PDF.GraphicsInterpreter
     public PDFGI_DashPattern DashPattern;
     public PDFGI_RenderingIntent RenderingIntent;
     public bool StrokeAdjustment;
-    public object[] BlendMode;
+    public PDF_BlendMode BlendMode;
     public object SoftMask;
-    public double AlphaConstant;
+    public double StrokingAlphaConstant;
+    public double NonStrokingAlphaConstant;
     public bool AlphaSource;
 
     // Device Dependent
     // Used for Scan conversion
     public bool Overprint;
+    public bool NonStrokingOverprint;
     public double OverprintMode;
     public object BlackGeneration;
     public object UndercolorRemoval;
@@ -64,9 +66,12 @@ namespace Converter.FileStructures.PDF.GraphicsInterpreter
       newGS.StrokeAdjustment = this.StrokeAdjustment;
       newGS.BlendMode = this.BlendMode;
       newGS.SoftMask = this.SoftMask;
-      newGS.AlphaConstant = this.AlphaConstant;
+      newGS.StrokingAlphaConstant = this.StrokingAlphaConstant;
       newGS.AlphaSource = this.AlphaSource;
-
+      newGS.Overprint = this.Overprint;
+      newGS.OverprintMode = this.OverprintMode;
+      newGS.Smoothness = this.Smoothness;
+      newGS.NonStrokingOverprint = this.NonStrokingOverprint;
       // NOTE(@Aleksa) This MAYBE doens't have to be a deep copy, think about it
       newGS.TextState = this.TextState.DeepCopy();
       return newGS;

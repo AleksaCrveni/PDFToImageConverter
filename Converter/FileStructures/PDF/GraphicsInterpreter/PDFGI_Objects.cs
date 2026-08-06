@@ -25,6 +25,7 @@ namespace Converter.FileStructures.PDF.GraphicsInterpreter
     public double TL = 0; // Text leading
     public int TMode = 0; // Render mode
     public double TRise = 0; // Rise
+    public bool Tk = true; // TextKnock out 9.3.8
     public bool Active;
     public PDF_FontData Font;
     public void InitMatrixes()

@@ -268,4 +268,36 @@
     Color,
     Luminosity
   }
+
+  [Flags]
+  public enum PDF_ExtGStateFlags : uint
+  { 
+    LW    = 1,
+    LC    = 1 << 1,
+    LJ    = 1 << 2,
+    ML    = 1 << 3,
+    D     = 1 << 4,
+    RI    = 1 << 5,
+    OP    = 1 << 6,
+    op    = 1 << 7,
+    OPM   = 1 << 8, 
+    Font  = 1 << 9,
+    BG    = 1 << 10,
+    BG2   = 1 << 11,
+    UCR   = 1 << 12,
+    UCR2  = 1 << 13,
+    TR    = 1 << 14,
+    TR2   = 1 << 15,
+    HT    = 1 << 16,
+    FL    = 1 << 17,
+    SM    = 1 << 18,
+    SA    = 1 << 19,
+    BM    = 1 << 20,
+    SMask = 1 << 21,
+    CA    = 1 << 22,
+    ca    = 1 << 23,
+    AIS   = 1 << 24,
+    TK    = 1 << 25
+  }
+
 }

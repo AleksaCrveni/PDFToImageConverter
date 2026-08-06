@@ -627,6 +627,7 @@ namespace Converter.FileStructures.PDF
     public byte[] Metadata;
     public Dictionary<object, object>? OC;
     public PDF_CommonStreamDict CommonStreamData;
+    public object Matte;
     public bool IsRGB;
   }
 
@@ -682,6 +683,7 @@ namespace Converter.FileStructures.PDF
     public double NonStrokingAlphaConstant;
     public bool AlphaSource;
     public bool TextKnockout;
+    public PDF_ExtGStateFlags SetFlags;
   }
 
   public class PDF_GraphicsStateSoftMask

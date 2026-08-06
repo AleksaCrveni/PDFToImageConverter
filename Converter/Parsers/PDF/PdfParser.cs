@@ -479,6 +479,7 @@ namespace Converter.Parsers.PDF
       if (!helper.GoToStartOfDict())
         throw new InvalidDataException("Invalid ExtGState dict!");
       string tokenString = helper.GetNextToken();
+      PDF_ExtGStateFlags f = 0;
       while (tokenString != "")
       {
 
@@ -486,19 +487,23 @@ namespace Converter.Parsers.PDF
         {
           case "LW":
             state.LineWidth = helper.GetNextDouble();
+            f |= PDF_ExtGStateFlags.LW;
             break;
           case "LC":
             state.LineCap = helper.GetNextInt32();
             if (state.LineCap < 0 || state.LineCap > 2)
               throw new InvalidDataException("Invalid Line Cap!");
+            f |= PDF_ExtGStateFlags.LC;
             break;
           case "LJ":
             state.LineJoin = helper.GetNextInt32();
             if (state.LineJoin < 0 || state.LineJoin > 2)
               throw new InvalidDataException("Invalid Line Join!");
+            f |= PDF_ExtGStateFlags.LJ;
             break;
           case "ML":
             state.MiterLimit = helper.GetNextDouble();
+            f |= PDF_ExtGStateFlags.ML;
             break;
           case "D":
             PDFGI_DashPattern dp = new PDFGI_DashPattern();
@@ -506,23 +511,29 @@ namespace Converter.Parsers.PDF
             // where its parsed
             dp.DashArray = helper.GetNextInt32Array().ToArray();
             dp.Phase = helper.GetNextInt32();
+            f |= PDF_ExtGStateFlags.D;
             break;
           case "RI":
             break;
             state.RenderingIntent = helper.GetNextName<PDFGI_RenderingIntent>();
             if (state.RenderingIntent == null)
               throw new InvalidDataException("Invalid Rendering intent");
+            f |= PDF_ExtGStateFlags.RI;
           case "OP":
             state.Overprint = helper.GetNextBool();
+            f |= PDF_ExtGStateFlags.OP;
             break;
           case "op":
             state.NonStrokingOverprint = helper.GetNextBool();
+            f |= PDF_ExtGStateFlags.op;
             break;
           case "OPM":
             state.OverprintMode = helper.GetNextInt32();
+            f |= PDF_ExtGStateFlags.OPM;
             break;
           case "Font":
             throw new NotImplementedException("Fonts in external dict not implemented yet!");
+            f |= PDF_ExtGStateFlags.Font;
             break;
           case "BG":
           case "BG2":
@@ -534,12 +545,15 @@ namespace Converter.Parsers.PDF
             throw new NotImplementedException($"{tokenString} not implemented yet!");
           case "FL":
             state.Flatness = helper.GetNextDouble();
+            f |= PDF_ExtGStateFlags.FL;
             break;
           case "SM":
             state.Smoothness = helper.GetNextDouble();
+            f |= PDF_ExtGStateFlags.SM;
             break;
           case "SA":
             state.StrokeAdjustment = helper.GetNextBool();
+            f |= PDF_ExtGStateFlags.SA;
             break;
           case "BM":
             List<PDF_BlendMode> blendModes = helper.GetListOfNames<PDF_BlendMode>();
@@ -556,6 +570,7 @@ namespace Converter.Parsers.PDF
 
             if (state.BlendMode == PDF_BlendMode.NULL)
               throw new InvalidDataException("Unknown BlendMode!");
+            f |= PDF_ExtGStateFlags.BM;
             break;
           case "SMask":
             PDF_GraphicsStateSoftMask sMask = new PDF_GraphicsStateSoftMask();
@@ -580,24 +595,36 @@ namespace Converter.Parsers.PDF
               // so only do for none for now
               string key = helper.GetNextToken();
               if (key != "None")
+              {
                 throw new InvalidDataException("Unknown Smask Name!");
+              }
+              else
+              {
+                sMask.Key = "None";
+              }
             }
             else
             {
               ParseXObjectImage(file, ref helper, sMask.SMask);
             }
+            state.SMask = sMask;
+            f |= PDF_ExtGStateFlags.SMask;
             break;
           case "CA":
             state.StrokingAlphaConstant = helper.GetNextDouble();
+            f |= PDF_ExtGStateFlags.CA;
             break;
           case "ca":
             state.NonStrokingAlphaConstant = helper.GetNextDouble();
+            f |= PDF_ExtGStateFlags.ca;
             break;
           case "AIS":
             state.AlphaSource = helper.GetNextBool();
+            f |= PDF_ExtGStateFlags.AIS;
             break;
           case "TK":
             state.TextKnockout = helper.GetNextBool();
+            f |= PDF_ExtGStateFlags.TK;
             break;
           default:
             break;
@@ -609,6 +636,7 @@ namespace Converter.Parsers.PDF
           break;
         tokenString = helper.GetNextToken();
       }
+      state.SetFlags = f;
     }
     private void ParseXObjects(PDFFile file, ref PDFSpanParseHelper helper, Dictionary<string, PDF_XObject> dict)
     {
@@ -777,6 +805,10 @@ namespace Converter.Parsers.PDF
             break;
           case "OC":
             helper.SkipNextDictOrIR();
+            break;
+          case "Matte":
+            // this is ony for Smasks
+            throw new NotImplementedException("Matte not supported yet!");
             break;
           default:
             ParseCommonStreamDictAsExtension(file, ref helper, tokenString, data.CommonStreamData);

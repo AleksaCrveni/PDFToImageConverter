@@ -155,10 +155,13 @@ namespace Converter.Parsers.PDF
           case 0x69: // i
             GS.Flatness = GetNextStackValAsDouble();
             break;
-          case 0x7371: // qs
-                       // Name of gs paramter dict that is in ExtGState subdict in current resorouceDict
-                       // do it later
-            throw new NotImplementedException("Operator not i implemented");
+          case 0x7367: // gs
+            string key = PopString();
+            PDF_ExtGState? xGState = _resourceDict.ExtGState.GetValueOrDefault(key);
+            Debug.Assert(xGState != null);
+            if (xGState == null)
+              break;
+            LoadExternalGraphicsState(xGState);
             break;
 
           // special graphics states
@@ -1703,6 +1706,71 @@ namespace Converter.Parsers.PDF
           throw new NotImplementedException("Invalid ColorSpace!");
           break;
       }
+    }
+
+    public void LoadExternalGraphicsState(PDF_ExtGState state)
+    {
+      Debug.Assert(state.SetFlags > 0);
+      if (state.SetFlags == 0)
+        return;
+
+      if (state.SetFlags.HasFlag(PDF_ExtGStateFlags.LW))
+        GS.LineWidth = state.LineWidth;
+      if (state.SetFlags.HasFlag(PDF_ExtGStateFlags.LC))
+        GS.LineCap = state.LineCap;
+      if (state.SetFlags.HasFlag(PDF_ExtGStateFlags.LJ))
+        GS.LineJoin = state.LineJoin;
+      if (state.SetFlags.HasFlag(PDF_ExtGStateFlags.ML))
+        GS.MiterLimit = state.MiterLimit;
+      if (state.SetFlags.HasFlag(PDF_ExtGStateFlags.D))
+        GS.DashPattern = state.DashPattern;
+      if (state.SetFlags.HasFlag(PDF_ExtGStateFlags.RI))
+        GS.RenderingIntent = state.RenderingIntent;
+      if (state.SetFlags.HasFlag(PDF_ExtGStateFlags.OP))
+        GS.Overprint = state.Overprint;
+      if (state.SetFlags.HasFlag(PDF_ExtGStateFlags.op))
+        GS.NonStrokingOverprint = state.NonStrokingOverprint;
+      else
+        GS.NonStrokingOverprint = state.Overprint;
+      if (state.SetFlags.HasFlag(PDF_ExtGStateFlags.OPM))
+        GS.OverprintMode = state.OverprintMode;
+      if (state.SetFlags.HasFlag(PDF_ExtGStateFlags.Font))
+        throw new NotImplementedException();
+      if (state.SetFlags.HasFlag(PDF_ExtGStateFlags.BG))
+        throw new NotImplementedException();
+      if (state.SetFlags.HasFlag(PDF_ExtGStateFlags.BG2))
+        throw new NotImplementedException();
+      if (state.SetFlags.HasFlag(PDF_ExtGStateFlags.UCR))
+        throw new NotImplementedException();
+      if (state.SetFlags.HasFlag(PDF_ExtGStateFlags.UCR2))
+        throw new NotImplementedException();
+      if (state.SetFlags.HasFlag(PDF_ExtGStateFlags.TR))
+        throw new NotImplementedException();
+      if (state.SetFlags.HasFlag(PDF_ExtGStateFlags.TR))
+        throw new NotImplementedException();
+      if (state.SetFlags.HasFlag(PDF_ExtGStateFlags.HT))
+        GS.Halftone = state.Halftone;
+      if (state.SetFlags.HasFlag(PDF_ExtGStateFlags.FL))
+        GS.Flatness = state.Flatness;
+      if (state.SetFlags.HasFlag(PDF_ExtGStateFlags.SM))
+        GS.Smoothness = state.Smoothness;
+      if (state.SetFlags.HasFlag(PDF_ExtGStateFlags.SA))
+        GS.StrokeAdjustment = state.StrokeAdjustment;
+      if (state.SetFlags.HasFlag(PDF_ExtGStateFlags.BM))
+        GS.BlendMode = state.BlendMode;
+      if (state.SetFlags.HasFlag(PDF_ExtGStateFlags.SMask))
+      {
+        if (state.SMask.Key != "None")
+          throw new NotImplementedException();
+      }
+      if (state.SetFlags.HasFlag(PDF_ExtGStateFlags.CA))
+        GS.StrokingAlphaConstant = state.StrokingAlphaConstant;
+      if (state.SetFlags.HasFlag(PDF_ExtGStateFlags.ca))
+        GS.NonStrokingAlphaConstant = state.NonStrokingAlphaConstant;
+      if (state.SetFlags.HasFlag(PDF_ExtGStateFlags.AIS))
+        GS.AlphaSource = state.AlphaSource;
+      if (state.SetFlags.HasFlag(PDF_ExtGStateFlags.TK))
+        GS.TextState.Tk = state.TextKnockout;
     }
 
     public void VoidDict()
