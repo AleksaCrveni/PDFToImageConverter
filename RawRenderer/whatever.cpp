@@ -23,22 +23,22 @@ uint32 buf_get(Buf *b, int n) {
     }
     return v;
 }
-struct Kita
+struct TestStruct
 {
     int a;
 };
 
 int main(int argc, char const *argv[])
 {
-   Kita k = {}; 
+   TestStruct k = {}; 
   /* code */
   return 0;
 }
-void RawDog(Kita kiturak)
+void RawDog(TestStruct kiturak)
 {
     int a = kiturak.a;
 }
-void PtrDog(Kita *kiturak)
+void PtrDog(TestStruct *kiturak)
 {
     int a = kiturak->a;
 }
