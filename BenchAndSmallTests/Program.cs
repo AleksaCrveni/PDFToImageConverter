@@ -29,6 +29,7 @@ using Converter.FileStructures.JPEG;
 using Converter.Parsers.Images.JPEG;
 using Converter.Utils;
 using System.Diagnostics;
+using Converter.FileStructures.PDF.GraphicsInterpreter;
 //int count1 = 0b_0000_0001;
 //int count2 = 0b_1110_0010;
 
@@ -374,9 +375,21 @@ using System.Diagnostics;
 //Console.ReadKey();
 //JPEGFile file = JPEGParser.Parse(Path.Join(Files.RootFolder, "pdf-stream5-0.jpg"), true);
 //File.WriteAllBytes("rawycbrMy.bin", file.Buffer);
-//byte[] rgb = new byte[file.Buffer.Length];
+//byte[] rgb = file.Buffer;
 //Debug.Assert(file.Buffer.Length == file.Height * file.Width * 3);
-//File.WriteAllBytes("rgbRawMy.bin",rgb);
+//File.WriteAllBytes("rgbRawMy.bin", rgb);
+//int scaledWidth = 266;
+//int scaledHeight = 33;
+//byte[] scaled = new byte[scaledWidth * scaledHeight * 3];
+//GenericImageHelper.ScaleImage(file.Buffer, file.Height, file.Width, scaled, scaledHeight, scaledWidth, PDFGI_ColorChannel.RGB);
+
+//TIFFRGBWriter scaledWriter = new TIFFRGBWriter("scaled.tiff");
+//TIFFWriterOptions scaledOptions = new TIFFWriterOptions();
+//scaledOptions.Height = scaledHeight;
+//scaledOptions.Width = scaledWidth;
+//scaledWriter.WriteEmptyImage(ref scaledOptions);
+//scaledWriter.WriteImageWithBuffer(ref scaledOptions, scaled);
+
 ////ColorHelper.ConvertYCbCrToRGBArray(file.Buffer);
 //TIFFRGBWriter writer = new TIFFRGBWriter("test.tiff");
 //TIFFWriterOptions options = new TIFFWriterOptions();
@@ -384,10 +397,10 @@ using System.Diagnostics;
 //options.Width = file.Width;
 //writer.WriteEmptyImage(ref options);
 //writer.WriteImageWithBuffer(ref options, file.Buffer);
-//TIFFWriter.WriteRandomRGBFullColorTiff("real.tiff", options);
 PdfParser p = new PdfParser();
 PDF_Options o = new PDF_Options();
-p.Parse(Files.Report, ref o);
+
+p.Parse(Files.Greek, ref o);
 //var summary = BenchmarkRunner.Run<MyBenches>();
 
 

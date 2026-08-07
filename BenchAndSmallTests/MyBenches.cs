@@ -1,6 +1,9 @@
 ﻿using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Jobs;
+using Converter;
+using Converter.FileStructures.PDF;
 using Converter.Parsers.Fonts;
+using Converter.Parsers.PDF;
 using System;
 using System.Buffers.Binary;
 using System.Collections.Generic;
@@ -13,22 +16,22 @@ using System.Threading.Tasks;
 
 namespace BenchAndSmallTests
 {
-  [SimpleJob(RuntimeMoniker.Net80)]
   [MemoryDiagnoser]
   public class MyBenches
   {
     private byte[] data;
     [Params(1000, 10000, 100_000)]
     public int N;
-
+    byte[] samplePDF = Array.Empty<byte>();
     [GlobalSetup]
     public void Setup()
     {
       data = new byte[N];
       new Random(new Random().Next()).NextBytes(data);
+      samplePDF = File.ReadAllBytes(@"W:\PDFToImageConverter\Files\sample.pdf");
     }
 
-    [Benchmark]
+    //[Benchmark]
     //fastests
     public int[] BitConverterBench()
     {
@@ -42,7 +45,7 @@ namespace BenchAndSmallTests
       return res;
     }
 
-    [Benchmark]
+   // [Benchmark]
     // about same as bitconverter
     public int[] UnsafeAsBench()
     {
@@ -55,7 +58,7 @@ namespace BenchAndSmallTests
 
       return res;
     }
-    [Benchmark]
+   // [Benchmark]
     //slowest
     public int[] ShiftingBench()
     {
@@ -70,7 +73,7 @@ namespace BenchAndSmallTests
     }
 
 
-    [Benchmark]
+    //[Benchmark]
     public int[] BinaryPrimitivesTest()
     {
       Span<byte> buffer = data.AsSpan();
@@ -82,6 +85,17 @@ namespace BenchAndSmallTests
       }
 
       return res;
+    }
+    [Benchmark]
+    public int BenchPDFSampleConversion()
+    {
+      PDFFile file = new PDFFile();
+      PdfParser p = new PdfParser();
+      MemoryStream m = new MemoryStream();
+      MemoryStream i = new MemoryStream(samplePDF);
+      PDF_Options o = new PDF_Options();
+      p.Parse(file, i, m, ref o);
+      return file.CrossReferenceEntries.Count;
     }
   }
 }

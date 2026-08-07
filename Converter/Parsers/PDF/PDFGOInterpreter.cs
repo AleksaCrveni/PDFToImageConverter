@@ -57,8 +57,7 @@ namespace Converter.Parsers.PDF
     public MyColor defaultColor;
     // this variable is used in specific case where cm is seen yet and we want to draw shape
     // because then it will move start at the end of the byte array instead of start because we use thin our origin TOP-LEFT and PDF does it BOTTOM-LEFT
-    public bool _cmExecuted = false; 
-
+    public bool _cmExecuted = false;
 
     // TODO: maybe NULL check is redundant if we let it throw to end?
     public PDFGOInterpreter(byte[] contentBuffer, PDF_ResourceDict resourceDict, IConverter converter, bool debug = false)
@@ -95,7 +94,7 @@ namespace Converter.Parsers.PDF
       GS = new GraphicsState();
       GS.CTM = MyMath.RealIdentityMatrix3x3();
     }
-    public void ConvertToPixelData()
+    public void ConvertToPixelData(bool external = false)
     {
 
       if (_debug)
@@ -168,10 +167,10 @@ namespace Converter.Parsers.PDF
           // NOTE: This may not work with multiple cm, they may need to be stored and calculated at TJ
           // because of order between different types of transformations
           case 0x71: // q
-            GSS.Push(GS.DeepCopy());
+            q();
             break;
           case 0x51: // Q
-            GS = GSS.Pop().DeepCopy();
+            Q();
             break;
           case 0x6d63: // cm
             double f = GetNextStackValAsDouble();
@@ -594,7 +593,8 @@ namespace Converter.Parsers.PDF
       }
       // TODO: remove this eventually
       Debug.Assert(_outputBuffer.Select(x => x > 0).Any());
-      _converter.Save(_outputBuffer);
+      if (external == false)
+        _converter.Save(_outputBuffer);
     }
     /// <summary>
     /// Read to next byte and see if its:
@@ -1196,6 +1196,7 @@ namespace Converter.Parsers.PDF
       AdvanceDrawPos(c, width);
     }
 
+    // this cna be optimized
     private void UpdateCTM(double a, double b, double c, double d, double e, double f)
     {
       reUsableMatrix1[0, 0] = a;
@@ -1224,7 +1225,22 @@ namespace Converter.Parsers.PDF
       GS.CTM[2, 1] = reUsableMatrix2[2, 1];
       GS.CTM[2, 2] = reUsableMatrix2[2, 2];
     }
+    private void UpdateCTM(double[,] m)
+    {
+      MyMath.MultiplyMatrixes3x3(m, GS.CTM, reUsableMatrix2);
 
+      GS.CTM[0, 0] = reUsableMatrix2[0, 0];
+      GS.CTM[0, 1] = reUsableMatrix2[0, 1];
+      GS.CTM[0, 2] = reUsableMatrix2[0, 2];
+
+      GS.CTM[1, 0] = reUsableMatrix2[1, 0];
+      GS.CTM[1, 1] = reUsableMatrix2[1, 1];
+      GS.CTM[1, 2] = reUsableMatrix2[1, 2];
+
+      GS.CTM[2, 0] = reUsableMatrix2[2, 0];
+      GS.CTM[2, 1] = reUsableMatrix2[2, 1];
+      GS.CTM[2, 2] = reUsableMatrix2[2, 2];
+    }
     // TODO: optimize
     public void ComputeTextRenderingMatrix()
     {
@@ -1403,7 +1419,32 @@ namespace Converter.Parsers.PDF
 
     public void ProcessFormExternalObject(PDF_XObjectFormData data)
     {
+      q();
+      UpdateCTM(data.Matrix);
+      //TODO(@Aleksa):After painting content stream we can use BBox to get bounding box and then clip it and cache it
+      PDF_ResourceDict holdDict = _resourceDict;
+      
+      // save interpreter state
+      byte[] holdBuff = _buffer;
+      int holdPos = _pos;
+      int holdReadPos = _readPos;
+      byte holdChar = _char;
+      // replace interpreter statee
+      if (data.ResourceDict != null)
+        _resourceDict = data.ResourceDict;
+      _buffer = data.CommonStreamData.DecodedData;
+      _pos = 0;
+      _readPos = 0;
+      _char = PDFConstants.SP;
 
+      ConvertToPixelData(external: true);
+      // return interpreter state
+      _resourceDict = holdDict;
+      _buffer = holdBuff;
+      _pos = holdPos;
+      _readPos = holdReadPos;
+      _char = holdChar;
+      Q();
     }
 
     public void ProcessPSExternalObject(PDF_XObjectPSData data) => throw new NotSupportedException("PS External objects not supported yet");
@@ -1886,6 +1927,10 @@ namespace Converter.Parsers.PDF
         _pathLogger.MoveToLog(x, y);
       }
     }
+
+    // test later if these 2 should get inlined
+    public void q() => GSS.Push(GS.DeepCopy());
+    public void Q() => GS = GSS.Pop().DeepCopy();
   }
 
 }

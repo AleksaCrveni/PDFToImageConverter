@@ -99,7 +99,7 @@ namespace RasterizeDebugger
         PDF_Options pdfOptions = new PDF_Options();
         _parser.Parse(_file, _dialog.OpenFile(), _outStream, ref pdfOptions, true);
         _fileFullPath = _dialog.FileName;
-        byte[] rawContent = _file.PageInformation[0].ContentDict.RawStreamData;
+        byte[] rawContent = _file.PageInformation[0].ContentDict.DecodedData;
         PDF_ResourceDict rDict = _file.PageInformation[0].ResourceDict;
 
         // TODO: make this later based on some mode, to be to convert to other _file formats as well
@@ -109,7 +109,7 @@ namespace RasterizeDebugger
           TargetConversion.TIFF_BILEVEL => throw new NotImplementedException(),
           TargetConversion.TIFF_GRAYSCALE => new TIFFGrayscaleConverter(rDict.Font, rDict, _file.PageInformation[0], SourceConversion.PDF, new TIFFWriterOptions(), _outStream),
           TargetConversion.TIFF_PALLETE => throw new NotImplementedException(),
-          TargetConversion.TIFF_RGB => throw new NotImplementedException(),
+          TargetConversion.TIFF_RGB => new TIFFRGBConverter(rDict.Font, rDict, _file.PageInformation[0], SourceConversion.PDF, new TIFFWriterOptions(), _outStream),
         };
 
         //pdfGo.ConvertToPixelData();

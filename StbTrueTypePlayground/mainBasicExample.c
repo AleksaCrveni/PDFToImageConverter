@@ -17,7 +17,7 @@ int main(int argc, char const *argv[])
 {
   long size;
   unsigned char* fontBuffer;
-  FILE* fontFile = fopen("W:/PDFToImageConverter/Files/TT1FontInfo.txt", "rb");
+  FILE* fontFile = fopen("W:/PDFToImageConverter/Files/ABCDEE+Arial#20Narrow,Bold-fontFile.txt", "rb");
   fseek(fontFile, 0, SEEK_END);
   size = ftell(fontFile);
   fseek(fontFile, 0, SEEK_SET);
@@ -52,7 +52,7 @@ int main(int argc, char const *argv[])
   float scaleFactor = stbtt_ScaleForPixelHeight(&info, lineHeight);
 
   char* textToTranslate = "Nova Dusk PDF";
-  int indexes[] = {4,8,11, 6, 1, 2, 10, 9, 7, 1, 5, 2, 3};
+  int indexes[] = {530};
   char* textToTranslate2nd = "Second Row";
 
   int x = 0;
@@ -66,11 +66,16 @@ int main(int argc, char const *argv[])
   ascent = roundf(ascent * scaleFactor);
   descent = roundf(descent * scaleFactor);
 
-
+  
+  int useIndex = 1;
   int i =0;
   int len = strlen(textToTranslate);
+  if (useIndex)
+  {
+    len = sizeof(indexes) / 4;
+  }
   int baseline = 0;
-  int useIndex = 1;
+
   for (i = 0; i < len; ++i)
   {
     /*if (textToTranslate[i] == '@')

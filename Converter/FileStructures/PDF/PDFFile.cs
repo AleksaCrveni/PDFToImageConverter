@@ -592,8 +592,8 @@ namespace Converter.FileStructures.PDF
     public byte[]? Metadata;
     public Dictionary<object, object>? PieceInfo;
     public DateTime? LastModified;
-    public int? StructParent;
-    public int? StructParents;
+    public int StructParent = -1;
+    public int StructParents = 1;
     public Dictionary<object, object>? OPI;
     public Dictionary<object, object>? OC;
     public PDF_CommonStreamDict CommonStreamData;
