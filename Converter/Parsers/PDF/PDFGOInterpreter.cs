@@ -842,6 +842,7 @@ namespace Converter.Parsers.PDF
         else if (_char == '\\')
         {
           ReadChar();
+          c = _char;
           if (_char >= '0' && _char < '8')
           {
             int count = 0;
