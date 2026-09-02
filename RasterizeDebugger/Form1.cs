@@ -123,7 +123,7 @@ namespace RasterizeDebugger
         ReadNextData(true);
         UpdateLabels();
         MemoryStream memoryStream = new MemoryStream();
-        TIFFGrayscaleWriter writer = new TIFFGrayscaleWriter(memoryStream);
+        TIFFRGBWriter writer = new TIFFRGBWriter(memoryStream);
         TIFFWriterOptions options = new TIFFWriterOptions()
         {
           Height = converter.GetHeight(),

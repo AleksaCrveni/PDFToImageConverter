@@ -36,7 +36,7 @@ namespace RasterizeDebugger
     readonly float MIN_ZOOM = 1f;
     Matrix _transform = new Matrix();
     MemoryStream memoryStream;
-    TIFFGrayscaleWriter writer;
+    TIFFRGBWriter writer;
     enum ZOOM { IN, OUT }
     public Playground()
     {
@@ -85,7 +85,7 @@ namespace RasterizeDebugger
       pb_main.Size = new Size(_width, _height);
 
       memoryStream = new MemoryStream();
-      writer = new TIFFGrayscaleWriter(memoryStream);
+      writer = new TIFFRGBWriter(memoryStream);
       TIFFWriterOptions options = new TIFFWriterOptions()
       {
         Height = _height,

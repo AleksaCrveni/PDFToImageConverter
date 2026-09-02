@@ -22,6 +22,7 @@ namespace Converter.Rasterizers
     private TTF_RASTERIZER_VERSION __rasterVersion;
     protected int __byteSize;
     protected int __beginOfSfnt;
+    protected MyColor __defaultColor;
     protected STBRasterizer(byte[] rawFontBuffer, string? encodingType)
     {
       // TODO: I think that we can soon remove all STB functions form IRasterizer since we established common interface that PDFGOInterpreter will use
@@ -32,6 +33,8 @@ namespace Converter.Rasterizers
       __rasterVersion = TTF_RASTERIZER_VERSION.V2;
       __byteSize = 8;
       __beginOfSfnt = 0;
+      __defaultColor = new MyColor();
+      __defaultColor.SetColor(0, 0, 0, 1);
       SetCorrectEncoding(encodingType);
     }
 
@@ -1693,6 +1696,7 @@ namespace Converter.Rasterizers
       // TODO: maybe this should be index -1 or name .notdef
       glyphInfo.Index = 0;
       glyphInfo.Name = string.Empty;
+      glyphInfo.Color = __defaultColor;
     }
 
     public virtual char? FindCharFromCID(char CID)
