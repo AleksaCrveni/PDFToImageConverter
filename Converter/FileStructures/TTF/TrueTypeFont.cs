@@ -23,6 +23,7 @@ namespace Converter.FileStructures.TTF
   {
     public short x, y, cx, cy, cx1, cy1;
     public byte type, padding;
+    // type -> TTF_VMove
   }
 
   public struct TableOffsets

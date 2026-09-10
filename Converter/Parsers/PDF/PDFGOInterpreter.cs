@@ -9,6 +9,7 @@ using Converter.Utils;
 using System.Buffers;
 using System.ComponentModel.Design;
 using System.Diagnostics;
+using System.Diagnostics.Metrics;
 using System.Globalization;
 using System.Text;
 
@@ -58,6 +59,7 @@ namespace Converter.Parsers.PDF
     // this variable is used in specific case where cm is seen yet and we want to draw shape
     // because then it will move start at the end of the byte array instead of start because we use thin our origin TOP-LEFT and PDF does it BOTTOM-LEFT
     public bool _cmExecuted = false;
+    public int TJCounter = 0;
 
     // TODO: maybe NULL check is redundant if we let it throw to end?
     public PDFGOInterpreter(byte[] contentBuffer, PDF_ResourceDict resourceDict, IConverter converter, bool debug = false)
@@ -434,11 +436,11 @@ namespace Converter.Parsers.PDF
               _debugState.FontRef = GS.TextState.FontRef;
               LiteralToDrawState lState = new LiteralToDrawState(literal, 0);
               _debugState.Literals.Add(lState);
+              TJCounter++;
               return;
             }
 
             PDF_DrawText(literal);
-
             break;
           case 0x4a54: // TJ
             //TODO: This is very bad
@@ -479,6 +481,7 @@ namespace Converter.Parsers.PDF
                   LiteralToDrawState lState = new LiteralToDrawState(literalsList[i].Literal, literalsList[i].PosCorrection);
                   _debugState.Literals.Add(lState);
                 }
+                TJCounter++;
                 return;
               }
 
@@ -1143,7 +1146,7 @@ namespace Converter.Parsers.PDF
       #endregion
 
       (float scaleX, float scaleY) s = GS.TextState.Font.Rasterizer.GetScale(glyphInfo.Index, textRenderingMatrix, width);
-
+      _debugState.Scale = s;
       #region asserts
       Debug.Assert(X > 0, $"X is negative at index {index}. Lit: {literal}");
       Debug.Assert(Y > 0, $"Y is negative at index {index}. Lit: {literal}");
@@ -1193,7 +1196,7 @@ namespace Converter.Parsers.PDF
       int shiftY = 0;
 
       GS.TextState.Font.Rasterizer.RasterizeGlyph(_outputBuffer, byteOffset, glyphWidth, glyphHeight, _targetSize.Width, s.scaleX, s.scaleY, shiftX, shiftY, ref glyphInfo);
-
+      
       AdvanceDrawPos(c, width);
     }
 

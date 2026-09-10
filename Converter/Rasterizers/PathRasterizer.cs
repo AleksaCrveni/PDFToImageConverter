@@ -2,6 +2,7 @@
 using Converter.FileStructures.PDF.GraphicsInterpreter;
 using Converter.FileStructures.PostScript;
 using Converter.FileStructures.Geometry;
+using Converter.DEBUG;
 
 namespace Converter.Rasterizers
 {
@@ -14,7 +15,12 @@ namespace Converter.Rasterizers
     public PathRasterizer(byte[] rawFontBuffer, string? encodingType) : base(rawFontBuffer, encodingType)
     {
     }
-
+#if DEBUG
+    public override InterpreterStateData GetCurrentGlyphInterpreterState()
+    {
+      throw new NotImplementedException();
+    }
+#endif
     public override void GetGlyphBoundingBox(ref GlyphInfo glyphInfo, float scaleX, float scaleY, ref int ix0, ref int iy0, ref int ix1, ref int iy1)
     {
     }

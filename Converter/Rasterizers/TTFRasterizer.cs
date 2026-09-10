@@ -1,4 +1,5 @@
-﻿using Converter.FileStructures.CompositeFonts;
+﻿using Converter.DEBUG;
+using Converter.FileStructures.CompositeFonts;
 using Converter.FileStructures.General;
 using Converter.FileStructures.PDF;
 using Converter.FileStructures.PDF.GraphicsInterpreter;
@@ -258,7 +259,12 @@ namespace Converter.Rasterizers
     {
       STB_MakeGlyphBitmapSubpixel(ref bitmapArr, byteOffset, glyphWidth, glyphHeight, glyphStride, scaleX, scaleY, shiftX, shiftY, glyphInfo.Index, ref glyphInfo);
     }
-
+#if DEBUG
+    public override InterpreterStateData GetCurrentGlyphInterpreterState()
+    {
+      return __lastState;
+    }
+#endif
     // Page 274. Make this more robust, ok for basic start
     public void GetGlyphInfo(int codepoint, ref GlyphInfo glyphInfo)
     {
@@ -597,6 +603,8 @@ namespace Converter.Rasterizers
       return Encoding.Default.GetString(buffer.Slice(pos, len));
     }
 
-    #endregion read helpers
+     #endregion read helpers
+
+
   }
 }

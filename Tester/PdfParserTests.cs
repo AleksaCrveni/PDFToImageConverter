@@ -14,7 +14,7 @@ namespace Tester
     /// </summary>
     public PdfParserTests()
     {
-      string dirName = "TestOutput";
+      string dirName = "TestOutputNEW";
       if (Directory.Exists(dirName))
         Directory.Delete(dirName, true);
 

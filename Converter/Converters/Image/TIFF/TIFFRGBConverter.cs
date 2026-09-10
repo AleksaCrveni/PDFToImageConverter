@@ -41,8 +41,8 @@ namespace Converter.Converters.Image.TIFF
 
         // temp workaround
         long rnd = Random.Shared.NextInt64();
-        if (Directory.Exists("TestOutput"))
-          _writer = new TIFFRGBWriter($"TestOutput/{rnd}_convertTest.tiff");
+        if (Directory.Exists("TestOutputNEW"))
+          _writer = new TIFFRGBWriter($"TestOutputNEW/{rnd}_convertTest.tiff");
         else
           _writer = new TIFFRGBWriter(__outputStream);
         TIFFWriterOptions tiffOptions = new TIFFWriterOptions()

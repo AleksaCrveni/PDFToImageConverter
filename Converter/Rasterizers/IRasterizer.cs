@@ -1,6 +1,7 @@
-﻿using Converter.FileStructures.PDF.GraphicsInterpreter;
-using Converter.FileStructures.TTF;
+﻿using Converter.DEBUG;
 using Converter.FileStructures.Geometry;
+using Converter.FileStructures.PDF.GraphicsInterpreter;
+using Converter.FileStructures.TTF;
 
 namespace Converter.Rasterizers
 {
@@ -56,5 +57,8 @@ namespace Converter.Rasterizers
     char? FindCharFromCID(char CID);
     List<char> FindLigatureFromCID(char CID);
 
+#if DEBUG
+   InterpreterStateData GetCurrentGlyphInterpreterState();
+#endif
   }
 }
