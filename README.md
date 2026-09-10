@@ -16,8 +16,11 @@ Development is heavily in progress which is why code can appear messy and have o
 TTF, Adobe Type 1, Adobe Type 0 fonts supported.
 Both normal and compressed (stream) pdfs are supported.
 Simple color processing supported.
+
 Most of operators supported including XObjects and External JPEG Images.
+
 Convert to RGB TIFF supported. (Have parsers and writers for most image formats but I didn't implement converters yet since there are some technical details on how pixels should be written to each converter and still keeping decent perf)
+
 Feature rich PDF Debugger to visualize data and help with step by step rasterizing glyphs. It doesn't really have error checking yet its just used for development debugging currently. It also supports playground where any glyph from any font in PDF can be rasterized and many other features.
 
 Example and comparison
