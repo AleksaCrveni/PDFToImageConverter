@@ -13,6 +13,8 @@ Current work is being done on improvement/rasterizer branch where I am trying to
 Development is heavily in progress which is why code can appear messy and have obvious bad practices which are just leftovers of some original ideas or trying outs that I realized aren't going to work along the way and am cleaning them up as I go. 
 
 # Features
+I am not sure about CJK PDFs yet, but I have tested some files with basic latin alphabet, cyrilic, greek..
+PS Shapes are currently NOT yet supported which may result in missing some lines, tables or shapes.
 TTF, Adobe Type 1, Adobe Type 0 fonts supported.
 Both normal and compressed (stream) pdfs are supported.
 Simple color processing supported.
