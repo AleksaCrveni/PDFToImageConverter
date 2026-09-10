@@ -7,18 +7,18 @@ There are 2 goals for this project:
 PDF 2.0 is currently not supported and is not in the current scope
 Reason as to why there is *lot* of c code is that for some testing I am using stb_truetype.h or modifications of the same
 
-# Development
-My rough *overestimate* is that this project is only 10% done as there are so many things to implement and support due to PDF specification being so large.
+# Development status
+Current work is being done on improvement/rasterizer branch where I am trying to improve rasterizer antialiasing because sometime pixel snapping doesn't look right as well as antialiasing when font size is very small (which is common).
 
 Development is heavily in progress which is why code can appear messy and have obvious bad practices which are just leftovers of some original ideas or trying outs that I realized aren't going to work along the way and am cleaning them up as I go. 
 
-Currently I am working on implementing basic Adobe Type 1 font interpreter and rasterizer.
-
 # Features
-Only font type that is currently supported is TrueType.
+TTF, Adobe Type 1, Adobe Type 0 fonts supported.
 Both normal and compressed (stream) pdfs are supported.
-No color processing supported yet.
-Small number of PDF Graphics Object operators supported currently.
+Simple color processing supported.
+Most of operators supported including XObjects and External JPEG Images.
+Convert to RGB TIFF supported. (Have parsers and writers for most image formats but I didn't implement converters yet since there are some technical details on how pixels should be written to each converter and still keeping decent perf)
+Feature rich PDF Debugger to visualize data and help with step by step rasterizing glyphs. It doesn't really have error checking yet its just used for development debugging currently. It also supports playground where any glyph from any font in PDF can be rasterized and many other features.
 
 Example and comparison
 ![Comparison](./Public/SampleFileCmp.png)
