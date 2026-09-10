@@ -23,6 +23,9 @@ Convert to RGB TIFF supported. (Have parsers and writers for most image formats 
 
 Feature rich PDF Debugger to visualize data and help with step by step rasterizing glyphs. It doesn't really have error checking yet its just used for development debugging currently. It also supports playground where any glyph from any font in PDF can be rasterized and many other features.
 
+![Debugger](./Public/Debugger.png)
+
+
 Example and comparison
 ![Comparison](./Public/SampleFileCmp.png)
 As you can see, my version has some issues with AA estimation that will be fixed along the way
