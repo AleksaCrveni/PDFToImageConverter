@@ -1146,7 +1146,9 @@ namespace Converter.Parsers.PDF
       #endregion
 
       (float scaleX, float scaleY) s = GS.TextState.Font.Rasterizer.GetScale(glyphInfo.Index, textRenderingMatrix, width);
-      _debugState.Scale = s;
+#if DEBUG
+      _debugState?.Scale = s;
+#endif
       #region asserts
       Debug.Assert(X > 0, $"X is negative at index {index}. Lit: {literal}");
       Debug.Assert(Y > 0, $"Y is negative at index {index}. Lit: {literal}");
