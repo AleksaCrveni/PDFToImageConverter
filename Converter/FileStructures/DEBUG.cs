@@ -15,6 +15,7 @@ namespace Converter.FileStructures
     public string FontRef;
     public bool isPath;
     public bool SkipPath = false;
+    public (float scaleX, float scaleY) Scale;
   }
 
   public class LiteralToDrawState

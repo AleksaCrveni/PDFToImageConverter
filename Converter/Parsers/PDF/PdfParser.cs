@@ -118,7 +118,7 @@ namespace Converter.Parsers.PDF
         TargetConversion.TIFF_PALLETE => throw new NotImplementedException(),
         TargetConversion.TIFF_RGB =>  new TIFFRGBConverter(rDict.Font, rDict, file.PageInformation[0], SourceConversion.PDF, new TIFFWriterOptions(), outStream),
       };
-    
+
       PDFGOInterpreter pdfGo = new PDFGOInterpreter(rawContent, rDict, converter);
       pdfGo.ConvertToPixelData();
     }

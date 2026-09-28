@@ -4,6 +4,7 @@ using Converter.FileStructures.PDF.GraphicsInterpreter;
 using Converter.FileStructures.TTF;
 using Converter.FileStructures.Geometry;
 using Converter.StaticData;
+using Converter.DEBUG;
 using System.Buffers.Binary;
 using System.Diagnostics;
 
@@ -23,6 +24,10 @@ namespace Converter.Rasterizers
     protected int __byteSize;
     protected int __beginOfSfnt;
     protected MyColor __defaultColor;
+#if DEBUG
+    public InterpreterStateData __lastState;
+#endif
+
     protected STBRasterizer(byte[] rawFontBuffer, string? encodingType)
     {
       // TODO: I think that we can soon remove all STB functions form IRasterizer since we established common interface that PDFGOInterpreter will use
@@ -36,10 +41,16 @@ namespace Converter.Rasterizers
       __defaultColor = new MyColor();
       __defaultColor.SetColor(0, 0, 0, 1);
       SetCorrectEncoding(encodingType);
+#if DEBUG
+      __lastState = new InterpreterStateData();
+#endif
     }
 
     protected void SetRasterizerVersion(TTF_RASTERIZER_VERSION v) => __rasterVersion = v;
     protected abstract void InitFont();
+#if DEBUG
+    public abstract InterpreterStateData GetCurrentGlyphInterpreterState();
+#endif
 
     public virtual void SetCorrectEncoding(string? encoding)
     {
@@ -1212,6 +1223,13 @@ namespace Converter.Rasterizers
       int windingCount = 0;
       List<int> windingLengths = new List<int>();
       List<PointF> windings = STB_FlattenCurves(ref vertices, numOfVerts, flatnessInPixels / scale, ref windingLengths, ref windingCount);
+
+#if DEBUG
+      __lastState.WindingCount = windingCount;
+      __lastState.WindingLengths = windingLengths;
+      __lastState.Windings = windings;
+#endif
+
       if (windings.Count > 0)
         STB_InternalRasterize(ref result, ref windings, ref windingLengths, windingCount, scaleX, scaleY, shiftX, shiftY, xOff, yOff, invert, ref glyphInfo);
     }
@@ -1622,6 +1640,10 @@ namespace Converter.Rasterizers
       gbm.Stride = glyphStride;
       gbm.Offset = byteOffset;
 
+#if DEBUG
+      __lastState.Vertices = vertices;
+#endif
+
       if (gbm.W > 0 && gbm.H > 0)
         STB_Rasterize(ref gbm, 0.35f, ref vertices, numOfVerts, scaleX, scaleY, shiftX, shiftY, ix0, iy0, true, ref glyphInfo);
     }
@@ -1708,7 +1730,7 @@ namespace Converter.Rasterizers
     {
       throw new NotImplementedException();
     }
-    #endregion 
+    #endregion
 
 
 

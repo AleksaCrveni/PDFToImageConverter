@@ -49,6 +49,7 @@
       lbl_charValue = new Label();
       label7 = new Label();
       panel1 = new Panel();
+      btn_setCurrFont = new Button();
       cb_fonts = new ComboBox();
       btn_upTo = new Button();
       txb_literalNumber = new TextBox();
@@ -65,7 +66,7 @@
       btn_SaveShape = new Button();
       cb_ProcessAllError = new CheckBox();
       btn_showContent = new Button();
-      btn_setCurrFont = new Button();
+      btn_ShowState = new Button();
       ((System.ComponentModel.ISupportInitialize)pb_mainImage).BeginInit();
       panel1.SuspendLayout();
       panel2.SuspendLayout();
@@ -297,6 +298,17 @@
       panel1.TabIndex = 21;
       panel1.Paint += panel1_Paint;
       // 
+      // btn_setCurrFont
+      // 
+      btn_setCurrFont.Anchor = AnchorStyles.Top | AnchorStyles.Right;
+      btn_setCurrFont.Location = new Point(127, 96);
+      btn_setCurrFont.Name = "btn_setCurrFont";
+      btn_setCurrFont.Size = new Size(73, 23);
+      btn_setCurrFont.TabIndex = 25;
+      btn_setCurrFont.Text = "Curr Font";
+      btn_setCurrFont.UseVisualStyleBackColor = true;
+      btn_setCurrFont.Click += btn_setCurrFont_Click;
+      // 
       // cb_fonts
       // 
       cb_fonts.FormattingEnabled = true;
@@ -459,22 +471,23 @@
       btn_showContent.UseVisualStyleBackColor = true;
       btn_showContent.Click += btn_showContent_Click;
       // 
-      // btn_setCurrFont
+      // btn_ShowState
       // 
-      btn_setCurrFont.Anchor = AnchorStyles.Top | AnchorStyles.Right;
-      btn_setCurrFont.Location = new Point(127, 96);
-      btn_setCurrFont.Name = "btn_setCurrFont";
-      btn_setCurrFont.Size = new Size(73, 23);
-      btn_setCurrFont.TabIndex = 25;
-      btn_setCurrFont.Text = "Curr Font";
-      btn_setCurrFont.UseVisualStyleBackColor = true;
-      btn_setCurrFont.Click += btn_setCurrFont_Click;
+      btn_ShowState.Anchor = AnchorStyles.Top | AnchorStyles.Right;
+      btn_ShowState.Location = new Point(312, 38);
+      btn_ShowState.Name = "btn_ShowState";
+      btn_ShowState.Size = new Size(115, 23);
+      btn_ShowState.TabIndex = 31;
+      btn_ShowState.Text = "Interpreter State";
+      btn_ShowState.UseVisualStyleBackColor = true;
+      btn_ShowState.Click += btn_ShowState_Click;
       // 
       // form_main
       // 
       AutoScaleDimensions = new SizeF(7F, 15F);
       AutoScaleMode = AutoScaleMode.Font;
       ClientSize = new Size(1012, 675);
+      Controls.Add(btn_ShowState);
       Controls.Add(btn_showContent);
       Controls.Add(cb_ProcessAllError);
       Controls.Add(btn_SaveShape);
@@ -550,5 +563,6 @@
     private Button btn_showContent;
     private ComboBox cb_fonts;
     private Button btn_setCurrFont;
+    private Button btn_ShowState;
   }
 }

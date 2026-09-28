@@ -7,6 +7,7 @@ using Converter.Parsers.Fonts;
 using Converter.StaticData;
 using Converter.Utils;
 using System.Diagnostics;
+using Converter.DEBUG;
 
 namespace Converter.Rasterizers
 {
@@ -86,6 +87,10 @@ namespace Converter.Rasterizers
       float scale = scaleX > scaleY ? scaleX : scaleY;
       // we scale here
       List<TTFVertex> vertices = RasterHelper.ConvertToTTFVertexFormat(shape); // for now we only support aspect ratio scaling
+#if DEBUG
+      __lastState.Vertices = vertices;
+#endif
+
       List<int> windingLengths = new List<int>();
       int windingCount = 0;
 
@@ -138,5 +143,16 @@ namespace Converter.Rasterizers
       result.Stride = glyphStride;
       STB_InternalRasterize(ref result, ref _currentShape._windings, ref _currentShape._windingLengths, _currentShape._windingCount, scaleX, scaleY, 0, 0, _currentShape._xMin, _currentShape._yMin, true, ref glyphInfo);
     }
+  #if DEBUG
+    public override InterpreterStateData GetCurrentGlyphInterpreterState()
+    {
+      if (_currentShape == null)
+        return null;
+      __lastState.WindingCount = _currentShape._windingCount;
+      __lastState.WindingLengths = _currentShape._windingLengths;
+      __lastState.Windings = _currentShape._windings;
+      return __lastState;
+    }
+#endif
   }
 }

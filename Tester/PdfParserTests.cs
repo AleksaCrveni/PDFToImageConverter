@@ -14,7 +14,7 @@ namespace Tester
     /// </summary>
     public PdfParserTests()
     {
-      string dirName = "TestOutput";
+      string dirName = "TestOutputNEW";
       if (Directory.Exists(dirName))
         Directory.Delete(dirName, true);
 
@@ -33,6 +33,7 @@ namespace Tester
       pdfParser.Parse(Files.Report, ref options);
       pdfParser.Parse(Files.Greek, ref options); // #SLOW
       pdfParser.Parse(Files.BasicColor, ref options);
+      pdfParser.Parse(Files.RasterSmallFonts, ref options);
     }
 
   }

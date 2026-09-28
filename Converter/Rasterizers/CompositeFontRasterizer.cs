@@ -1,4 +1,5 @@
 ﻿
+using Converter.DEBUG;
 using Converter.FileStructures.PDF;
 using Converter.FileStructures.PDF.GraphicsInterpreter;
 
@@ -57,5 +58,12 @@ namespace Converter.Rasterizers
     {
       return _cFontData.Cmap.LigatureCmap.GetValueOrDefault(CID, Array.Empty<char>().ToList());
     }
+#if DEBUG
+
+    public override InterpreterStateData GetCurrentGlyphInterpreterState()
+    {
+      return _actualRasterizer.GetCurrentGlyphInterpreterState();
+    }
+#endif
   }
 }

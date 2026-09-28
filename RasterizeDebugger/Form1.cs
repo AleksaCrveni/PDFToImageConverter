@@ -1,5 +1,7 @@
+using Converter;
 using Converter.Converters;
 using Converter.Converters.Image.TIFF;
+using Converter.DEBUG;
 using Converter.FileStructures.General;
 using Converter.FileStructures.PDF;
 using Converter.FileStructures.PDF.GraphicsInterpreter;
@@ -45,7 +47,9 @@ namespace RasterizeDebugger
     DataViewer contentViewer;
     enum ZOOM { IN, OUT }
     string _fileFullPath;
-
+    InterpreterStateForm _stateForm;
+    InterpreterStateData _stateData;
+    bool _fullInit = false;
     class LocalState
     {
       public string currentText;
@@ -84,6 +88,7 @@ namespace RasterizeDebugger
       DialogResult result = _dialog.ShowDialog();
       if (result == DialogResult.OK)
       {
+        _fullInit = false;
         if (_dialog.SafeFileNames.Length != 1)
         {
           MessageBox.Show("Can select only 1 file at the time!");
@@ -113,6 +118,7 @@ namespace RasterizeDebugger
         };
 
         //pdfGo.ConvertToPixelData();
+        rawContent = File.ReadAllBytes(Path.Combine(Files.RootFolder, "Prijemni-1CustomContent.txt"));
         _interpreter = new PDFGOInterpreter(rawContent, rDict, converter, true);
         lbl_contentLength.Text = rawContent.Length.ToString();
         _localState = new LocalState();
@@ -165,6 +171,17 @@ namespace RasterizeDebugger
             indCurr = i;
         }
         cb_fonts.SelectedIndex = indCurr;
+
+        if (_stateForm != null)
+          _stateForm.Close();
+        _stateForm = new InterpreterStateForm();
+        _stateData = new InterpreterStateData();
+        UpdateInterpreterStateAndUI();
+
+
+
+
+        _fullInit = true;
       }
     }
 
@@ -335,6 +352,7 @@ namespace RasterizeDebugger
           lbl_currentChar.Text = _localState.currentText[_localState.charIndex].ToString();
       }
 
+      UpdateInterpreterStateAndUI();
     }
     public void UpdateImageDataAndPictureBox()
     {
@@ -570,7 +588,7 @@ namespace RasterizeDebugger
 
     private void UpdateFontInfoTreeView()
     {
-     
+
       if (_interpreter._debugState.isPath)
         return;
 
@@ -853,6 +871,35 @@ namespace RasterizeDebugger
     {
 
       UpdateFontComboBoxWithCurrentFont();
+    }
+
+    private void btn_ShowState_Click(object sender, EventArgs e)
+    {
+      if (_stateForm == null)
+        return;
+      _stateForm.Show();
+      UpdateInterpreterStateAndUI();
+    }
+    private void UpdateInterpreterStateAndUI(bool updateUI = true)
+    {
+      CollectInterpreterStateData();
+      if (!updateUI || _stateForm == null || _stateData == null)
+        return;
+      _stateForm.UpdateUI(_stateData);
+      _stateForm.Focus();
+    }
+
+    private void CollectInterpreterStateData()
+    {
+      if (!_fullInit)
+        return;
+#if DEBUG
+      _stateData = _interpreter.GS.TextState?.Font?.Rasterizer?.GetCurrentGlyphInterpreterState();
+#endif
+      _stateData?.Font = cb_fonts.Items[cb_fonts.SelectedIndex].ToString();
+      _stateData?.Scale = _interpreter._debugState.Scale;
+      _stateData?.TJCount = _interpreter.TJCounter;
+      
     }
   }
 }

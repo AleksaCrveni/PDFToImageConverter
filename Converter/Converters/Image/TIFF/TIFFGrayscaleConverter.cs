@@ -22,8 +22,8 @@ namespace Converter.Converters.Image.TIFF
 
       // temp workaround
       long rnd = Random.Shared.NextInt64();
-      if (Directory.Exists("TestOutput"))
-        _writer = new TIFFGrayscaleWriter($"TestOutput/{rnd}_convertTest.tiff");
+      if (Directory.Exists("TestOutputNEW"))
+        _writer = new TIFFGrayscaleWriter($"TestOutputNEW/{rnd}_convertTest.tiff");
       else
         _writer = new TIFFGrayscaleWriter(__outputStream);
       TIFFWriterOptions tiffOptions = new TIFFWriterOptions()
