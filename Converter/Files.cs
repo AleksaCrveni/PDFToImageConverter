@@ -23,6 +23,7 @@ namespace Converter
     public static string Prijemni1 { get; set; }
     public static string Greek { get; set; }
     public static string BasicColor { get; set; }
+    public static string RasterSmallFonts { get; set; }
     static Files()
     { 
       RootFolder = Path.Combine(Directory.GetParent(Directory.GetCurrentDirectory()).Parent.Parent.Parent.FullName, "Files");
@@ -44,6 +45,7 @@ namespace Converter
       Prijemni1 = Path.Combine(RootFolder, "Prijemni-1.pdf");
       Greek = Path.Combine(RootFolder, "greek.pdf");
       BasicColor = Path.Combine(RootFolder, "BasicColors.pdf");
+      RasterSmallFonts = Path.Combine(RootFolder, "SmallFontsTest.pdf");
     }
   }
 }
