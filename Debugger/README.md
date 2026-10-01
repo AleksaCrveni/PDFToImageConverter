@@ -1,0 +1,1 @@
+ImGUI .NET port (https://github.com/ImGuiNET/ImGui.NET) is used in this project. Their MIT Licence is included under ImGUINET_LICENCE

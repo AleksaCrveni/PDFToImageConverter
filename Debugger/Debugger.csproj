@@ -1,0 +1,69 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net11.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Veldrid" Version="4.9.0" />
+    <PackageReference Include="Veldrid.StartupUtilities" Version="4.9.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Reference Include="ImGui.NET">
+      <HintPath>..\ImGui.NET\net11.0\ImGui.NET.dll</HintPath>
+    </Reference>
+  </ItemGroup>
+  
+  <ItemGroup>
+    <EmbeddedResource Include="Shaders/GLSL/imgui-vertex.glsl" LogicalName="imgui-vertex.glsl" />
+    <EmbeddedResource Include="Shaders/GLSL/imgui-frag.glsl" LogicalName="imgui-frag.glsl" />
+    <EmbeddedResource Include="Shaders/HLSL/imgui-vertex.hlsl.bytes" LogicalName="imgui-vertex.hlsl.bytes" />
+    <EmbeddedResource Include="Shaders/HLSL/imgui-frag.hlsl.bytes" LogicalName="imgui-frag.hlsl.bytes" />
+    <EmbeddedResource Include="Shaders/SPIR-V/imgui-vertex.spv" LogicalName="imgui-vertex.spv" />
+    <EmbeddedResource Include="Shaders/SPIR-V/imgui-frag.spv" LogicalName="imgui-frag.spv" />
+    <EmbeddedResource Include="Shaders/Metal/imgui-vertex.metallib" LogicalName="imgui-vertex.metallib" />
+    <EmbeddedResource Include="Shaders/Metal/imgui-frag.metallib" LogicalName="imgui-frag.metallib" />
+  </ItemGroup>
+  
+  <ItemGroup>
+  <Content Include="deps/cimgui/win-x86/cimgui.dll">
+    <PackagePath>runtimes/win-x86/native</PackagePath>
+    <Pack>true</Pack>
+  </Content>
+  <Content Include="deps/cimgui/win-x64/cimgui.dll">
+    <PackagePath>runtimes/win-x64/native</PackagePath>
+    <Pack>true</Pack>
+  </Content>
+  <Content Include="deps/cimgui/win-arm64/cimgui.dll">
+    <PackagePath>runtimes/win-arm64/native</PackagePath>
+    <Pack>true</Pack>
+  </Content>
+  <Content Include="deps/cimgui/linux-x64/cimgui.so">
+    <PackagePath>runtimes/linux-x64/native/libcimgui.so</PackagePath>
+    <Pack>true</Pack>
+  </Content>
+  <Content Include="deps/cimgui/osx/cimgui.dylib">
+    <PackagePath>runtimes/osx/native/libcimgui.dylib</PackagePath>
+    <Pack>true</Pack>
+  </Content>
+  <Content Include="build/Debugger.targets">
+    <PackagePath>build/Debugger.targets</PackagePath>
+    <Pack>true</Pack>
+  </Content>
+</ItemGroup>
+  
+  <ItemGroup>
+    <None Update="cimgui.dll">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
+<Target Name="BeforeBuild">
+  <Message Text="BeforePublish" Importance="high" />
+</Target>
+</Project>
