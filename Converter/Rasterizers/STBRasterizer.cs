@@ -1696,7 +1696,8 @@ namespace Converter.Rasterizers
       // TODO: maybe this should be index -1 or name .notdef
       glyphInfo.Index = 0;
       glyphInfo.Name = string.Empty;
-      glyphInfo.Color = __defaultColor;
+      if (glyphInfo.Color == null)
+        glyphInfo.Color = __defaultColor;
     }
 
     public virtual char? FindCharFromCID(char CID)
