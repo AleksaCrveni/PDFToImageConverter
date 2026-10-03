@@ -17,26 +17,55 @@ namespace Converter.Utils
     /// <param name="outputWidth"></param>
     public static void ScaleImage(byte[] original, int originalHeight, int originalWidth, byte[] output, int outputHeight, int outputWidth, PDFGI_ColorChannel channelCount)
     {
-      
-      float xScaleFactor = (originalWidth - 1) / ((float)outputWidth - 1);
-      float yScaleFactor = (originalHeight - 1) / ((float)outputHeight - 1);
-      //Array.Fill<byte>(output, 255);
-      for (int y = 0; y < outputHeight; y++)
+      if (channelCount == PDFGI_ColorChannel.RGB)
       {
-        for (int x = 0; x < outputWidth; x++)
+        float xRatio = (originalWidth - 1) / ((float)outputWidth - 1);
+        float yRatio = (originalHeight - 1) / ((float)outputHeight - 1);
+        //Array.Fill<byte>(output, 255);
+        for (int y = 0; y < outputHeight; y++)
         {
-          int originalX = (int)MathF.Round(x * xScaleFactor);
-          int originalY = (int)MathF.Round(y * yScaleFactor);
-          int outPos = (y * outputWidth + x) * (int)channelCount;
-          int origPos = (originalY * originalWidth + originalX) * (int)channelCount;
-          output[outPos] = original[origPos];
-          if (channelCount == PDFGI_ColorChannel.RGB)
+          for (int x = 0; x < outputWidth; x++)
           {
-            output[outPos + 1] = original[origPos + 1];
-            output[outPos + 2] = original[origPos + 2];
+            int x1 = (int)Math.Floor(x * xRatio);
+            int y1 = (int)Math.Floor(y * yRatio);
+            int xH = (int)Math.Ceiling(x * xRatio);
+            int yH = (int)Math.Ceiling(y * yRatio);
+
+            double xWeight = (x * xRatio) - x1;
+            double yWeight = (y * yRatio) - y1;
+
+            int aOffset = (y1 * originalWidth + x1) * (int)channelCount;
+            int bOffset = (y1 * originalWidth + xH) * (int)channelCount;
+            int cOffset = (yH * originalWidth + x1) * (int)channelCount;
+            int dOffset = (yH * originalWidth + xH) * (int)channelCount;
+
+            byte R = (byte)(original[aOffset + 0] * (1 - xWeight) * (1 - yWeight) +
+                            original[bOffset + 0] * xWeight * (1 - yWeight) +
+                            original[cOffset + 0] * yWeight * (1 - xWeight) +
+                            original[dOffset + 0] * xWeight * yWeight);
+
+            byte G = (byte)(original[aOffset + 1] * (1 - xWeight) * (1 - yWeight) +
+                            original[bOffset + 1] * xWeight * (1 - yWeight) +
+                            original[cOffset + 1] * yWeight * (1 - xWeight) +
+                            original[dOffset + 1] * xWeight * yWeight);
+
+            byte B = (byte)(original[aOffset + 2] * (1 - xWeight) * (1 - yWeight) +
+                            original[bOffset + 2] * xWeight * (1 - yWeight) +
+                            original[cOffset + 2] * yWeight * (1 - xWeight) +
+                            original[dOffset + 2] * xWeight * yWeight);
+
+            output[(y * outputWidth + x) * (int)channelCount + 0] = R;
+            output[(y * outputWidth + x) * (int)channelCount + 1] = G;
+            output[(y * outputWidth + x) * (int)channelCount + 2] = B;
           }
         }
       }
+      else
+      {
+        // only for development. Later just return nothing.
+        throw new NotSupportedException($"{channelCount} not supported for image scaling!");
+      }
+
     }
 
     /// <summary>

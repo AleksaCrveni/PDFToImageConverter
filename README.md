@@ -7,6 +7,11 @@ There are 2 goals for this project:
 PDF 2.0 is currently not supported and is not in the current scope
 Reason as to why there is *lot* of c code is that for some testing I am using stb_truetype.h or modifications of the same
 
+# Improvements
+After sometime of development, countles improvements during and getting finally getting image quality to "okish" level I have decided to track improvements, both visual and perf wise.
+
+You can find examples and details in the Improvements folder.
+
 # Development status
 Current work is being done on improvement/rasterizer branch where I am trying to improve rasterizer antialiasing because sometime pixel snapping doesn't look right as well as antialiasing when font size is very small (which is common).
 
