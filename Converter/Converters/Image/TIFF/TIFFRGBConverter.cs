@@ -7,8 +7,8 @@ namespace Converter.Converters.Image.TIFF
   public class TIFFRGBConverter : AConverter
   {
     private ITIFFWriter _writer;
-    public TIFFRGBConverter(List<PDF_FontData> fontDataRecords, PDF_ResourceDict rDict, PDF_PageInfo pInfo, SourceConversion source, TIFFWriterOptions options, Stream outStream)
-     : base(fontDataRecords, rDict, pInfo, source, options, outStream) { }
+    public TIFFRGBConverter(List<PDF_FontData> fontDataRecords, PDF_ResourceDict rDict, PDF_PageInfo pInfo, SourceConversion source, TIFFWriterOptions options, Destination destination)
+     : base(fontDataRecords, rDict, pInfo, source, options, destination) { }
     public override byte[] CreateBuffer()
     {
       byte[] buff = new byte[__options.Width * __options.Height * 3];
@@ -42,9 +42,9 @@ namespace Converter.Converters.Image.TIFF
         // temp workaround
         long rnd = Random.Shared.NextInt64();
         if (Directory.Exists("TestOutput"))
-          _writer = new TIFFRGBWriter($"TestOutput/{rnd}_convertTest.tiff");
+          _writer = new TIFFRGBWriter($"TestOutput/{__destination.FileName}_convertTest.tiff");
         else
-          _writer = new TIFFRGBWriter(__outputStream);
+          _writer = new TIFFRGBWriter(__destination.OutStream);
         TIFFWriterOptions tiffOptions = new TIFFWriterOptions()
         {
           Width = __options.Width,

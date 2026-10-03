@@ -63,10 +63,19 @@ namespace Converter.Parsers.PDF
     /// </returns>
     public PDFFile Parse(string filepath, ref PDF_Options options, bool DEBUG = false)
     {
+      // don't do any validation during development
+      ReadOnlySpan<char> filenameSpan = Path.GetFileName(filepath.AsSpan());
+      string filename = filenameSpan.Slice(0, filenameSpan.Length - 4).ToString();
       PDFFile file = new PDFFile();
       Stream inStream = File.OpenRead(filepath);
       // have this better just hardcode for now
-      Stream outStream = File.Create("convertTest.tiff");
+      Stream outStream = File.Create($"{filename}.tiff");
+
+      Destination dest = new Destination();
+      dest.OutStream = outStream;
+      dest.FileName = filename;
+      file.Destination = dest;
+
       // go to end to find byte offset to cross refernce table
       Parse(file, inStream, outStream, ref options, DEBUG);
       inStream.Close();
@@ -85,15 +94,21 @@ namespace Converter.Parsers.PDF
     /// <param name="options"></param>
     public void Parse(PDFFile file, Stream inputStream, Stream outputStream, ref PDF_Options options, bool DEBUG = false)
     {
+      if (file.Destination == null)
+      {
+        file.Destination = new Destination();
+        file.Destination.OutStream = outputStream;
+        file.Destination.FileName = string.Empty;
+      }
       file.Stream = inputStream;
       file.Options = options;
-      ReadInitialData(file, outputStream, DEBUG);
+      ReadInitialData(file, DEBUG);
     }
 
 
     // Read PDFVersion, Byte offset for last cross reference table, file trailer
 
-    void ReadInitialData(PDFFile file, Stream outStream, bool DEBUG)
+    void ReadInitialData(PDFFile file, bool DEBUG)
     {
       file.PdfVersion = ParsePdfVersionFromHeader(file.Stream);
       ParseTrailersAndCrossReferenceData(file);
@@ -101,10 +116,10 @@ namespace Converter.Parsers.PDF
       ParseRootPageTree(file, (file.Catalog.PagesIR.Item1, file.Catalog.PagesIR.Item2));
       ParsePagesData(file);
       if (!DEBUG)
-        ConvertPageDataToImage(file, outStream);
+        ConvertPageDataToImage(file);
     }
 
-    private void ConvertPageDataToImage(PDFFile file, Stream outStream)
+    private void ConvertPageDataToImage(PDFFile file)
     {
       byte[] rawContent = file.PageInformation[0].ContentDict.DecodedData;
       PDF_ResourceDict rDict = file.PageInformation[0].ResourceDict;
@@ -114,9 +129,9 @@ namespace Converter.Parsers.PDF
       IConverter converter = file.Target switch
       {
         TargetConversion.TIFF_BILEVEL => throw new NotImplementedException(),
-        TargetConversion.TIFF_GRAYSCALE => new TIFFGrayscaleConverter(rDict.Font, rDict, file.PageInformation[0], SourceConversion.PDF, new TIFFWriterOptions(), outStream),
+        TargetConversion.TIFF_GRAYSCALE => new TIFFGrayscaleConverter(rDict.Font, rDict, file.PageInformation[0], SourceConversion.PDF, new TIFFWriterOptions(), file.Destination),
         TargetConversion.TIFF_PALLETE => throw new NotImplementedException(),
-        TargetConversion.TIFF_RGB =>  new TIFFRGBConverter(rDict.Font, rDict, file.PageInformation[0], SourceConversion.PDF, new TIFFWriterOptions(), outStream),
+        TargetConversion.TIFF_RGB =>  new TIFFRGBConverter(rDict.Font, rDict, file.PageInformation[0], SourceConversion.PDF, new TIFFWriterOptions(), file.Destination),
       };
     
       PDFGOInterpreter pdfGo = new PDFGOInterpreter(rawContent, rDict, converter);

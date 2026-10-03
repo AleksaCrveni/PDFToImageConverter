@@ -12,16 +12,16 @@ namespace Converter.Converters
     protected PDF_ResourceDict __rDict;
     protected PDF_PageInfo __pInfo;
     protected TIFFWriterOptions __options;
-    protected Stream __outputStream;
+    protected Destination __destination;
 
-    public AConverter(List<PDF_FontData> fontDataRecords, PDF_ResourceDict rDict, PDF_PageInfo pInfo, SourceConversion source, TIFFWriterOptions options, Stream outStream)
+    public AConverter(List<PDF_FontData> fontDataRecords, PDF_ResourceDict rDict, PDF_PageInfo pInfo, SourceConversion source, TIFFWriterOptions options, Destination destination)
     {
       __fontDataRecords = fontDataRecords;
       __rDict = rDict;
       __pInfo = pInfo;
       __source = source;
       __options = options;
-      __outputStream = outStream;
+      __destination = destination;
       SetupConverter();
     }
     public abstract void SetupConverter();

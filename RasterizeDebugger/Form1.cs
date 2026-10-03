@@ -107,9 +107,9 @@ namespace RasterizeDebugger
         IConverter converter = _file.Target switch
         {
           TargetConversion.TIFF_BILEVEL => throw new NotImplementedException(),
-          TargetConversion.TIFF_GRAYSCALE => new TIFFGrayscaleConverter(rDict.Font, rDict, _file.PageInformation[0], SourceConversion.PDF, new TIFFWriterOptions(), _outStream),
+          TargetConversion.TIFF_GRAYSCALE => new TIFFGrayscaleConverter(rDict.Font, rDict, _file.PageInformation[0], SourceConversion.PDF, new TIFFWriterOptions(), _file.Destination),
           TargetConversion.TIFF_PALLETE => throw new NotImplementedException(),
-          TargetConversion.TIFF_RGB => new TIFFRGBConverter(rDict.Font, rDict, _file.PageInformation[0], SourceConversion.PDF, new TIFFWriterOptions(), _outStream),
+          TargetConversion.TIFF_RGB => new TIFFRGBConverter(rDict.Font, rDict, _file.PageInformation[0], SourceConversion.PDF, new TIFFWriterOptions(), _file.Destination),
         };
 
         //pdfGo.ConvertToPixelData();

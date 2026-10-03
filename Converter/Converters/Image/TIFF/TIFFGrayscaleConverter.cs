@@ -6,8 +6,8 @@ namespace Converter.Converters.Image.TIFF
   public class TIFFGrayscaleConverter : AConverter
   {
     private ITIFFWriter _writer;
-    public TIFFGrayscaleConverter(List<PDF_FontData> fontDataRecords, PDF_ResourceDict rDict, PDF_PageInfo pInfo, SourceConversion source, TIFFWriterOptions options, Stream outStream)
-      : base(fontDataRecords, rDict, pInfo, source, options, outStream) { }
+    public TIFFGrayscaleConverter(List<PDF_FontData> fontDataRecords, PDF_ResourceDict rDict, PDF_PageInfo pInfo, SourceConversion source, TIFFWriterOptions options, Destination destination)
+      : base(fontDataRecords, rDict, pInfo, source, options, destination) { }
 
     public override void SetupConverter()
     {
@@ -25,7 +25,7 @@ namespace Converter.Converters.Image.TIFF
       if (Directory.Exists("TestOutput"))
         _writer = new TIFFGrayscaleWriter($"TestOutput/{rnd}_convertTest.tiff");
       else
-        _writer = new TIFFGrayscaleWriter(__outputStream);
+        _writer = new TIFFGrayscaleWriter(__destination.OutStream);
       TIFFWriterOptions tiffOptions = new TIFFWriterOptions()
         {
           Width = __options.Width,

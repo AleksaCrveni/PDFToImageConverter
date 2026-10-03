@@ -22,7 +22,9 @@ namespace Converter.FileStructures.PDF
     public List<(int key, PDF_ObjectStream data)> ObjectStreams { get; set; }
     //public List<CMAP> CMAPS; Global cmaps
     public TargetConversion Target { get; set; } = TargetConversion.TIFF_RGB;
+    public Destination Destination { get; set; }
     public PDF_Options Options;
+    
 
     public PDFFile()
     {
