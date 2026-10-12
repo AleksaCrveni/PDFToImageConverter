@@ -22,12 +22,13 @@ namespace Converter.Writers.TIFF
     public static void CalculateStripAndRowInfo(ulong byteCount, int height, ref int stripSize, out uint stripCount, out int rowsPerStrip, out int remainder)
     {
       stripSize = stripSize - stripSize % height;
-      stripCount = (uint)Math.Ceiling(byteCount / (decimal)stripSize);
-      if ((uint)byteCount % stripSize > 0)
+      stripCount = (uint)(byteCount / (ulong)stripSize);
+      
+      remainder = Convert.ToInt32((uint)byteCount % stripSize);
+      if (remainder > 0)
         stripCount++;
 
       rowsPerStrip = height - 1 / (int)stripCount;
-      remainder = Convert.ToInt32((uint)byteCount % stripSize);
     }
 
     // No need to use BufferWriter its ok
