@@ -1,37 +1,63 @@
 ﻿using Converter.FileStructures.TIFF;
+using System.Diagnostics;
+using System.Dynamic;
+using System.Text;
 
 namespace Converter.Parsers.Images.TIFF
 {
   // NOTE: FOR NOW JUST SUPPORT LITTLE ENDIAN
   
-  public class TIFFParser
+  public static class TIFFParser
   {
     private static readonly int KB = 1024;
-    public TIFFParser()
+  
+    public static TIFFFile? Parse(string filePath)
     {
-
-    }
-
-    public TIFFFile Parse(string filePath)
-    {
-      Stream stream = File.OpenRead(filePath);
-      TIFFFile file = new TIFFFile();
-      file.Stream = stream;
-      ParseHeader(file);
-      ParseIFD(file);
-      ParseImageData(file);
+      Stream stream = null;
+      TIFFFile file = null;
+      try
+      {
+        stream = File.OpenRead(filePath);
+        file = new TIFFFile();
+        file.Stream = stream;
+        ParseHeader(file);
+        ParseIFD(file);
+        ParseImageData(file);
+      } 
+      finally
+      {
+        if (stream != null)
+        {
+          stream.Close();
+          stream.Dispose();
+        }
+      }
 
       return file;
     }
+
+    public static TIFF_DATA? GetImage(TIFFFile file, int pageIndex = 0)
+    {
+      if (pageIndex + 1 > file.TotalPages)
+        return null;
+
+      foreach (TIFF_DATA ifd in file.TIFFs)
+      {
+        if (ifd.Metadata.PageNumber == pageIndex)
+          return ifd;
+      }
+
+      return null;
+    }
     
-    public void ParseImageData(TIFFFile file)
+    public static void ParseImageData(TIFFFile file)
     {
       // First check max stripCount so we can allocate just once and not for each 'image'(IFD)
       uint maxStripCount = 0;
-      foreach (TIFF_Data d in file.TIFFs)
+      foreach (TIFF_DATA d in file.TIFFs)
       {
-        uint stripCount = d.Tag.ImageLength / d.Tag.RowsPerStrip;
-        if (d.Tag.ImageLength % d.Tag.RowsPerStrip > 0)
+        uint stripCount = d.Metadata.ImageHeight / d.Metadata.RowsPerStrip;
+        if (d.Metadata.ImageHeight % d.Metadata.RowsPerStrip > 0)
           stripCount++;
         if (stripCount > maxStripCount)
           maxStripCount = stripCount;
@@ -44,12 +70,12 @@ namespace Converter.Parsers.Images.TIFF
       Span<byte> stripOffsetsBuffer = maxStripCount * 4 <= KB * 4 ? stackalloc byte[(int)maxStripCount * 4] : new byte[maxStripCount * 4];
       Span<byte> stripCountsBuffer = maxStripCount * 4 <= KB * 4 ? stackalloc byte[(int)maxStripCount * 4] : new byte[maxStripCount * 4];
       TIFF_IFD_DATA tag;
-      TIFF_Data data;
+      TIFF_DATA data;
       for (int z = 0; z < file.TIFFs.Count; z++)
       {
         data = file.TIFFs[z];
-        tag = data.Tag;
-        uint stripCount = (uint)Math.Floor((tag.ImageLength + tag.RowsPerStrip -1) / (decimal)tag.RowsPerStrip);
+        tag = data.Metadata;
+        uint stripCount = (uint)Math.Floor((tag.ImageHeight + tag.RowsPerStrip -1) / (decimal)tag.RowsPerStrip);
        
 
         // Load strip offsets
@@ -77,7 +103,7 @@ namespace Converter.Parsers.Images.TIFF
             throw new InvalidDataException("Invalid strip byte counts value! Unexpected EOS!");
 
           // copy
-          data.FullImageData = imageDataBuffer;
+          data.RawPixelData = imageDataBuffer;
           continue;
         }
 
@@ -99,7 +125,7 @@ namespace Converter.Parsers.Images.TIFF
       }
     }
 
-    public void ParseHeader(TIFFFile file)
+    public static void ParseHeader(TIFFFile file)
     {
       TIFF_Header header = file.Header;
       Span<byte> buffer = stackalloc byte[8];
@@ -125,7 +151,7 @@ namespace Converter.Parsers.Images.TIFF
       file.Header = header;
     }
     // NoDE => number of directory entries
-    public void ParseIFD(TIFFFile file)
+    public static void ParseIFD(TIFFFile file)
     {
       file.Stream.Position = file.Header.FirstIFDByteOffset;
       // alloc separate buffer and then load entire IFD
@@ -143,7 +169,7 @@ namespace Converter.Parsers.Images.TIFF
         throw new InvalidDataException("Invalid IFD NoDE.");
 
       // -4 for next IFD position
-      TIFF_Data tiffData = new TIFF_Data();
+      TIFF_DATA tiffData = new TIFF_DATA();
       TIFF_IFD_DATA tag = new TIFF_IFD_DATA();
       TIFF_TagType tagValue = 0;
       ushort type = 0;
@@ -174,7 +200,7 @@ namespace Converter.Parsers.Images.TIFF
             tag.ImageWidth = valueOrOffset;
             break;
           case TIFF_TagType.ImageLength:
-            tag.ImageLength = valueOrOffset;
+            tag.ImageHeight = valueOrOffset;
             break;
           case TIFF_TagType.BitsPerSample:
             tag.BitsPerSample = (ushort)valueOrOffset;
@@ -272,10 +298,11 @@ namespace Converter.Parsers.Images.TIFF
             break;
         }
       }
-      tiffData.Tag = tag;
+      tiffData.Metadata = tag;
       file.TIFFs.Add(tiffData);
       // next IFD is last 4 bytes but read only 1 for now
       // its 0 if this is last IFD
     }
+
   }
 }

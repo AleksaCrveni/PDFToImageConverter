@@ -14,15 +14,13 @@ namespace Tester
     [TestMethod]
     public void ParseTest()
     {
-      TIFFParser parser = new TIFFParser();
-      parser.Parse(Files.BilevelTiff);
+      TIFFParser.Parse(Files.BilevelTiff);
     }
 
     [TestMethod]
     public void ParseMyTiff()
     {
-      TIFFParser parser = new TIFFParser();
-      parser.Parse(Files.CreateTestTiff);
+      TIFFParser.Parse(Files.CreateTestTiff);
     }
   }
 }

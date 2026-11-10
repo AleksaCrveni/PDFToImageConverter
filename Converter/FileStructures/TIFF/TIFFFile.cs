@@ -6,17 +6,17 @@
     public TIFF_Header Header = new TIFF_Header();
     public Stream Stream { get; set; }
     // this isn't global since there are more lists, but for now we just parse 1 so keep
-    public List<TIFF_Data> TIFFs { get; set; } = new List<TIFF_Data>();
+    public List<TIFF_DATA> TIFFs { get; set; } = new List<TIFF_DATA>();
     public int TotalPages = -1; // -1 in case its not available
   }
 
-  public struct TIFF_Data
+  public class TIFF_DATA
   {
-    public TIFF_IFD_DATA Tag;
-    public byte[] FullImageData;
+    public TIFF_IFD_DATA Metadata;
+    public byte[] RawPixelData;
   };
 
-  public struct TIFF_Header
+  public class TIFF_Header
   {
     // if false its Big Endian
     public bool IsLittleEndian;
@@ -24,7 +24,7 @@
   }
 
   // 12 B
-  public struct TIFF_IFD_FIELD
+  public class TIFF_IFD_FIELD
   {
     public ushort Tag;
     public ushort Type;
@@ -38,13 +38,13 @@
   // just do it for now and fix if any issues
   // there is a problem with default values because 0 is taken
   // so I am just going to make field nullable and check for that.
-  public struct TIFF_IFD_DATA
+  public class TIFF_IFD_DATA
   {
     public TIFF_IFD_DATA() { }
     public TIFF_PhotometricInterpretation? PhotometricInterpretation;
     public TIFF_Compression? Compression = TIFF.TIFF_Compression.NoCompression;
     public ushort? BitsPerSample;
-    public uint ImageLength; // required
+    public uint ImageHeight; // required
     public uint ImageWidth; // required
     public TIFF_ResolutionUnit ResolutionUnit = TIFF_ResolutionUnit.Inch;
     // in actual data this is represented as 2 uints, 1 for numerator and one for denominator
