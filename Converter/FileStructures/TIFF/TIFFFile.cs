@@ -12,7 +12,7 @@
 
   public struct TIFF_Data
   {
-    public TIFF_Tag Tag;
+    public TIFF_IFD_DATA Tag;
     public byte[] FullImageData;
   };
 
@@ -24,7 +24,7 @@
   }
 
   // 12 B
-  public struct TIFF_IFD
+  public struct TIFF_IFD_FIELD
   {
     public ushort Tag;
     public ushort Type;
@@ -38,9 +38,9 @@
   // just do it for now and fix if any issues
   // there is a problem with default values because 0 is taken
   // so I am just going to make field nullable and check for that.
-  public struct TIFF_Tag
+  public struct TIFF_IFD_DATA
   {
-    public TIFF_Tag() { }
+    public TIFF_IFD_DATA() { }
     public TIFF_PhotometricInterpretation? PhotometricInterpretation;
     public TIFF_Compression? Compression = TIFF.TIFF_Compression.NoCompression;
     public ushort? BitsPerSample;

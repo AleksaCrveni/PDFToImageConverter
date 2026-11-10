@@ -3,6 +3,7 @@
 namespace Converter.Parsers.Images.TIFF
 {
   // NOTE: FOR NOW JUST SUPPORT LITTLE ENDIAN
+  
   public class TIFFParser
   {
     private static readonly int KB = 1024;
@@ -11,7 +12,7 @@ namespace Converter.Parsers.Images.TIFF
 
     }
 
-    public void Parse(string filePath)
+    public TIFFFile Parse(string filePath)
     {
       Stream stream = File.OpenRead(filePath);
       TIFFFile file = new TIFFFile();
@@ -19,6 +20,8 @@ namespace Converter.Parsers.Images.TIFF
       ParseHeader(file);
       ParseIFD(file);
       ParseImageData(file);
+
+      return file;
     }
     
     public void ParseImageData(TIFFFile file)
@@ -40,7 +43,7 @@ namespace Converter.Parsers.Images.TIFF
       // ARENA can't work easily, as I cant read into span starting at half
       Span<byte> stripOffsetsBuffer = maxStripCount * 4 <= KB * 4 ? stackalloc byte[(int)maxStripCount * 4] : new byte[maxStripCount * 4];
       Span<byte> stripCountsBuffer = maxStripCount * 4 <= KB * 4 ? stackalloc byte[(int)maxStripCount * 4] : new byte[maxStripCount * 4];
-      TIFF_Tag tag;
+      TIFF_IFD_DATA tag;
       TIFF_Data data;
       for (int z = 0; z < file.TIFFs.Count; z++)
       {
@@ -141,8 +144,8 @@ namespace Converter.Parsers.Images.TIFF
 
       // -4 for next IFD position
       TIFF_Data tiffData = new TIFF_Data();
-      TIFF_Tag tag = new TIFF_Tag();
-      ushort tagValue = 0;
+      TIFF_IFD_DATA tag = new TIFF_IFD_DATA();
+      TIFF_TagType tagValue = 0;
       ushort type = 0;
       uint count = 0;
       uint valueOrOffset;
@@ -151,7 +154,7 @@ namespace Converter.Parsers.Images.TIFF
       // something  is wrong with my offsets or slices....... it gives wrong values, maybe something im offset by 1 or something?/
       for (int i = 0; i < buffer.Length - 4; i += 12)
       {
-        tagValue = BitConverter.ToUInt16(buffer.Slice(i, 2));
+        tagValue = (TIFF_TagType)BitConverter.ToUInt16(buffer.Slice(i, 2));
         type = BitConverter.ToUInt16(buffer.Slice(i + 2, 2));
         count = BitConverter.ToUInt32(buffer.Slice(i + 4, 4));
 
@@ -164,19 +167,19 @@ namespace Converter.Parsers.Images.TIFF
         // IMPROVE THIS SO ACCOUNT FOR Type.......
         switch (tagValue)
         {
-          case 254:
+          case TIFF_TagType.NewSubfileType:
             tag.NewSubfileType = valueOrOffset;
             break;
-          case 256:
+          case TIFF_TagType.ImageWidth:
             tag.ImageWidth = valueOrOffset;
             break;
-          case 257:
+          case TIFF_TagType.ImageLength:
             tag.ImageLength = valueOrOffset;
             break;
-          case 258:
+          case TIFF_TagType.BitsPerSample:
             tag.BitsPerSample = (ushort)valueOrOffset;
             break;
-          case 259:
+          case TIFF_TagType.Compression:
             TIFF_Compression c = valueOrOffset switch
             {
               1 => TIFF_Compression.NoCompression,
@@ -186,7 +189,7 @@ namespace Converter.Parsers.Images.TIFF
             };
             tag.Compression = c;
             break;
-          case 262:
+          case TIFF_TagType.PhotometricInterpretation:
             TIFF_PhotometricInterpretation p = valueOrOffset switch
             {
               >= 0 and <= 4 => (TIFF_PhotometricInterpretation)valueOrOffset,
@@ -194,32 +197,32 @@ namespace Converter.Parsers.Images.TIFF
             };
             tag.PhotometricInterpretation = p;
             break;
-          case 266:
+          case TIFF_TagType.FillOrder:
             if (valueOrOffset < 1 || valueOrOffset > 2)
               throw new InvalidDataException("Invalid fill ordrer tag value!");
             tag.FillOrder = (ushort)valueOrOffset;
             break;
-          case 273:
+          case TIFF_TagType.StripOffsetsPointer:
             // process later
             tag.StripOffsetsPointer = valueOrOffset;
             break;
-          case 274:
+          case TIFF_TagType.Orientation:
             if (valueOrOffset < 1 || valueOrOffset > 8)
               throw new InvalidDataException("Invalid orientation tag value!");
             tag.Orientation = (ushort)valueOrOffset;
             break;
-          case 277:
+          case TIFF_TagType.SamplesPerPixel:
             // not sure if there is any validation here
             tag.SamplesPerPixel = (ushort)valueOrOffset;
             break;
-          case 278:
+          case TIFF_TagType.RowsPerStrip:
             tag.RowsPerStrip = valueOrOffset;
             break;
-          case 279:
+          case TIFF_TagType.StripByteCountsPointer:
             // process later
             tag.StripByteCountsPointer = valueOrOffset;
             break;
-          case 282:
+          case TIFF_TagType.XResolution:
             // this is pointer
             rationalBuffer.Clear();
             file.Stream.Position = valueOrOffset;
@@ -230,7 +233,7 @@ namespace Converter.Parsers.Images.TIFF
             uint denominator = BitConverter.ToUInt32(rationalBuffer.Slice(4, 4));
             tag.XResolution = numerator / (double)denominator;
             break;
-          case 283:
+          case TIFF_TagType.YResolution:
 
             rationalBuffer.Clear();
             file.Stream.Position = valueOrOffset;
@@ -241,12 +244,12 @@ namespace Converter.Parsers.Images.TIFF
             denominator = BitConverter.ToUInt32(rationalBuffer.Slice(4, 4));
             tag.YResolution = numerator / (double)denominator;
             break;
-          case 284:
+          case TIFF_TagType.PlanarConfiguration:
             if (valueOrOffset < 1 || valueOrOffset > 2)
               throw new InvalidDataException("Invalid planar configuration value!");
             tag.PlanarConfiguration = (ushort)valueOrOffset;
             break;
-          case 296:
+          case TIFF_TagType.ResolutionUnit:
             TIFF_ResolutionUnit r = valueOrOffset switch
             {
               1 => TIFF_ResolutionUnit.NoAbsoluteUnitOfMe,
@@ -256,7 +259,7 @@ namespace Converter.Parsers.Images.TIFF
             };
             tag.ResolutionUnit = r;
             break;
-          case 297:
+          case TIFF_TagType.PageNumber:
             // first short in long is pagenubmer, second part is total pages
             ushort pageNumber = (ushort)(valueOrOffset >> 16);
             ushort totalPages = (ushort)valueOrOffset; // can just cutoff

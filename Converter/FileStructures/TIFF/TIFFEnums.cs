@@ -38,6 +38,7 @@
     StripByteCountsPointer = 279,
     XResolution = 282,
     YResolution = 283,
+    PlanarConfiguration = 284,
     ResolutionUnit = 296,
     PageNumber = 297,
     ColorMap = 320
