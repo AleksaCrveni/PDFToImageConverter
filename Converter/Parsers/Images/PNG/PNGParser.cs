@@ -1,11 +1,11 @@
 ﻿using Converter.FileStructures.PNG;
 using Converter.Utils;
 using Converter.Utils.PNG;
+using Microsoft.Extensions.Hosting;
 using System.Buffers;
 using System.Buffers.Binary;
 using System.Diagnostics;
 using System.IO.Compression;
-using System.Numerics;
 
 namespace Converter.Parsers.Images.PNG
 {
@@ -223,28 +223,70 @@ namespace Converter.Parsers.Images.PNG
       }
       else if (file.Interlance == PNG_INTERLANCE.ADAM7)
       {
-
+        throw new NotSupportedException("Interlanced files not supported!");
       }
     } 
 
     public static void UndoFilter(byte filter, Span<byte> currentRow, Span<byte> previousRow, int bytesPerPixel)
     {
-      Debug.Assert(filter == 0);
       switch (filter)
       {
         case (byte)PNG_FILTER.NONE:
           break;
         case (byte)PNG_FILTER.SUB:
+          if (currentRow.Length == 0)
+            return;
+          for (int i = 1; i < currentRow.Length; i++)
+          {
+            currentRow[i] = (byte)(currentRow[i] + currentRow[i - 1]);
+          }
           break;
         case (byte)PNG_FILTER.UP:
+          if (currentRow.Length == 0)
+            return;
+          for (int i = 0; i < currentRow.Length; i++)
+          {
+            currentRow[i] = (byte)(currentRow[i] + previousRow[i]);
+          }
           break;
         case (byte)PNG_FILTER.AVERAGE:
+          if (currentRow.Length == 0)
+            return;
+          currentRow[0] = (byte)(currentRow[0] + (byte)Math.Floor((0 + previousRow[0]) / 2f));
+
+          for (int i = 1; i < currentRow.Length; i++)
+          {
+            currentRow[i] = (byte)(currentRow[i] + (byte)Math.Floor((currentRow[i - 1] + previousRow[i]) / 2f));
+          }
           break;
         case (byte)PNG_FILTER.PAETH:
+          if (currentRow.Length == 0)
+            return;
+          currentRow[0] = (byte)(currentRow[0] + PaethPredictor(0, previousRow[0], 0));
+          for (int i = 1; i < currentRow.Length; i++)
+          {
+            currentRow[i] = (byte)(currentRow[i] + PaethPredictor(currentRow[i - 1], previousRow[0], previousRow[i -1]));
+          }
           break;
         default:
           throw new InvalidDataException("Unknown Filter Type!");
       }
+    }
+    public static byte PaethPredictor(byte a, byte b, byte c)
+    {
+      int p = a + b - c;
+      int pa = Math.Abs(p - a);
+      int pb = Math.Abs(p - b);
+      int pc = Math.Abs(p - c);
+      int Pr = 0;
+      if (pa <= pb && pa <= pc)
+        Pr = a;
+      else if (pb <= pc)
+        Pr = b;
+      else
+        Pr = c;
+
+      return (byte)Pr;
     }
   }
 }
