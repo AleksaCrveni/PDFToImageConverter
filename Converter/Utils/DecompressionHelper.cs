@@ -105,5 +105,13 @@ namespace Converter.Utils
       var compressStream = new MemoryStream(input);
       return new ZLibStream(compressStream, CompressionMode.Decompress);
     }
+    public static ZLibStream GetZLibStreamDecompress(Stream s)
+    {
+      return new ZLibStream(s, CompressionMode.Decompress);
+    }
+    public static DeflateStream GetDeflateStreamDecompress(Stream s)
+    {
+      return new DeflateStream(s, CompressionMode.Decompress);
+    }
   }
 }

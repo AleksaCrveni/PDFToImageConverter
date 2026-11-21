@@ -64,8 +64,10 @@ namespace Converter.Parsers.Images.PNG
 
       PNG_CHUNK_TYPE lastChunk = PNG_CHUNK_TYPE.IHDR;
       bool seenIDAT = false;
+      int IDATCounter = 0;
       uint currCrc = 0;
       bool EOF = false;
+      using MemoryStream IDATFullData = new MemoryStream();
       while (!EOF)
       {
         crc.Reset();
@@ -108,7 +110,17 @@ namespace Converter.Parsers.Images.PNG
             if (seenIDAT && lastChunk != PNG_CHUNK_TYPE.IDAT)
               throw new InvalidDataException("IDAT chunks must appear consecutively!");
             seenIDAT = true;
-            ParseIDAT(file, stream, len, crc);
+            IDATCounter++;
+            byte[] arr = ArrayPool<byte>.Shared.Rent((int)len);
+            bytesRead = stream.Read(arr, 0, (int)len);
+            if (bytesRead != len)
+              throw new InvalidDataException("Invalid IDAT chunk data!");
+            crc.UpdateCRC(arr.AsSpan().Slice(0, (int)len));
+            //ZLibStream zLib = DecompressionHelper.GetZLibStreamDecompress(arr.AsSpan().Slice(0, (int)len).ToArray());
+            //zLib.CopyTo(IDATFullData);
+
+            IDATFullData.Write(arr.AsSpan().Slice(0, (int)len));
+            ArrayPool<byte>.Shared.Return(arr);
             // read next 8 so that can be used
             bytesRead = stream.Read(buffer.Slice(0, 12));
             if (bytesRead != 12)
@@ -116,13 +128,18 @@ namespace Converter.Parsers.Images.PNG
             currCrc = BinaryPrimitives.ReadUInt32BigEndian(buffer.Slice(0, 4));
             break;
           case PNG_CHUNK_TYPE.PLTE:
-           //throw new NotImplementedException();
+            throw new NotImplementedException();
             break;
           case PNG_CHUNK_TYPE.tRNS:
-           // throw new NotImplementedException();
+            throw new NotImplementedException();
             break;
           case PNG_CHUNK_TYPE.NULL:
             throw new InvalidDataException("Unknown chunk!");
+            break;
+          case PNG_CHUNK_TYPE.IEND:
+            IDATFullData.Position = 0;
+            ParseIDAT(file, IDATFullData, (uint)IDATFullData.Length);
+            // process here!
             break;
           default:
             // skip
@@ -177,25 +194,32 @@ namespace Converter.Parsers.Images.PNG
         throw new InvalidDataException("Invalid CRC32 for IHDR chunk!");
     }
 
-    public static void ParseIDAT(PNGFile file, Stream stream, uint len, CRC32Impl crc)
+    public static void ParseIDAT(PNGFile file, Stream stream, uint len)
     {
       // TODO: support uint reads and not just int
       Debug.Assert(len < Int32.MaxValue);
-      byte[] arr = ArrayPool<byte>.Shared.Rent((int)len);
-      int bytesRead = stream.Read(arr, 0, (int)len);
-      if (bytesRead != len)
-        throw new InvalidDataException("Invalid IDAT chunk data!");
-      crc.UpdateCRC(arr.AsSpan().Slice(0, (int)len));
-      ZLibStream zLib = DecompressionHelper.GetZLibStreamDecompress(arr);
-
+      // use stream directly here if possible
       byte bitsPerPixel = PNGHelper.GetBitsPerPixel(file.ColorSheme, file.BitDepth);
       // do we really need this?? We should prob use this for rowSizeCalc
       int bytesPerPixel = PNGHelper.GetBytesPerPixel(bitsPerPixel);
+      byte[] arr = Array.Empty<byte>();
+      using (ZLibStream zlib = DecompressionHelper.GetZLibStreamDecompress(stream))
+      {
+        using (MemoryStream ms = new MemoryStream())
+        {
+          zlib.CopyTo(ms);
+          zlib.Close();
+          arr = ms.ToArray();
+        }
+      }
 
-      uint rowSize = PNGHelper.GetRowSize(bitsPerPixel, file.Width);
+      int rowSize = (int)PNGHelper.GetRowSize(bitsPerPixel, file.Width);
+           
+      Span<byte> buffer = arr.AsSpan();
+
       // maybe we should see if it overflowed and wrapped?
-      byte[] currRow = new byte[rowSize];
-      byte[] prevRow = new byte[rowSize];
+      Span<byte> currRow = buffer.Slice(0, rowSize);
+      Span<byte> prevRow = buffer.Slice(0, rowSize);
 
       byte[] output = new byte[(rowSize - 1) * file.Height];
       if (file.Interlance == PNG_INTERLANCE.NONE)
@@ -206,20 +230,22 @@ namespace Converter.Parsers.Images.PNG
         {
           // Read is limited to int but row can be uint..??
           // TODO: see how to deal with this or just assume row that is over int max value is not valid..?(prob now)
-          bytesRead = zLib.Read(currRow);
-          if (bytesRead != currRow.Length)
-            throw new InvalidDataException("Invalid pixel data row length data!");
 
-          Span<byte> currData = currRow.AsSpan().Slice(1);
-          Span<byte> prevData = prevRow.AsSpan().Slice(1);
+          Span<byte> currData = currRow.Slice(1);
+          Span<byte> prevData = prevRow.Slice(1);
 
           byte filter = currRow[0];
-          UndoFilter(filter, currData, prevData, bytesPerPixel);
-
-          Array.ConstrainedCopy(currRow, 1, output, i * currData.Length, currData.Length);
-          Array.Copy(currRow, prevRow, currRow.Length); // Set currentRow to be prev
+          UndoFilter(filter, currData, prevData, bytesPerPixel, i);
+          currData.CopyTo(output.AsSpan().Slice(i * currData.Length, currData.Length));
+          //Array.ConstrainedCopy(currRow, 1, output, i * currData.Length, currData.Length);
+          if (i + 1 < file.Height)
+          {
+            currRow = buffer.Slice((i + 1) * rowSize, rowSize);
+            prevRow = buffer.Slice(i * rowSize, rowSize);
+          }
+          //Array.Copy(currRow, prevRow, currRow.Length); // Set currentRow to be prev
         }
-        file.RawIDAT = output;
+        file.RawPixelData = output;
       }
       else if (file.Interlance == PNG_INTERLANCE.ADAM7)
       {
@@ -227,7 +253,7 @@ namespace Converter.Parsers.Images.PNG
       }
     } 
 
-    public static void UndoFilter(byte filter, Span<byte> currentRow, Span<byte> previousRow, int bytesPerPixel)
+    public static void UndoFilter(byte filter, Span<byte> currentRow, Span<byte> previousRow, int bytesPerPixel, int rowIndex)
     {
       switch (filter)
       {
@@ -242,7 +268,7 @@ namespace Converter.Parsers.Images.PNG
           }
           break;
         case (byte)PNG_FILTER.UP:
-          if (currentRow.Length == 0)
+          if (currentRow.Length == 0 || rowIndex == 0)
             return;
           for (int i = 0; i < currentRow.Length; i++)
           {
@@ -252,21 +278,43 @@ namespace Converter.Parsers.Images.PNG
         case (byte)PNG_FILTER.AVERAGE:
           if (currentRow.Length == 0)
             return;
-          currentRow[0] = (byte)(currentRow[0] + (byte)Math.Floor((0 + previousRow[0]) / 2f));
-
-          for (int i = 1; i < currentRow.Length; i++)
-          {
-            currentRow[i] = (byte)(currentRow[i] + (byte)Math.Floor((currentRow[i - 1] + previousRow[i]) / 2f));
+          if (rowIndex == 0)
+          {            
+            for (int i = 1; i < currentRow.Length; i++)
+            {
+              currentRow[i] = (byte)(currentRow[i] + (byte)Math.Floor((currentRow[i - 1]) / 2f));
+            }
           }
+          else
+          {
+            currentRow[0] = (byte)(currentRow[0] + (byte)Math.Floor((0 + previousRow[0]) / 2f));
+
+            for (int i = 1; i < currentRow.Length; i++)
+            {
+              currentRow[i] = (byte)(currentRow[i] + (byte)Math.Floor((currentRow[i - 1] + previousRow[i]) / 2f));
+            }
+          }
+          
           break;
         case (byte)PNG_FILTER.PAETH:
           if (currentRow.Length == 0)
             return;
-          currentRow[0] = (byte)(currentRow[0] + PaethPredictor(0, previousRow[0], 0));
-          for (int i = 1; i < currentRow.Length; i++)
+          if (rowIndex == 0)
           {
-            currentRow[i] = (byte)(currentRow[i] + PaethPredictor(currentRow[i - 1], previousRow[0], previousRow[i -1]));
+            for (int i = 1; i < currentRow.Length; i++)
+            {
+              currentRow[i] = (byte)(currentRow[i] + PaethPredictor(currentRow[i - 1], 0, 0));
+            }
           }
+          else
+          {
+            currentRow[0] = (byte)(currentRow[0] + PaethPredictor(0, previousRow[0], 0));
+            for (int i = 1; i < currentRow.Length; i++)
+            {
+              currentRow[i] = (byte)(currentRow[i] + PaethPredictor(currentRow[i - 1], previousRow[0], previousRow[i - 1]));
+            }
+          }
+          
           break;
         default:
           throw new InvalidDataException("Unknown Filter Type!");

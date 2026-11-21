@@ -70,8 +70,8 @@ namespace Converter.Writers.PNG
       byte[] rowBuffer = new byte[rowSize];
       ZLibStream zLib = new ZLibStream(stream, CompressionMode.Compress);
 
-      if (file.RawIDAT != null)
-        WriteSuppliedBuffer(file, zLib, file.RawIDAT, rowBuffer);
+      if (file.RawPixelData != null)
+        WriteSuppliedBuffer(file, zLib, file.RawPixelData, rowBuffer);
       else
         WriteRandomBuffer(file, zLib, rowBuffer);
 

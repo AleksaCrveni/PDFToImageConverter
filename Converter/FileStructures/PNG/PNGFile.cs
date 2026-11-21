@@ -10,7 +10,7 @@
     public PNG_COLOR_SCHEME ColorSheme;
     public PNG_COMPRESSION Compression;
     public PNG_INTERLANCE Interlance;
-    public byte[] RawIDAT;
+    public byte[] RawPixelData;
     public PNG_TRNS TransparencyData;
   }
 
