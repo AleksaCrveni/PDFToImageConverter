@@ -4,7 +4,6 @@
   {
 
     public TIFF_Header Header = new TIFF_Header();
-    public Stream Stream { get; set; }
     // this isn't global since there are more lists, but for now we just parse 1 so keep
     public List<TIFF_DATA> TIFFs { get; set; } = new List<TIFF_DATA>();
     public int TotalPages = -1; // -1 in case its not available

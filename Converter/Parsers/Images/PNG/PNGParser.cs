@@ -14,10 +14,17 @@ namespace Converter.Parsers.Images.PNG
   {
     public static PNGFile Parse(string filename)
     {
+      using (FileStream fs = File.OpenRead(filename))
+      {
+        return Parse(fs);
+      }
+    }
+
+    public static PNGFile Parse(Stream s)
+    {
       PNGFile file = new PNGFile();
-      Stream stream = File.OpenRead(filename);
-      VerifyHeader(stream);
-      ParseChunks(file, stream);
+      VerifyHeader(s);
+      ParseChunks(file, s);
       return file;
     }
     

@@ -13,26 +13,19 @@ namespace Converter.Parsers.Images.TIFF
   
     public static TIFFFile? Parse(string filePath)
     {
-      Stream stream = null;
-      TIFFFile file = null;
-      try
-      {
-        stream = File.OpenRead(filePath);
-        file = new TIFFFile();
-        file.Stream = stream;
-        ParseHeader(file);
-        ParseIFD(file);
-        ParseImageData(file);
-      } 
-      finally
-      {
-        if (stream != null)
-        {
-          stream.Close();
-          stream.Dispose();
-        }
-      }
 
+      using (FileStream fs = File.OpenRead(filePath)) 
+      {
+        return Parse(fs);
+      }
+    }
+
+    public static TIFFFile? Parse(Stream s)
+    {
+      TIFFFile file = new TIFFFile();
+      ParseHeader(file, s);
+      ParseIFD(file, s);
+      ParseImageData(file, s);
       return file;
     }
 
@@ -50,7 +43,7 @@ namespace Converter.Parsers.Images.TIFF
       return null;
     }
     
-    public static void ParseImageData(TIFFFile file)
+    public static void ParseImageData(TIFFFile file, Stream s)
     {
       // First check max stripCount so we can allocate just once and not for each 'image'(IFD)
       uint maxStripCount = 0;
@@ -79,14 +72,14 @@ namespace Converter.Parsers.Images.TIFF
        
 
         // Load strip offsets
-        file.Stream.Position = (long)tag.StripOffsetsPointer;
-        int readBytes = file.Stream.Read(stripOffsetsBuffer);
+        s.Position = (long)tag.StripOffsetsPointer;
+        int readBytes = s.Read(stripOffsetsBuffer);
         if (readBytes != stripOffsetsBuffer.Length)
           throw new InvalidDataException("Invalid strip offsets actual value!");
 
         // Load strip counts
-        file.Stream.Position = (long)tag.StripByteCountsPointer;
-        readBytes = file.Stream.Read(stripCountsBuffer);
+        s.Position = (long)tag.StripByteCountsPointer;
+        readBytes = s.Read(stripCountsBuffer);
         if (readBytes != stripCountsBuffer.Length)
           throw new InvalidDataException("Invalid strip counts actual value!");
 
@@ -94,11 +87,11 @@ namespace Converter.Parsers.Images.TIFF
         if (stripCount == 1)
         {
           uint byteCountVal = BitConverter.ToUInt32(stripCountsBuffer);
-          file.Stream.Position = (long)tag.StripOffsetsPointer;
+          s.Position = (long)tag.StripOffsetsPointer;
           //TODO: have some limit so we don't run out of memory
           // usually file is very large just heap alloc
           byte[] imageDataBuffer = new byte[(int)tag.StripByteCountsPointer];
-          readBytes = file.Stream.Read(imageDataBuffer);
+          readBytes = s.Read(imageDataBuffer);
           if (readBytes != imageDataBuffer.Length)
             throw new InvalidDataException("Invalid strip byte counts value! Unexpected EOS!");
 
@@ -112,7 +105,7 @@ namespace Converter.Parsers.Images.TIFF
         {
           uint offset = BitConverter.ToUInt32(stripOffsetsBuffer.Slice(i, 4));
           uint byteCount = BitConverter.ToUInt32(stripCountsBuffer.Slice(i, 4));
-          if (offset + byteCount > file.Stream.Length)
+          if (offset + byteCount > s.Length)
           {
             throw new Exception("TIF-29");
           }
@@ -120,16 +113,16 @@ namespace Converter.Parsers.Images.TIFF
 
         // JUST FOR DEBUG
         Span<byte> imgRawArr = new byte[BitConverter.ToUInt32(stripCountsBuffer.Slice(stripCountsBuffer.Length - 4, 4)) + (stripCountsBuffer.Length - 4) / 4 * 8192];
-        file.Stream.Position = 8;
-        file.Stream.Read(imgRawArr);
+        s.Position = 8;
+        s.Read(imgRawArr);
       }
     }
 
-    public static void ParseHeader(TIFFFile file)
+    public static void ParseHeader(TIFFFile file, Stream s)
     {
       TIFF_Header header = file.Header;
       Span<byte> buffer = stackalloc byte[8];
-      int readBytes = file.Stream.Read(buffer);
+      int readBytes = s.Read(buffer);
       if (readBytes < 8)
         throw new InvalidCastException("Invalid TIFF File. File too short!");
       // 0 - 1 byte order II for little endian, MM for big endian
@@ -151,12 +144,12 @@ namespace Converter.Parsers.Images.TIFF
       file.Header = header;
     }
     // NoDE => number of directory entries
-    public static void ParseIFD(TIFFFile file)
+    public static void ParseIFD(TIFFFile file, Stream s)
     {
-      file.Stream.Position = file.Header.FirstIFDByteOffset;
+      s.Position = file.Header.FirstIFDByteOffset;
       // alloc separate buffer and then load entire IFD
       Span<byte> NoDEBuffer = stackalloc byte[2];
-      int bytesRead = file.Stream.Read(NoDEBuffer);
+      int bytesRead = s.Read(NoDEBuffer);
       if (bytesRead < 2)
         throw new InvalidDataException("Invalid IFD.");
       short NoDE = BitConverter.ToInt16(NoDEBuffer);
@@ -164,7 +157,7 @@ namespace Converter.Parsers.Images.TIFF
       // * 12 because IFD is 12 bytes long, + 4 for next IFD offset
       int sizeOfAllDirectoryEntries = NoDE * 12 + 4;
       Span<byte> buffer = sizeOfAllDirectoryEntries <= 4 * KB ? stackalloc byte[sizeOfAllDirectoryEntries] : new byte[sizeOfAllDirectoryEntries];
-      int readBytes = file.Stream.Read(buffer);
+      int readBytes = s.Read(buffer);
       if (readBytes < sizeOfAllDirectoryEntries)
         throw new InvalidDataException("Invalid IFD NoDE.");
 
@@ -251,8 +244,8 @@ namespace Converter.Parsers.Images.TIFF
           case TIFF_TagType.XResolution:
             // this is pointer
             rationalBuffer.Clear();
-            file.Stream.Position = valueOrOffset;
-            bytesRead = file.Stream.Read(rationalBuffer);
+            s.Position = valueOrOffset;
+            bytesRead = s.Read(rationalBuffer);
             if (bytesRead != 8)
               throw new InvalidDataException("Invalid rational. Unexpected EOS!");
             uint numerator = BitConverter.ToUInt32(rationalBuffer.Slice(0, 4));
@@ -262,8 +255,8 @@ namespace Converter.Parsers.Images.TIFF
           case TIFF_TagType.YResolution:
 
             rationalBuffer.Clear();
-            file.Stream.Position = valueOrOffset;
-            bytesRead = file.Stream.Read(rationalBuffer);
+            s.Position = valueOrOffset;
+            bytesRead = s.Read(rationalBuffer);
             if (bytesRead != 8)
               throw new InvalidDataException("Invalid rational. Unexpected EOS!");
             numerator = BitConverter.ToUInt32(rationalBuffer.Slice(0, 4));
