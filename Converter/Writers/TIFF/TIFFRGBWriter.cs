@@ -1,10 +1,14 @@
 ﻿using Converter.FileStructures.TIFF;
 using Converter.Utils;
 using System.Diagnostics;
-using System.Security.Principal;
 
 namespace Converter.Writers.TIFF
 {
+  /// <summary>
+  /// TODO(@Aleksa): this writer should really be static(look at PNG reader) and it should be invoked
+  /// by generic ImgWriter (like ImgLoader) where correct writer should be used based on data and passed TAG
+  /// This way we can handle streams better, simplify code and not depend on interfaces and also have it thread safe
+  /// </summary>
   public class TIFFRGBWriter : ITIFFWriter, IDisposable
   {
     Stream _stream;
@@ -91,32 +95,32 @@ namespace Converter.Writers.TIFF
     public void WriteImage(ref PositionIncrBufferWriter writer, ref TIFFWriterOptions options, TIFF_ImgDataMode mode, byte[]? suppliedBuffer = null)
     {
       int pos = 0;
+      uint currStreamOffset = (uint)_stream.Position;
       writer.WriteUnsigned32ToBuffer(ref pos, 8);
 
       data.BitsPerSample = options.BitsPerSample;
       data.SamplesPerPixel = 3;
       ulong byteCount = (uint)options.Width * (uint)options.Height * (uint)data.SamplesPerPixel;
 
-      // write in ~8k Strips
-      // smallest stripsize that can be used where rowsPerStrip will be whole number
-      // get closest number to 8192 that is dividable by 8192 / options.height
       int stripSize = TIFFInternals.DEFAULT_STRIP_SIZE;
 
       TIFFInternals.CalculateStripAndRowInfo(byteCount, options.Height, ref stripSize, out uint stripCount, out int rowsPerStrip, out int remainder);
-      data.StripCount = (int)stripCount;
-      data.RowsPerStrip = (int)rowsPerStrip;
+      data.StripCount = stripCount;
+      data.RowsPerStrip = (uint)rowsPerStrip;
       Debug.Assert(stripCount == 1 && rowsPerStrip == options.Height);
       
+      int NextIFDPositionSize = 4; // position right after the header that refences where IFD is;
       int tagCount = 12;
-      int ifdSectionSize = tagCount * 12;
-      ifdSectionSize += 4; // 4 to zero next IFD
-      ifdSectionSize += 2; // 2 for tagCount on start of IFD
-      data.ImageDataOffset = (int)_stream.Position + ifdSectionSize + 22 + 4; // 22 bytes after ifd and zero section for bits persample, xres and yres and 4 for ifd position at the start
-      data.InitialImageDataOffset = (int)_stream.Position + ifdSectionSize + 22 + 4;
+      int ifdSectionSize = 2 + tagCount * 12 + 4; // 2 for tagCount on the start of IFD, 4 for zero address at the end of IFD
+      // sizes of fields that we point to from IFD , like bits per sample, XRes and YRes
+      int referencedValuesSize = 2 + 2 + 2 + 4 + 4 + 4 + 4; // 22
+
+      data.ImageDataOffset = (uint)(currStreamOffset + ifdSectionSize + referencedValuesSize + NextIFDPositionSize); // 22 bytes after ifd and zero section for bits persample, xres and yres and 4 for ifd position at the start
+      data.InitialImageDataOffset = (uint)(currStreamOffset + ifdSectionSize + referencedValuesSize + NextIFDPositionSize);
       data.StripOffsetsPointer = data.ImageDataOffset;
       data.StripByteCounterOffsets = (uint)byteCount;
 
-      WriteIFD(ref writer, ref options, ref data, ref pos, tagCount);
+      WriteIFD(ref writer, ref options, ref data, ref pos, tagCount, (uint)(currStreamOffset + ifdSectionSize + NextIFDPositionSize));
       // write 4 bytes of 0s for next IFD address
       writer.WriteUnsigned32ToBuffer(ref pos, 0);
       // bitsPerSample - 3 8s in 16 bytes each
@@ -131,9 +135,6 @@ namespace Converter.Writers.TIFF
       // YRes
       writer.WriteUnsigned32ToBuffer(ref pos, 72);
       writer.WriteUnsigned32ToBuffer(ref pos, 1);
-
-
-
 
       _stream.Write(writer._buffer.Slice(0, pos));
       // make this optionable
@@ -160,7 +161,7 @@ namespace Converter.Writers.TIFF
       _stream.Flush();
     }
 
-    private void WriteIFD(ref PositionIncrBufferWriter writer, ref TIFFWriterOptions options, ref TIFF_RGBData data, ref int pos, int tagCount)
+    private void WriteIFD(ref PositionIncrBufferWriter writer, ref TIFFWriterOptions options, ref TIFF_RGBData data, ref int pos, int tagCount, uint endOfIFDGlobalOffset)
     {
       writer.WriteUnsigned16ToBuffer(ref pos, (ushort)tagCount);
 
@@ -169,7 +170,7 @@ namespace Converter.Writers.TIFF
       TIFFInternals.WriteIFDEntryToBuffer(ref writer, ref pos, TIFF_TagType.ImageLength, TIFF_TagSize.SHORT, 1,
         (uint)options.Height);
       TIFFInternals.WriteIFDEntryToBuffer(ref writer, ref pos, TIFF_TagType.BitsPerSample, TIFF_TagSize.SHORT, 3,
-        (uint)(_stream.Position + 6 + tagCount * 12 + 4)); 
+        (uint)(endOfIFDGlobalOffset)); 
       TIFFInternals.WriteIFDEntryToBuffer(ref writer, ref pos, TIFF_TagType.Compression, TIFF_TagSize.SHORT, 1,
         (uint)TIFF_Compression.NoCompression);
       TIFFInternals.WriteIFDEntryToBuffer(ref writer, ref pos, TIFF_TagType.PhotometricInterpretation, TIFF_TagSize.SHORT, 1,
@@ -184,9 +185,9 @@ namespace Converter.Writers.TIFF
         (uint)data.StripByteCounterOffsets);
       // Have to write 2 more entiries so start offsets for rationals will be fs.Position + 6 (2 *12) + 4 + 6 (bitsPersample 3 8's))
       TIFFInternals.WriteIFDEntryToBuffer(ref writer, ref pos, TIFF_TagType.XResolution, TIFF_TagSize.RATIONAL, 1,
-        (uint)(_stream.Position + 6 + tagCount * 12 + 4 + 6));
+        (uint)(endOfIFDGlobalOffset + 6)); // + 6 becase we write 3 ushorts for bits per sample
       TIFFInternals.WriteIFDEntryToBuffer(ref writer, ref pos, TIFF_TagType.YResolution, TIFF_TagSize.RATIONAL, 1,
-        (uint)(_stream.Position + 6 + tagCount * 12 + 4 + 6 + 8));
+        (uint)(endOfIFDGlobalOffset + 6 + 8)); // + 6 +  8 because of bitspersample and then 8 bytes for XResolution
       TIFFInternals.WriteIFDEntryToBuffer(ref writer, ref pos, TIFF_TagType.ResolutionUnit, TIFF_TagSize.SHORT, 1,
         (uint)TIFF_ResolutionUnit.Inch);
     }

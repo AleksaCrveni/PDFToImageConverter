@@ -21,12 +21,12 @@
 
   public struct TIFF_RGBData
   {
-    public int StripOffsetsPointer;
+    public uint StripOffsetsPointer;
     public uint StripByteCounterOffsets;
-    public int ImageDataOffset;
-    public int InitialImageDataOffset;
-    public int StripCount;
-    public int RowsPerStrip;
+    public uint ImageDataOffset;
+    public uint InitialImageDataOffset;
+    public uint StripCount;
+    public uint RowsPerStrip;
     public int BitsPerSample;
     public int SamplesPerPixel;
   }
