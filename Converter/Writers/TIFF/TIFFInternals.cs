@@ -19,16 +19,21 @@ namespace Converter.Writers.TIFF
       writer.WriteUnsigned32ToBuffer(ref pos, valueOrOffset);
     }
 
+    /// <summary>
+    /// fuck strips and offsets and stuff, just write as one strip almost all of the readers read it that way anyway
+    /// </summary>
+    /// <param name="byteCount"></param>
+    /// <param name="height"></param>
+    /// <param name="stripSize"></param>
+    /// <param name="stripCount"></param>
+    /// <param name="rowsPerStrip"></param>
+    /// <param name="remainder"></param>
     public static void CalculateStripAndRowInfo(ulong byteCount, int height, ref int stripSize, out uint stripCount, out int rowsPerStrip, out int remainder)
     {
-      stripSize = stripSize - stripSize % height;
-      stripCount = (uint)(byteCount / (ulong)stripSize);
-      
-      remainder = Convert.ToInt32((uint)byteCount % stripSize);
-      if (remainder > 0)
-        stripCount++;
-
-      rowsPerStrip = height - 1 / (int)stripCount;
+      stripSize = (int)byteCount;
+      rowsPerStrip = height;
+      stripCount = 1;
+      remainder = 0;
     }
 
     // No need to use BufferWriter its ok
@@ -48,14 +53,10 @@ namespace Converter.Writers.TIFF
         writeBuffer[2] = 42;
         writeBuffer[3] = 0;
       }
-      // write IFD after data later
-      writeBuffer[4] = 0;
-      writeBuffer[5] = 0;
-      writeBuffer[6] = 0;
-      writeBuffer[7] = 0;
+     
 
       // maybe dont have to write instantly
-      fs.Write(writeBuffer.Slice(0, 8));
+      fs.Write(writeBuffer.Slice(0, 4));
     }
   }
 }
