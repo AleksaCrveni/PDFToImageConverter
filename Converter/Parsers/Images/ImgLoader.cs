@@ -57,7 +57,7 @@ namespace Converter.Parsers.Images
 
           img.Height = (int)tiff.Metadata.ImageHeight;
           img.Width = (int)tiff.Metadata.ImageWidth;
-          img.BytesPerPixel = (double)(tiff.Metadata.SamplesPerPixel * tiff.Metadata.BitsPerSample);
+          img.BytesPerPixel = (double)(tiff.Metadata.SamplesPerPixel * (tiff.Metadata.BitsPerSample / 8));
           img.BitsPerSample = (int)tiff.Metadata.BitsPerSample;
           img.RawPixels = tiff.RawPixelData;
         }

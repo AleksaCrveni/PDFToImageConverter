@@ -6,7 +6,7 @@
     public TIFF_Header Header = new TIFF_Header();
     // this isn't global since there are more lists, but for now we just parse 1 so keep
     public List<TIFF_DATA> TIFFs { get; set; } = new List<TIFF_DATA>();
-    public int TotalPages = -1; // -1 in case its not available
+    public int TotalPages = 0;
   }
 
   public class TIFF_DATA
@@ -42,7 +42,8 @@
     public TIFF_IFD_DATA() { }
     public TIFF_PhotometricInterpretation? PhotometricInterpretation;
     public TIFF_Compression? Compression = TIFF.TIFF_Compression.NoCompression;
-    public ushort? BitsPerSample;
+    public ushort BitsPerSample;
+    public ushort BitsPerSampleCount;
     public uint ImageHeight; // required
     public uint ImageWidth; // required
     public TIFF_ResolutionUnit ResolutionUnit = TIFF_ResolutionUnit.Inch;
@@ -53,14 +54,16 @@
     public double? YResolution;
     // StripsPerImage = floor ((ImageLength + RowsPerStrip - 1) / RowsPerStrip - use for
     public uint RowsPerStrip;
-    public uint? StripOffsetsPointer;
+    public uint StripOffsetsPointer;
     // required
-    public uint? StripByteCountsPointer;
+    public uint StripByteCountsPointer;
     public uint NewSubfileType = 0;
     public ushort FillOrder = 1;
     public ushort Orientation = 1;
     public ushort SamplesPerPixel = 1;
     public ushort PlanarConfiguration = 1;
     public ushort PageNumber;
+    public int StripOffsetCount;
+    public int StripByteCountCount;
   }
 }
