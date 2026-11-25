@@ -59,4 +59,18 @@ PDF_Options options = new PDF_Options();
 parser.Parse(filePath, ref options);
 </code>
 
-
+# References
+https://www.itu.int/itudoc/itu-t/com16/tiff-fx/docs/tiff6.pdf - Used for implementing TIFF writer/reader
+https://en.wikipedia.org/wiki/PackBits - Used for TIFF PackBits Decompression
+https://pdfa.org/norm-refs/Type1Fonts.pdf - Used for Adobe Type 1 Interpreter
+https://www.w3.org/Graphics/JPEG/itu-t81.pdf - Used for JPEG implementation
+https://github.com/yigolden-oss/JpegLibrary - Used for some parts of JPEG code
+ICC1V42.pdf - Used for ICC parser
+https://opensource.adobe.com/dc-acrobat-sdk-docs/pdfstandards/PDF32000_2008.pdf - Used for implementing PDF parser
+https://pdfa.org/norm-refs/5411.ToUnicode.pdf - used for Adobe font ToUnicode section implementation
+https://www.os2site.com/sw/dev/openwatcom/docs/postscript_level_2_reference_manual.pdf - Used for understanding how PostScript works, since a lot of PDF/Adobe tech is based on that
+https://www.w3.org/TR/png-3/ - Used for PNG Implementation
+https://en.wikipedia.org/wiki/BMP_file_format - Used for BMP implementation
+https://github.com/nothings/stb/blob/master/stb_truetype.h - Main rasterizer source code that was rewritten in C#
+https://nothings.org/gamedev/rasterize/ - Info on how stb_truetype works
+https://developer.apple.com/fonts/TrueType-Reference-Manual/ - TTF specification
