@@ -1,10 +1,6 @@
 ﻿using Converter.FileStructures.General;
-using Converter.FileStructures.TIFF;
 using Converter.Parsers.Images;
-using Converter.Parsers.Images.PNG;
-using Converter.Parsers.Images.TIFF;
 using Converter.Writers;
-using System.Security.Cryptography;
 using System.Text;
 
 if (args == null || args.Length == 0)
@@ -28,23 +24,6 @@ if (args.Length != 2)
 
 string p1 = args[0];
 string p2 = args[1];
-//if (!p1.EndsWith(".tiff") || !p2.EndsWith(".tiff"))
-//{
-//  Console.WriteLine("Only TIFF files supported!");
-//  return 1;
-//}
-
-//if (!File.Exists(p1))
-//{
-//  Console.WriteLine($"File {p1} can't be found!");
-//  return 1;
-//}
-
-//if (!File.Exists(p2))
-//{
-//  Console.WriteLine($"File {p2} can't be found!");
-//  return 1;
-//}
 
 Img img1 = ImgLoader.Load(p1);
 Img img2 = ImgLoader.Load(p2);
