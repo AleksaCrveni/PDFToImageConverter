@@ -3,13 +3,16 @@ using Converter.FileStructures.TIFF;
 using Converter.Parsers.Images;
 using Converter.Parsers.Images.PNG;
 using Converter.Parsers.Images.TIFF;
+using Converter.Writers;
+using System.Security.Cryptography;
+using System.Text;
 
 if (args == null || args.Length == 0)
 {
   args = new string[]
   {
-   "local1",
-   "local2"
+    "W:\\PDFToImageConverter\\Baseline\\sample.pdf.0.NoBGRANoNothing.png",
+    "W:\\PDFToImageConverter\\Baseline\\sample_convertTest.tiff"
   };
 }
 uint marker = 0;
@@ -65,6 +68,7 @@ if (img1.Height != img2.Height ||
 byte[] rawOut = new byte[img1.RawPixels.Length];
 Array.Copy(img1.RawPixels, rawOut, img1.RawPixels.Length);
 int bpp = (int)img1.BytesPerPixel;
+StringBuilder sb = new StringBuilder(); 
 for (int i = 0; i < rawOut.Length; i+= bpp)
 {
   byte R1 = rawOut[i];
@@ -90,10 +94,21 @@ for (int i = 0; i < rawOut.Length; i+= bpp)
     int pix = i == 0 ? 0 : i / bpp;
     int row = pix == 0 ? 0 : (int)(pix / img1.Height);
     int col = pix == 0 ? 0 : (int)(pix % img1.Width );
-    Console.WriteLine($"Diff at pixel {pix}. Row: {row} Col: {col}. R1:{R1} G1:{G1} B1:{B1} A1:{A1} --- R2:{R2} G2:{G2} B2:{B2} A2:{A2}");
+    sb.AppendFormat("Diff at pixel {0}. Row: {1} Col: {2}. R1:{3} G1:{4} B1:{5} A1:{6} --- R2:{7} G2:{8} B2:{9} A2:{10}\n", pix, row, col, R1, G1, B1, A1, R2, G2, B2, A2);
   }
 
 }
+// this is very slow with Terminal on Windows, but its still faster than using WriteLine each time, its 'ok' for now
+Console.Write(sb.ToString());
 
-    
+Img diff = new Img();
+diff.BitsPerSample = img2.BitsPerSample;
+diff.BytesPerPixel = img2.BytesPerPixel;
+diff.Height        = img2.Height;
+diff.Width         = img2.Width;
+diff.Type          = img2.Type;
+diff.RawPixels     = rawOut;
+
+ImgWriter.Write("diff", diff);
+
 return 0;
