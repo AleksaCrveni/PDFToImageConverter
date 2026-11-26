@@ -113,5 +113,15 @@ namespace Converter.Utils
     {
       return new DeflateStream(s, CompressionMode.Decompress);
     }
+
+    /// <summary>
+    /// Apple Macintosh PackBits Compression
+    /// </summary>
+    /// <param name="output"></param>
+    /// <param name="packed"></param>
+    public static void UnpackPackBits(MemoryStream output, Stream packed)
+    {
+      throw new NotImplementedException();
+    }
   }
 }
