@@ -52,16 +52,18 @@ namespace Converter.Parsers.Images.TIFF
         ifd = tiff.Metadata;
         List<uint> stripOffsets;
         List<uint> stripByteCounts;
+        uint totalByteCount = 0;
         if (ifd.StripOffsetCount == 1)
         {
           stripOffsets = new List<uint>(1) { ifd.StripOffsetsPointer };
           stripByteCounts = new List<uint>(1) { ifd.StripByteCountsPointer };
-
+          totalByteCount = ifd.StripByteCountsPointer;
         }
         else
         {
           int offsetBufferSize = ifd.StripOffsetCount * 4;
           int countsBufferSize = ifd.StripByteCountCount * 4;
+          
           Span<byte> stripOffsetsBuffer = new byte[offsetBufferSize];// don't do any smart pre alocc for now, alamost laways there will be 1 TIFF per file, improve later if needed
           Span<byte> stripCountsBuffer = new byte[countsBufferSize];
           // Load strip offsets
@@ -103,23 +105,29 @@ namespace Converter.Parsers.Images.TIFF
             }
             stripOffsets.Add(offset);
             stripByteCounts.Add(byteCount);
+            totalByteCount += byteCount;
           }
         }
 
         if (ifd.Compression != TIFF_Compression.NoCompression)
           throw new NotSupportedException("Decompression not supported yet!");
 
-        using (MemoryStream ms = new MemoryStream())
+        byte[] output = new byte[totalByteCount];
+        totalByteCount = 0;
+
+        //TODO(@Aleksa): Make this work for really large images if needed!
+        for (int i = 0; i < stripOffsets.Count; i++)
         {
-          for (int i = 0; i < stripOffsets.Count; i++)
-          {
-            uint stripOffset = stripOffsets[i];
-            uint byteCount = stripByteCounts[i];
-            s.Position = stripOffset;
-            s.CopyTo(ms, (int)byteCount);
-          }
-          tiff.RawPixelData = ms.ToArray();
+          uint stripOffset = stripOffsets[i];
+          uint byteCount = stripByteCounts[i];
+          s.Position = stripOffset;
+          int readBytes = s.Read(output, (int)totalByteCount, (int)byteCount);
+          if (readBytes != byteCount)
+            throw new InvalidDataException("Unexpected EOF!");
+          totalByteCount += byteCount;
         }
+
+        tiff.RawPixelData = output;
       }
     }
 
@@ -177,7 +185,7 @@ namespace Converter.Parsers.Images.TIFF
       TIFF_DATA tiffData = new TIFF_DATA();
       TIFF_IFD_DATA tag = new TIFF_IFD_DATA();
       TIFF_TagType tagValue = 0;
-      ushort type = 0;
+      TIFF_TagSize type = 0;
       uint count = 0;
       uint valueOrOffset;
       // usedd
@@ -193,16 +201,43 @@ namespace Converter.Parsers.Images.TIFF
         if (file.Header.IsLittleEndian)
         {
           tagValue = (TIFF_TagType)BinaryPrimitives.ReadUInt16LittleEndian(buffer.Slice(i, 2));
-          type = BinaryPrimitives.ReadUInt16LittleEndian(buffer.Slice(i + 2, 2));
+          type = (TIFF_TagSize)BinaryPrimitives.ReadUInt16LittleEndian(buffer.Slice(i + 2, 2));
           count = BinaryPrimitives.ReadUInt32LittleEndian(buffer.Slice(i + 4, 4));
+          // this checks arent really needed for little endian because of byte order but keep it for now to make clear why we are doing it for big endian
+          if (count * (int)type > 4 || type == TIFF_TagSize.LONG) // its pointer so its 4 bytes, but referenced values are size of type
+          {
+            valueOrOffset = BinaryPrimitives.ReadUInt32LittleEndian(buffer.Slice(i + 8, 4));
+          }
+          else if (type == TIFF_TagSize.SHORT)
+          {
+            valueOrOffset = BinaryPrimitives.ReadUInt16LittleEndian(buffer.Slice(i + 8, 2));
+          }
+          else
+          {
+            throw new NotImplementedException();
+          }
+
           valueOrOffset = BinaryPrimitives.ReadUInt32LittleEndian(buffer.Slice(i + 8, 4));
         }
         else
         {
           tagValue = (TIFF_TagType)BinaryPrimitives.ReadUInt16BigEndian(buffer.Slice(i, 2));
-          type = BinaryPrimitives.ReadUInt16BigEndian(buffer.Slice(i + 2, 2));
+          type = (TIFF_TagSize)BinaryPrimitives.ReadUInt16BigEndian(buffer.Slice(i + 2, 2));
           count = BinaryPrimitives.ReadUInt32BigEndian(buffer.Slice(i + 4, 4));
-          valueOrOffset = BinaryPrimitives.ReadUInt32BigEndian(buffer.Slice(i + 8, 4));
+          if (count * (int)type > 4 || type == TIFF_TagSize.LONG) // its pointer so its 4 bytes, but referenced values are size of type
+          {
+            valueOrOffset = BinaryPrimitives.ReadUInt32BigEndian(buffer.Slice(i + 8, 4));
+          }
+          else if (type == TIFF_TagSize.SHORT)
+          {
+            valueOrOffset = BinaryPrimitives.ReadUInt16BigEndian(buffer.Slice(i + 8, 2));
+          }
+          else
+          {
+            throw new NotImplementedException();
+          }
+          
+          
         }
         // make enums for tag values
         // don't do casting because some values can have 0 and some can't and some are required and 
